@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+
+
+<meta name="larp-status-bar" content="black-translucent">
+<meta name="larp-theme-color" content="#000000">
+
+<meta name="format-detection" content="telephone=no">
+<title>Shopify</title>
+<link rel="preload" href="./larp-assets/shopify-mobile/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="./larp-static/shopify-mobile.css">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png"><meta name="theme-color" content="#000000"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Shopify"><script>(function(){var N=navigator,W=window,D=document;if(!(N.standalone===true||(W.matchMedia&&matchMedia("(display-mode: standalone)").matches)))return;if(!/iP(hone|od|ad)|Macintosh/.test(N.userAgent)||!("ontouchend" in D))return;var max=innerHeight,tries=0,busy=0,TR=1;function short(){var h=innerHeight;if(h>max)max=h;if(innerWidth>h)return max-h>4;return max-h>4||screen.height-h>(TR?30:75)}function heal(){if(busy||tries>7||!short())return;var b=D.body;if(!b)return;busy=1;tries++;var keep=[],all=b.getElementsByTagName("*");for(var i=0;i<all.length;i++)if(all[i].scrollTop>0)keep.push([all[i],all[i].scrollTop]);var se=D.scrollingElement,sy=se?se.scrollTop:0,prev=b.style.display;b.style.display="none";void b.offsetHeight;b.style.display=prev;for(var j=0;j<keep.length;j++)keep[j][0].scrollTop=keep[j][1];if(se)se.scrollTop=sy;setTimeout(function(){busy=0;if(innerHeight>max)max=innerHeight},400)}function later(ms){setTimeout(heal,ms)}addEventListener("resize",function(){if(innerHeight>max)max=innerHeight});D.addEventListener("focusout",function(e){var t=e.target;if(t&&(t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.isContentEditable))later(160)});addEventListener("pageshow",function(){later(400)});D.addEventListener("visibilitychange",function(){if(!D.hidden)later(400)});if(D.readyState==="complete")later(600);else addEventListener("load",function(){later(600)})})();</script></head><body>
+<div id="app">
+  <main id="screens">
+    <section class="scr" id="s-home" data-tab="home"></section>
+    <section class="scr" id="s-orders" data-tab="orders"></section>
+    <section class="scr" id="s-products" data-tab="products"></section>
+    <section class="scr" id="s-menu" data-tab="menu"></section>
+  </main>
+  <nav id="tabbar" aria-label="Tabs">
+    <button class="tb-side" data-act="search" aria-label="Search"><i class="ic i-search"></i></button>
+    <div class="tb-pill"><span class="tb-ind"></span><button class="tb" data-tab="home" aria-label="Home"><i class="ic i-tab-home"></i></button><button class="tb" data-tab="orders" aria-label="Orders"><i class="ic i-tab-orders"></i></button><button class="tb" data-tab="products" aria-label="Products"><i class="ic i-tab-products"></i></button><button class="tb" data-tab="menu" aria-label="Menu"><i class="ic i-tab-menu"></i></button></div>
+    <button class="tb-side" data-act="sidekick" aria-label="Sidekick"><i class="ic i-sidekick"></i></button>
+  </nav>
+  <div id="layers"></div>
+  <div id="banner" aria-live="polite"></div>
+  <div id="toast" role="status"></div>
+  <div id="splash"><i class="ic i-bag"></i></div>
+</div>
+<script id="payload" type="application/json">{}</script>
+<script>(function(){var el=document.getElementById("payload");function ok(t){try{var p=JSON.parse(t||"{}");return p&&p.st&&p.d}catch(e){return false}}try{var r=sessionStorage.getItem("checker.shopifyLarp.payload");if(r&&ok(r)){el.textContent=r;return}}catch(e){}try{var x=new XMLHttpRequest();x.open("GET","./shopify-larp-base.json",false);x.send(null);if(x.status===200&&ok(x.responseText))el.textContent=x.responseText}catch(e){}})();</script>
+<script>/* checker.shopifyLarp.payload.bootstrap */(function(){var el=document.getElementById("payload");function ok(t){try{var p=JSON.parse(t||"{}");return !!(p&&p.st&&p.d)}catch(e){return false}}try{var bx=new XMLHttpRequest();bx.open("GET","./shopify-larp-base.json",false);bx.send(null);if((bx.status===200||bx.status===0)&&ok(bx.responseText))sessionStorage.setItem("checker.shopifyLarp.baseRaw",bx.responseText)}catch(e){}function take(store){try{var r=store.getItem("checker.shopifyLarp.payload");if(r&&ok(r)){el.textContent=r;return true}}catch(e){}return false}if(take(sessionStorage))return;try{if(ok(window.__LARP_SAVED_PAYLOAD__)){el.textContent=window.__LARP_SAVED_PAYLOAD__;return}}catch(e){}if(take(localStorage))return;if(el&&ok(el.textContent))return;try{var raw=sessionStorage.getItem("checker.shopifyLarp.baseRaw");if(raw&&ok(raw))el.textContent=raw}catch(e){}})();</script>
+<script src="./larp-assets/shopify-mobile/app.js"></script>
+
+</body></html>
