@@ -501,7 +501,7 @@
     var sc = $("#s-home");
     if (!sc || sc._ptrBound) return;
     sc._ptrBound = true;
-    var THRESH = 64, HOLD = 56, MAXPULL = 120;
+    var THRESH = 100, HOLD = 84, MAXPULL = 180;
     var x0 = null, y0 = null, pull = 0, shift = 0, axis = null, busy = false, spH = 28;
     try { sc.style.overscrollBehaviorY = "contain"; } catch (e) {}
     function ptrEl() { return $("#ptr", sc); }
@@ -519,11 +519,11 @@
       ptr._ios = true;
       if (!document.getElementById("ptr-ios-css")) {
         var st = document.createElement("style"); st.id = "ptr-ios-css";
-        st.textContent = "@keyframes ptrStep{to{transform:rotate(360deg)}}#ptr .ptr-ios.load{animation:ptrStep .9s steps(12) infinite}";
+        st.textContent = "@keyframes ptrStep{to{transform:rotate(360deg)}}#ptr .ptr-ios.load{animation:ptrStep .9s steps(8) infinite}";
         document.head.appendChild(st);
       }
       var sp = "";
-      for (var i = 0; i < 12; i++) sp += '<line x1="12" y1="2" x2="12" y2="7.6" stroke="#d5d8dd" stroke-width="2.1" stroke-linecap="round" transform="rotate(' + (i * 30) + ' 12 12)" opacity="0"/>';
+      for (var i = 0; i < 8; i++) sp += '<line x1="12" y1="2" x2="12" y2="7.6" stroke="#d5d8dd" stroke-width="2.1" stroke-linecap="round" transform="rotate(' + (i * 45) + ' 12 12)" opacity="0"/>';
       ptr.innerHTML = '<svg class="ptr-ios" width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">' + sp + "</svg>";
       ptr.style.width = ptr.style.height = "32px";
       ptr.style.background = "none"; ptr.style.border = "0"; ptr.style.boxShadow = "none"; ptr.style.borderRadius = "0";
@@ -531,8 +531,8 @@
     /* progress 0..1 reveals spokes one by one; loading shows all 12 with a fading tail. */
     function spokes(ptr, progress, loading) {
       var sv = ptr && $(".ptr-ios", ptr); if (!sv) return;
-      var n = loading ? 12 : Math.round(Math.min(1, progress) * 12), L = sv.childNodes;
-      for (var i = 0; i < 12; i++) L[i].setAttribute("opacity", i < n ? (1 - (i / 12) * 0.78).toFixed(2) : "0");
+      var n = loading ? 8 : Math.round(Math.min(1, progress) * 8), L = sv.childNodes;
+      for (var i = 0; i < 8; i++) L[i].setAttribute("opacity", i < n ? (1 - (i / 8) * 0.75).toFixed(2) : "0");
       sv.classList.toggle("load", !!loading);
     }
     function placePtr(ptr) {
@@ -586,7 +586,7 @@
         pull = shift = 0; return;
       }
       pull = dy;
-      shift = MAXPULL * (1 - Math.exp(-pull / 170));
+      shift = MAXPULL * (1 - Math.exp(-pull / 220));
       if (e.cancelable) e.preventDefault(); // stop WKWebView's native rubber-band so only OUR transform moves
       apply(shift);
     }, { passive: false });
