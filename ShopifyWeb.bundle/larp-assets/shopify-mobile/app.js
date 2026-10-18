@@ -513,7 +513,30 @@
       if (sheet) out.push(sheet);
       return out;
     }
+    /* iOS-style activity indicator: 12 spokes, revealed while pulling, stepped rotation while loading. */
+    function ensureSpinner(ptr) {
+      if (!ptr || ptr._ios) return;
+      ptr._ios = true;
+      if (!document.getElementById("ptr-ios-css")) {
+        var st = document.createElement("style"); st.id = "ptr-ios-css";
+        st.textContent = "@keyframes ptrStep{to{transform:rotate(360deg)}}#ptr .ptr-ios.load{animation:ptrStep .9s steps(12) infinite}";
+        document.head.appendChild(st);
+      }
+      var sp = "";
+      for (var i = 0; i < 12; i++) sp += '<line x1="12" y1="2" x2="12" y2="7.6" stroke="#d5d8dd" stroke-width="2.1" stroke-linecap="round" transform="rotate(' + (i * 30) + ' 12 12)" opacity="0"/>';
+      ptr.innerHTML = '<svg class="ptr-ios" width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">' + sp + "</svg>";
+      ptr.style.width = ptr.style.height = "32px";
+      ptr.style.background = "none"; ptr.style.border = "0"; ptr.style.boxShadow = "none"; ptr.style.borderRadius = "0";
+    }
+    /* progress 0..1 reveals spokes one by one; loading shows all 12 with a fading tail. */
+    function spokes(ptr, progress, loading) {
+      var sv = ptr && $(".ptr-ios", ptr); if (!sv) return;
+      var n = loading ? 12 : Math.round(Math.min(1, progress) * 12), L = sv.childNodes;
+      for (var i = 0; i < 12; i++) L[i].setAttribute("opacity", i < n ? (1 - (i / 12) * 0.78).toFixed(2) : "0");
+      sv.classList.toggle("load", !!loading);
+    }
     function placePtr(ptr) {
+      ensureSpinner(ptr);
       var hd = $(".hm-hd", sc);
       if (!ptr || !hd) return;
       var h = ptr.getBoundingClientRect().height; if (h > 4) spH = h;
@@ -531,8 +554,9 @@
       });
       if (ptr) {
         ptr.style.transition = anim ? anim.replace(/transform/, "transform").replace(/ease/, "ease") : "none";
-        ptr.style.opacity = Math.min(1, s / 40);
-        ptr.style.transform = s ? "translate3d(0," + (s / 2 - spH / 2) + "px,0)" + (spin ? "" : " rotate(" + s * 4 + "deg)") : "";
+        ptr.style.opacity = Math.min(1, s / 30);
+        ptr.style.transform = s ? "translate3d(0," + (s / 2 - spH / 2) + "px,0)" : "";
+        if (s) spokes(ptr, s / THRESH, spin);
       }
     }
     function clearInline() {
@@ -572,11 +596,9 @@
       reset();
       if (!go) { drop(); return; }
       busy = true; hap(10);
-      var ptr = ptrEl(); if (ptr) ptr.classList.add("spin");
-      apply(HOLD, "transform .2s ease", true);
+            apply(HOLD, "transform .2s ease", true);
       setTimeout(function () {
         drop(function () {
-          var p = ptrEl(); if (p) p.classList.remove("spin");
           busy = false; renderHome();
         });
       }, 700);
