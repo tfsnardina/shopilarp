@@ -1,137 +1,61 @@
-name: Build ShopifyLarp IPA
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-permissions:
-  contents: write
-jobs:
-  build:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Locate project
-        run: |
-          set -e
-          echo "Fichiers du dépôt :"
-          ls -la
-          # Le projet est directement à la racine du dépôt.
-          if [ -f "project.yml" ]; then
-            PROJECT_DIR="."
-          elif [ -f "ShopifyLarp/project.yml" ]; then
-            PROJECT_DIR="ShopifyLarp"
-          else
-            PROJECT_FILE=$(find . \
-              -not -path './.git/*' \
-              -name project.yml \
-              -print -quit)
-            if [ -z "$PROJECT_FILE" ]; then
-              echo "ERREUR : aucun project.yml trouvé."
-              echo "Le dépôt doit contenir la configuration XcodeGen."
-              exit 1
-            fi
-            PROJECT_DIR=$(dirname "$PROJECT_FILE")
-          fi
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Projet trouvé dans : $PROJECT_DIR"
-      - name: Verify web bundle
-        run: |
-          set -e
-          if [ -f "ShopifyWeb.bundle/index.html" ]; then
-            BUNDLE="$GITHUB_WORKSPACE/ShopifyWeb.bundle"
-          elif [ -f "$PROJECT_DIR/ShopifyWeb.bundle/index.html" ]; then
-            BUNDLE="$GITHUB_WORKSPACE/$PROJECT_DIR/ShopifyWeb.bundle"
-          else
-            echo "ERREUR : ShopifyWeb.bundle/index.html introuvable."
-            echo "Vérifie que le bundle et ses fichiers sont bien dans le dépôt."
-            exit 1
-          fi
-          echo "BUNDLE=$BUNDLE" >> "$GITHUB_ENV"
-          echo "Bundle trouvé : $BUNDLE"
-          find "$BUNDLE" -maxdepth 2 -type f | head -80
-      - name: Install XcodeGen
-        run: brew install xcodegen
       - name: Configure web resources
         run: |
           set -e
+
           cd "$PROJECT_DIR"
-          # Place le bundle à côté du projet XcodeGen.
-          if [ "$BUNDLE" != "$GITHUB_WORKSPACE/$PROJECT_DIR/ShopifyWeb.bundle" ]; then
-            rm -rf ShopifyWeb.bundle
-            cp -R "$BUNDLE" ShopifyWeb.bundle
+
+          echo "Recherche de ShopifyWeb.bundle..."
+          find "$GITHUB_WORKSPACE" \
+            -type f -path '*/ShopifyWeb.bundle/index.html' \
+            -print
+
+          if [ -f "$GITHUB_WORKSPACE/ShopifyWeb.bundle/index.html" ]; then
+            BUNDLE_SOURCE="$GITHUB_WORKSPACE/ShopifyWeb.bundle"
+          elif [ -f "$PROJECT_DIR/ShopifyWeb.bundle/index.html" ]; then
+            BUNDLE_SOURCE="$GITHUB_WORKSPACE/$PROJECT_DIR/ShopifyWeb.bundle"
+          else
+            echo "ERREUR : index.html est introuvable."
+            echo "Vérifie que ShopifyWeb.bundle contient bien index.html."
+            exit 1
           fi
+
+          # Évite de copier le dossier sur lui-même.
+          if [ "$BUNDLE_SOURCE" != "$GITHUB_WORKSPACE/$PROJECT_DIR/ShopifyWeb.bundle" ]; then
+            rm -rf ShopifyWeb.bundle
+            cp -R "$BUNDLE_SOURCE" ShopifyWeb.bundle
+          fi
+
           test -f ShopifyWeb.bundle/index.html
-          # Vérifie que la configuration contient les ressources Web.
+
           python3 - <<'PY'
           from pathlib import Path
           import re
+
           p = Path("project.yml")
           text = p.read_text()
-          if re.search(r'(?m)^\s+resources\s*:', text):
-              if "ShopifyWeb.bundle" not in text:
+
+          if re.search(r'(?m)^  resources\s*:', text):
+              if not re.search(
+                  r'(?m)^\s+-\s+path:\s*ShopifyWeb\.bundle\s*$',
+                  text
+              ):
                   raise SystemExit(
-                      "La section resources existe déjà, "
-                      "mais ShopifyWeb.bundle n'y est pas référencé. "
-                      "Corrige project.yml pour éviter de casser "
-                      "les ressources existantes."
+                      "Ajoute ShopifyWeb.bundle à la section resources "
+                      "de project.yml sans supprimer les ressources existantes."
                   )
-              print("Bundle déjà référencé dans project.yml.")
           else:
-              match = re.search(r'(?m)^(\s{2})sources\s*:', text)
+              match = re.search(r'(?m)^  sources\s*:', text)
               if not match:
-                  raise SystemExit(
-                      "Section sources introuvable dans project.yml. "
-                      "Vérifie la configuration XcodeGen."
-                  )
-              indent = match.group(1)
-              addition = (
-                  f"{indent}resources:\n"
-                  f"{indent}  - path: ShopifyWeb.bundle\n"
+                  raise SystemExit("Section sources introuvable dans project.yml.")
+
+              text = (
+                  text[:match.start()]
+                  + "  resources:\n    - path: ShopifyWeb.bundle\n"
+                  + text[match.start():]
               )
-              text = text[:match.start()] + addition + text[match.start():]
               p.write_text(text)
-              print("ShopifyWeb.bundle ajouté aux ressources.")
+
+          print("Ressources Web configurées.")
           PY
+
           xcodegen generate
-      - name: Build iOS application
-        run: |
-          set -e
-          cd "$PROJECT_DIR"
-          xcodebuild \
-            -project ShopifyLarp.xcodeproj \
-            -scheme ShopifyLarp \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-      - name: Verify bundle in app
-        run: |
-          set -e
-          APP=$(find "$PROJECT_DIR/build/Build/Products/Release-iphoneos" \
-            -maxdepth 1 -name '*.app' -type d -print -quit)
-          test -n "$APP"
-          if [ ! -f "$APP/ShopifyWeb.bundle/index.html" ]; then
-            echo "ERREUR : le bundle n'est pas inclus dans l'application."
-            find "$APP" -maxdepth 3 -print | head -100
-            exit 1
-          fi
-          echo "Bundle correctement intégré : $APP"
-      - name: Package unsigned IPA
-        run: |
-          set -e
-          APP=$(find "$PROJECT_DIR/build/Build/Products/Release-iphoneos" \
-            -maxdepth 1 -name '*.app' -type d -print -quit)
-          test -n "$APP"
-          rm -rf Payload ShopifyLarp-unsigned.ipa
-          mkdir -p Payload
-          cp -R "$APP" Payload/
-          zip -qr ShopifyLarp-unsigned.ipa Payload
-      - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ShopifyLarp-unsigned-ipa
-          path: ShopifyLarp-unsigned.ipa
-          if-no-files-found: error
