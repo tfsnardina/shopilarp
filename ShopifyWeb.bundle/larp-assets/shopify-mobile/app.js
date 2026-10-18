@@ -513,27 +513,28 @@
       if (sheet) out.push(sheet);
       return out;
     }
-    /* iOS-style activity indicator: 12 spokes, revealed while pulling, stepped rotation while loading. */
+    /* iOS-style activity indicator: 8 rounded spokes. While pulling, each spoke fades in smoothly with the
+       gesture; while loading, every spoke runs the same linear fade, phase-shifted (continuous, no stepping). */
     function ensureSpinner(ptr) {
       if (!ptr || ptr._ios) return;
       ptr._ios = true;
       if (!document.getElementById("ptr-ios-css")) {
         var st = document.createElement("style"); st.id = "ptr-ios-css";
-        st.textContent = "@keyframes ptrStep{to{transform:rotate(360deg)}}#ptr .ptr-ios.load{animation:ptrStep .9s steps(8) infinite}";
+        st.textContent = "@keyframes ptrFade{0%{opacity:1}100%{opacity:.14}}" +
+          "#ptr .ptr-ios.load line{animation:ptrFade .8s linear infinite}";
         document.head.appendChild(st);
       }
       var sp = "";
-      for (var i = 0; i < 8; i++) sp += '<line x1="12" y1="2" x2="12" y2="7.6" stroke="#d5d8dd" stroke-width="2.1" stroke-linecap="round" transform="rotate(' + (i * 45) + ' 12 12)" opacity="0"/>';
-      ptr.innerHTML = '<svg class="ptr-ios" width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">' + sp + "</svg>";
+      for (var i = 0; i < 8; i++) sp += '<line x1="16" y1="3.6" x2="16" y2="9.6" stroke="#eceef2" stroke-width="3" stroke-linecap="round" transform="rotate(' + (i * 45) + ' 16 16)" opacity="0" style="animation-delay:' + (-(0.8 - i * 0.1)).toFixed(1) + 's"/>';
+      ptr.innerHTML = '<svg class="ptr-ios" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">' + sp + "</svg>";
       ptr.style.width = ptr.style.height = "32px";
       ptr.style.background = "none"; ptr.style.border = "0"; ptr.style.boxShadow = "none"; ptr.style.borderRadius = "0";
     }
-    /* progress 0..1 reveals spokes one by one; loading shows all 12 with a fading tail. */
     function spokes(ptr, progress, loading) {
       var sv = ptr && $(".ptr-ios", ptr); if (!sv) return;
-      var n = loading ? 8 : Math.round(Math.min(1, progress) * 8), L = sv.childNodes;
-      for (var i = 0; i < 8; i++) L[i].setAttribute("opacity", i < n ? (1 - (i / 8) * 0.75).toFixed(2) : "0");
+      var L = sv.childNodes, k = Math.min(1, progress) * 8;
       sv.classList.toggle("load", !!loading);
+      for (var i = 0; i < 8; i++) L[i].setAttribute("opacity", loading ? 1 : (Math.max(0, Math.min(1, k - i)) * (1 - i * 0.07)).toFixed(2));
     }
     function placePtr(ptr) {
       ensureSpinner(ptr);
