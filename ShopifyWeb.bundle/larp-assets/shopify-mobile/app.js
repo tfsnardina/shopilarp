@@ -491,45 +491,98 @@
       '<circle class="gd" cx="22" cy="24" r="2.4" fill="#36d27a"/><circle class="gd d2" cx="40" cy="30" r="2" fill="#36d27a"/><circle class="gd d3" cx="30" cy="42" r="1.8" fill="#36d27a"/></svg>';
   }
 
-  /* Pull to refresh on Home (spinner over the black header). */
+  /* Pull to refresh on Home.
+     The header (.hm-hd: profile / store / bell) is never transformed: only the
+     content under it (.hm-top children except .ptr + .hm-hd, and .hm-sheet) follows
+     the finger. The spinner sits in the gap opened between the header and the content.
+     Listeners are bound ONCE on the persistent #s-home (renderHome() rebuilds its
+     innerHTML and calls bindPtr() again - re-binding used to stack handlers). */
   function bindPtr() {
-    var sc = $("#s-home"), ptr = $("#ptr"), y0 = null, pull = 0, busy = false;
-    function drop() {
-      sc.style.transition = "transform .28s ease";
-      sc.style.transform = "";
-      ptr.style.transition = "opacity .2s, transform .28s";
-      ptr.style.opacity = 0;
-      ptr.style.transform = "";
-      setTimeout(function () { sc.style.transition = ""; ptr.style.transition = ""; }, 300);
+    var sc = $("#s-home");
+    if (!sc || sc._ptrBound) return;
+    sc._ptrBound = true;
+    var THRESH = 64, HOLD = 56, MAXPULL = 120;
+    var x0 = null, y0 = null, pull = 0, shift = 0, axis = null, busy = false, spH = 28;
+    try { sc.style.overscrollBehaviorY = "contain"; } catch (e) {}
+    function ptrEl() { return $("#ptr", sc); }
+    function bodyEls() {
+      var out = [], top = $(".hm-top", sc), sheet = $(".hm-sheet", sc);
+      if (top) Array.prototype.forEach.call(top.children, function (c) {
+        if (c.id !== "ptr" && !(c.classList && c.classList.contains("hm-hd"))) out.push(c);
+      });
+      if (sheet) out.push(sheet);
+      return out;
     }
+    function placePtr(ptr) {
+      var hd = $(".hm-hd", sc);
+      if (!ptr || !hd) return;
+      var h = ptr.getBoundingClientRect().height; if (h > 4) spH = h;
+      ptr.style.position = "absolute"; ptr.style.left = "50%"; ptr.style.right = "auto";
+      ptr.style.marginLeft = -(ptr.getBoundingClientRect().width || spH) / 2 + "px";
+      ptr.style.top = hd.offsetTop + hd.offsetHeight + "px";
+      ptr.style.bottom = "auto"; ptr.style.zIndex = "1"; ptr.style.pointerEvents = "none";
+    }
+    function apply(s, anim, spin) {
+      var els = bodyEls(), ptr = ptrEl(), t = s ? "translate3d(0," + s + "px,0)" : "";
+      els.forEach(function (el) {
+        el.style.transition = anim || "none";
+        el.style.willChange = s ? "transform" : "";
+        el.style.transform = t;
+      });
+      if (ptr) {
+        ptr.style.transition = anim ? anim.replace(/transform/, "transform").replace(/ease/, "ease") : "none";
+        ptr.style.opacity = Math.min(1, s / 40);
+        ptr.style.transform = s ? "translate3d(0," + (s / 2 - spH / 2) + "px,0)" + (spin ? "" : " rotate(" + s * 4 + "deg)") : "";
+      }
+    }
+    function clearInline() {
+      bodyEls().forEach(function (el) { el.style.transition = ""; el.style.transform = ""; el.style.willChange = ""; });
+      var ptr = ptrEl(); if (ptr) { ptr.style.transition = ""; ptr.style.transform = ""; ptr.style.opacity = ""; }
+    }
+    function drop(done) {
+      apply(0, "transform .3s cubic-bezier(.2,.8,.2,1), opacity .2s");
+      setTimeout(function () { clearInline(); if (done) done(); }, 320);
+    }
+    function reset() { x0 = y0 = null; pull = shift = 0; axis = null; }
     sc.addEventListener("touchstart", function (e) {
-      y0 = sc.scrollTop <= 0 && !busy ? e.touches[0].clientY : null;
-      pull = 0;
-      sc.style.transition = "";
+      if (busy || e.touches.length !== 1 || sc.scrollTop > 0) { reset(); return; }
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; pull = shift = 0; axis = null;
+      placePtr(ptrEl());
     }, { passive: true });
     sc.addEventListener("touchmove", function (e) {
-      if (y0 === null || sc.scrollTop > 0) return;
-      pull = Math.max(0, e.touches[0].clientY - y0);
-      if (pull <= 0) return;
-      var shift = Math.min(64, pull * 0.35);
-      sc.style.transform = "translate3d(0," + shift + "px,0)";
-      ptr.style.opacity = Math.min(1, pull / 80);
-      ptr.style.transform = "translate3d(0," + Math.min(28, shift) + "px,0) rotate(" + pull + "deg)";
-    }, { passive: true });
-    sc.addEventListener("touchend", function () {
       if (y0 === null) return;
-      y0 = null;
-      if (pull < 80) { drop(); return; }
+      var dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
+      if (axis === null) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+        axis = (dy > 0 && Math.abs(dy) > Math.abs(dx) && sc.scrollTop <= 0) ? "y" : "x";
+      }
+      if (axis !== "y") return;
+      if (dy <= 0 || sc.scrollTop > 0) { // finger went back up: hand over to normal scrolling
+        if (shift) apply(0);
+        pull = shift = 0; return;
+      }
+      pull = dy;
+      shift = MAXPULL * (1 - Math.exp(-pull / 170));
+      if (e.cancelable) e.preventDefault(); // stop WKWebView's native rubber-band so only OUR transform moves
+      apply(shift);
+    }, { passive: false });
+    function end() {
+      if (y0 === null || axis !== "y" || !shift) { reset(); return; }
+      var go = shift >= THRESH;
+      reset();
+      if (!go) { drop(); return; }
       busy = true; hap(10);
-      ptr.classList.add("spin");
-      sc.style.transition = "transform .2s ease";
-      sc.style.transform = "translate3d(0,48px,0)";
+      var ptr = ptrEl(); if (ptr) ptr.classList.add("spin");
+      apply(HOLD, "transform .2s ease", true);
       setTimeout(function () {
-        drop();
-        setTimeout(function () { ptr.classList.remove("spin"); busy = false; renderHome(); }, 280);
+        drop(function () {
+          var p = ptrEl(); if (p) p.classList.remove("spin");
+          busy = false; renderHome();
+        });
       }, 700);
-    });
-    sc.addEventListener("touchcancel", function () { y0 = null; pull = 0; drop(); });
+    }
+    sc.addEventListener("touchend", end);
+    sc.addEventListener("touchcancel", function () { var had = shift; reset(); if (had) drop(); });
   }
 
   /* РІвЂќР‚РІвЂќР‚ Orders РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
