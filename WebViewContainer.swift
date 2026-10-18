@@ -271,8 +271,8 @@ final class WebHostViewController: UIViewController {
         web.scrollView.contentInsetAdjustmentBehavior = .never
         web.scrollView.contentInset = .zero
         web.scrollView.scrollIndicatorInsets = .zero
-        web.scrollView.bounces = false
-        web.scrollView.alwaysBounceVertical = false
+        web.scrollView.bounces = true
+        web.scrollView.alwaysBounceVertical = true
         web.scrollView.alwaysBounceHorizontal = false
         web.scrollView.delaysContentTouches = false
         web.navigationDelegate = coordinator
