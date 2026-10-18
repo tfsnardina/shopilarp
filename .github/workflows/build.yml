@@ -4,86 +4,103 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
     runs-on: macos-latest
 
     steps:
-      - name: Télécharger le dépôt
+      # 1. Télécharger le dépôt
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
-      - name: Localiser le projet
+      # 2. Trouver le projet Xcode
+      - name: Locate project
         shell: bash
         run: |
           set -euo pipefail
 
-          PROJECT_FILE="$(find "$GITHUB_WORKSPACE" \
+          echo "Recherche du projet Xcode..."
+
+          PROJECT_YML=$(find "$GITHUB_WORKSPACE" \
             -type f -name project.yml \
             -not -path '*/.git/*' \
-            -print -quit)"
+            -print -quit)
 
-          if [ -z "$PROJECT_FILE" ]; then
-            echo "ERREUR : project.yml introuvable."
-            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -print
+          if [ -z "$PROJECT_YML" ]; then
+            echo "ERREUR : aucun project.yml trouvé."
+            echo "Le dépôt doit contenir les fichiers du projet iOS."
             exit 1
           fi
 
-          PROJECT_DIR="$(dirname "$PROJECT_FILE")"
+          PROJECT_DIR=$(dirname "$PROJECT_YML")
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Projet trouvé : $PROJECT_DIR"
 
-      - name: Vérifier ShopifyWeb.bundle
+      # 3. Vérifier le bundle Web présent dans le dépôt
+      - name: Verify web bundle
         shell: bash
         run: |
           set -euo pipefail
 
-          BUNDLE_INDEX="$(find "$GITHUB_WORKSPACE" \
-            -type f \
-            -path '*/ShopifyWeb.bundle/index.html' \
-            -not -path '*/.git/*' \
-            -print -quit)"
+          echo "Recherche de ShopifyWeb.bundle..."
 
-          if [ -z "$BUNDLE_INDEX" ]; then
+          BUNDLE=$(find "$GITHUB_WORKSPACE" \
+            -type f -path '*/ShopifyWeb.bundle/index.html' \
+            -not -path '*/.git/*' \
+            -print -quit)
+
+          if [ -z "$BUNDLE" ]; then
             echo "ERREUR : ShopifyWeb.bundle/index.html introuvable."
-            echo "Vérifie que le bundle est présent dans le dépôt."
+            echo "Ajoute le bundle directement dans le dépôt GitHub."
             exit 1
           fi
 
-          BUNDLE_SOURCE="$(dirname "$BUNDLE_INDEX")"
-          echo "BUNDLE_SOURCE=$BUNDLE_SOURCE" >> "$GITHUB_ENV"
-          echo "Bundle trouvé : $BUNDLE_SOURCE"
+          BUNDLE_DIR=$(dirname "$BUNDLE")
 
-      - name: Installer XcodeGen
+          echo "Bundle trouvé : $BUNDLE_DIR"
+          echo "BUNDLE_SOURCE=$BUNDLE_DIR" >> "$GITHUB_ENV"
+
+      # 4. Installer XcodeGen
+      - name: Install XcodeGen
         shell: bash
         run: |
           set -euo pipefail
           brew install xcodegen
 
-      - name: Configurer les ressources web
+      # 5. Configurer les ressources Web
+      - name: Configure web resources
         shell: bash
         run: |
           set -euo pipefail
 
-          DEST="$PROJECT_DIR/ShopifyWeb.bundle"
+          mkdir -p "$PROJECT_DIR/ShopifyWeb.bundle"
 
-          if [ "$BUNDLE_SOURCE" != "$DEST" ]; then
-            rm -rf "$DEST"
-            cp -R "$BUNDLE_SOURCE" "$DEST"
+          if [ "$BUNDLE_SOURCE" != "$PROJECT_DIR/ShopifyWeb.bundle" ]; then
+            rm -rf "$PROJECT_DIR/ShopifyWeb.bundle"
+            cp -R "$BUNDLE_SOURCE" "$PROJECT_DIR/ShopifyWeb.bundle"
           fi
 
-          test -f "$DEST/index.html"
-          echo "ShopifyWeb.bundle prêt."
+          test -f "$PROJECT_DIR/ShopifyWeb.bundle/index.html"
 
-      - name: Générer le projet Xcode
+          echo "Bundle Web configuré."
+
+      # 6. Générer le projet Xcode
+      - name: Generate Xcode project
         shell: bash
         run: |
           set -euo pipefail
           cd "$PROJECT_DIR"
           xcodegen generate
 
-      - name: Compiler l’application iOS
+          test -d ShopifyLarp.xcodeproj
+
+      # 7. Compiler l'application
+      - name: Build iOS application
         shell: bash
         run: |
           set -euo pipefail
@@ -94,64 +111,70 @@ jobs:
             -scheme ShopifyLarp \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath "$RUNNER_TEMP/ShopifyLarpBuild" \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Vérifier l’application compilée
+      # 8. Vérifier l'application compilée
+      - name: Verify app and web bundle
         shell: bash
         run: |
           set -euo pipefail
 
-          APP_DIR="$RUNNER_TEMP/ShopifyLarpBuild/Build/Products/Release-iphoneos"
-
-          APP="$(find "$APP_DIR" \
+          APP=$(find "$PROJECT_DIR/build/Build/Products/Release-iphoneos" \
             -maxdepth 1 -type d -name '*.app' \
-            -print -quit)"
+            -print -quit)
 
           if [ -z "$APP" ]; then
             echo "ERREUR : application .app introuvable."
             exit 1
           fi
 
-          if [ -f "$APP/ShopifyWeb.bundle/index.html" ]; then
-            echo "Bundle trouvé dans ShopifyWeb.bundle."
-          elif [ -f "$APP/index.html" ]; then
-            echo "Bundle trouvé à la racine de l'application."
-          elif [ -f "$APP/www/index.html" ]; then
-            echo "Bundle trouvé dans www."
-          else
-            echo "ERREUR : index.html absent de l'application compilée."
-            find "$APP" -name index.html -print
+          if [ ! -f "$APP/ShopifyWeb.bundle/index.html" ]; then
+            echo "ERREUR : le bundle Web n'est pas intégré dans l'application."
+            find "$APP" -maxdepth 3 -print
             exit 1
           fi
 
-          echo "APP_PATH=$APP" >> "$GITHUB_ENV"
+          echo "Application : $APP"
+          echo "Bundle Web intégré."
 
-      - name: Créer l’IPA non signée
+      # 9. Générer directement le fichier IPA
+      - name: Package unsigned IPA
         shell: bash
         run: |
           set -euo pipefail
 
-          mkdir -p "$RUNNER_TEMP/ipa/Payload"
-          cp -R "$APP_PATH" "$RUNNER_TEMP/ipa/Payload/"
+          APP=$(find "$PROJECT_DIR/build/Build/Products/Release-iphoneos" \
+            -maxdepth 1 -type d -name '*.app' \
+            -print -quit)
 
-          cd "$RUNNER_TEMP/ipa"
+          test -n "$APP"
 
-          /usr/bin/zip -qr \
-            "$GITHUB_WORKSPACE/ShopifyLarp-unsigned.ipa" \
-            Payload
+          rm -rf Payload ShopifyLarp-unsigned.ipa
+          mkdir -p Payload
 
-          test -s "$GITHUB_WORKSPACE/ShopifyLarp-unsigned.ipa"
+          cp -R "$APP" Payload/
 
-          echo "IPA créée avec succès."
-          ls -lh "$GITHUB_WORKSPACE/ShopifyLarp-unsigned.ipa"
+          /usr/bin/zip -qry ShopifyLarp-unsigned.ipa Payload
 
-      - name: Publier l’IPA comme artefact
-        uses: actions/upload-artifact@v4
+          test -s ShopifyLarp-unsigned.ipa
+
+          echo "IPA créée : ShopifyLarp-unsigned.ipa"
+          ls -lh ShopifyLarp-unsigned.ipa
+
+      # 10. Publier l'IPA directement dans une GitHub Release
+      - name: Publish IPA release
+        uses: softprops/action-gh-release@v2
         with:
-          name: ShopifyLarp-IPA
-          path: ShopifyLarp-unsigned.ipa
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
+          tag_name: ipa-build-${{ github.run_number }}
+          name: ShopifyLarp IPA Build ${{ github.run_number }}
+          body: |
+            Compilation automatique de ShopifyLarp.
+
+            Fichier : ShopifyLarp-unsigned.ipa
+            Attention : cette IPA n'est pas signée.
+          files: ShopifyLarp-unsigned.ipa
+          fail_on_unmatched_files: true
+          generate_release_notes: false
+          make_latest: false
