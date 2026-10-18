@@ -1,0 +1,48 @@
+
+name: Build ShopifyLarp IPA
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "ShopifyLarp.zip"
+      - ".github/workflows/build.yml"
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract project
+        run: |
+          unzip -o ShopifyLarp.zip -d extracted
+          find extracted -name "*.xcodeproj" -o -name "*.xcworkspace"
+
+      - name: Build app
+        run: |
+          PROJECT=$(find extracted -name "*.xcodeproj" -print -quit)
+          if [ -z "$PROJECT" ]; then
+            echo "Aucun projet Xcode trouvé"
+            exit 1
+          fi
+          xcodebuild -project "$PROJECT" \
+            -scheme "$(basename "$PROJECT" .xcodeproj)" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Package unsigned IPA
+        run: |
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" -print -quit)
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -r ShopifyLarp-unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShopifyLarp-unsigned-ipa
+          path: ShopifyLarp-unsigned.ipa
