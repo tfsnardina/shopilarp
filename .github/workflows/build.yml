@@ -4,49 +4,81 @@ name: Build ShopifyLarp IPA
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-latest
-    steps:
-      - name: Télécharger le dépôt
-        uses: actions/checkout@v4
 
-      - name: Extraire le projet original
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Extract original project
         run: |
-          mkdir source
+          mkdir -p source
           unzip -o ShopifyLarp.zip -d source
           find source -name project.yml -print
 
-      - name: Installer XcodeGen
+      - name: Extract ShopifyWeb.bundle
+        run: |
+          mkdir -p bundle-extract
+          unzip -o ShopifyLarp.zip \
+            'ShopifyLarp/ShopifyWeb.bundle/*' \
+            -d bundle-extract
+
+          test -d bundle-extract/ShopifyLarp/ShopifyWeb.bundle
+
+          rm -rf ShopifyWeb.bundle
+          cp -R bundle-extract/ShopifyLarp/ShopifyWeb.bundle \
+            ./ShopifyWeb.bundle
+
+      - name: Publish bundle to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -f ShopifyWeb.bundle
+          git commit -m "Add ShopifyWeb.bundle resources" || true
+          git push origin HEAD:main
+
+      - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Générer le projet Xcode
+      - name: Generate Xcode project
         run: |
-          cd source
-          PROJECT_DIR=$(find . -name project.yml -print -quit | xargs dirname)
-          cd "$PROJECT_DIR"
+          cd source/ShopifyLarp
           xcodegen generate
 
-      - name: Compiler l'application
+      - name: Build iOS application
         run: |
-          cd source
-          PROJECT_DIR=$(find . -name '*.xcodeproj' -print -quit)
-          xcodebuild -project "$PROJECT_DIR" \
+          cd source/ShopifyLarp
+
+          xcodebuild \
+            -project ShopifyLarp.xcodeproj \
             -scheme ShopifyLarp \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO build
+            CODE_SIGNING_ALLOWED=NO \
+            build
 
-      - name: Créer l'IPA
+      - name: Package unsigned IPA
         run: |
-          APP=$(find source/build/Build/Products/Release-iphoneos -name '*.app' -type d -print -quit)
+          APP=$(find source/ShopifyLarp/build/Build/Products/Release-iphoneos \
+            -maxdepth 1 -name '*.app' -type d -print -quit)
+
           test -n "$APP"
+
           mkdir -p Payload
           cp -R "$APP" Payload/
           zip -qr ShopifyLarp-unsigned.ipa Payload
 
-      - name: Publier l'IPA
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: ShopifyLarp-unsigned-ipa
