@@ -160,17 +160,9 @@ enum WebViewContainer {
             if let host {
                 pushSafeArea(to: webView, insets: host.deviceSafeAreaInsets())
             }
-            let build = WebViewContainer.appBuildLabel().replacingOccurrences(of: " ", with: "")
             webView.evaluateJavaScript(
                 """
                 document.querySelectorAll('a[aria-label="Made with LarpLabs"]').forEach(function(a){a.remove();});
-                (function(){
-                  var id='checker-build-tag';
-                  var el=document.getElementById(id);
-                  if(!el){el=document.createElement('div');el.id=id;document.documentElement.appendChild(el);}
-                  el.textContent='\(build)';
-                  el.style.cssText='position:fixed;top:calc(var(--top,0px) + 2px);right:4px;z-index:99999;font:10px/1.2 -apple-system,sans-serif;color:rgba(255,255,255,.35);pointer-events:none';
-                })();
                 """
             )
         }
