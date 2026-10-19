@@ -552,32 +552,52 @@
       ptr.style.top = hd.offsetTop + hd.offsetHeight + "px";
       ptr.style.bottom = "auto"; ptr.style.zIndex = "1"; ptr.style.pointerEvents = "none";
     }
-    function apply(s, anim, spin) {
-      var els = bodyEls(), ptr = ptrEl(), t = s ? "translate3d(0," + s + "px,0)" : "";
+    /* Everything is driven by ONE requestAnimationFrame spring: the content follows the finger directly while
+       dragging, and on release it glides (velocity preserved, no overshoot) to the hold position / back to 0. */
+    var cur = 0, vel = 0, tgt = 0, raf = 0, last = 0, onDone = null, loading = false;
+    function apply(s) {
+      var els = bodyEls(), ptr = ptrEl(), t = s > 0.05 ? "translate3d(0," + s.toFixed(2) + "px,0)" : "";
       els.forEach(function (el) {
-        el.style.transition = anim || "none";
-        el.style.willChange = s ? "transform" : "";
+        el.style.transition = "none";
+        el.style.willChange = t ? "transform" : "";
         el.style.transform = t;
       });
       if (ptr) {
-        ptr.style.transition = anim ? anim.replace(/transform/, "transform").replace(/ease/, "ease") : "none";
-        ptr.style.opacity = Math.min(1, s / 30);
-        ptr.style.transform = s ? "translate3d(0," + (s / 2 - spH / 2) + "px,0)" : "";
-        if (s) spokes(ptr, s / THRESH, spin);
+        ptr.style.transition = "none";
+        ptr.style.opacity = Math.min(1, s / 30).toFixed(2);
+        ptr.style.transform = t ? "translate3d(0," + (s / 2 - spH / 2).toFixed(2) + "px,0)" : "";
+        if (s > 0.05) spokes(ptr, s / THRESH, loading);
       }
     }
     function clearInline() {
       bodyEls().forEach(function (el) { el.style.transition = ""; el.style.transform = ""; el.style.willChange = ""; });
       var ptr = ptrEl(); if (ptr) { ptr.style.transition = ""; ptr.style.transform = ""; ptr.style.opacity = ""; }
     }
-    function drop(done) {
-      apply(0, "transform .3s cubic-bezier(.2,.8,.2,1), opacity .2s");
-      setTimeout(function () { clearInline(); if (done) done(); }, 320);
+    function stopSpring() { if (raf) cancelAnimationFrame(raf); raf = 0; onDone = null; }
+    function step(t) {
+      var dt = Math.min(0.032, Math.max(0.001, (t - last) / 1000)); last = t;
+      var K = 200, C = 2 * Math.sqrt(K);                       // critically damped: smooth, no bounce
+      vel += (K * (tgt - cur) - C * vel) * dt;
+      cur += vel * dt;
+      if (Math.abs(tgt - cur) < 0.2 && Math.abs(vel) < 3) {
+        cur = tgt; vel = 0; raf = 0; apply(cur);
+        var d = onDone; onDone = null; if (d) d();
+        return;
+      }
+      apply(cur);
+      raf = requestAnimationFrame(step);
     }
+    function springTo(to, done) {
+      tgt = to; onDone = done || null;
+      if (!raf) { last = performance.now(); raf = requestAnimationFrame(step); }
+    }
+    function home(done) { springTo(0, function () { clearInline(); if (done) done(); }); }
     function reset() { x0 = y0 = null; pull = shift = 0; axis = null; }
+    var lastT = 0;
     sc.addEventListener("touchstart", function (e) {
-      if (busy || e.touches.length !== 1 || sc.scrollTop > 0) { reset(); return; }
+      if (busy || raf || e.touches.length !== 1 || sc.scrollTop > 0) { reset(); return; }
       x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; pull = shift = 0; axis = null;
+      cur = vel = 0; loading = false; lastT = 0;
       placePtr(ptrEl());
     }, { passive: true });
     sc.addEventListener("touchmove", function (e) {
@@ -591,29 +611,29 @@
       }
       if (axis !== "y") return;
       if (dy <= 0 || sc.scrollTop > 0) { // finger went back up: hand over to normal scrolling
-        if (shift) apply(0);
+        if (cur) { cur = 0; apply(0); clearInline(); }
         pull = shift = 0; return;
       }
       pull = dy;
-      shift = MAXPULL * (1 - Math.exp(-pull / 220));
+      var ns = MAXPULL * (1 - Math.exp(-pull / 220)), now = e.timeStamp || performance.now();
+      if (lastT && now > lastT) vel = Math.max(-3000, Math.min(3000, (ns - cur) / ((now - lastT) / 1000)));
+      lastT = now; shift = cur = ns;
       if (e.cancelable) e.preventDefault(); // stop WKWebView's native rubber-band so only OUR transform moves
-      apply(shift);
+      apply(cur);
     }, { passive: false });
     function end() {
       if (y0 === null || axis !== "y" || !shift) { reset(); return; }
       var go = shift >= THRESH;
       reset();
-      if (!go) { drop(); return; }
-      busy = true; hap(10);
-            apply(HOLD, "transform .2s ease", true);
+      if (!go) { home(); return; }
+      busy = true; loading = true; hap(10);
+      springTo(HOLD);
       setTimeout(function () {
-        drop(function () {
-          busy = false; renderHome();
-        });
-      }, 700);
+        home(function () { loading = false; busy = false; renderHome(); });
+      }, 800);
     }
     sc.addEventListener("touchend", end);
-    sc.addEventListener("touchcancel", function () { var had = shift; reset(); if (had) drop(); });
+    sc.addEventListener("touchcancel", function () { var had = cur; reset(); if (had) home(); });
   }
 
   /* РІвЂќР‚РІвЂќР‚ Orders РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
