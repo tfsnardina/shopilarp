@@ -1579,7 +1579,19 @@
     setTimeout(gone, 5200);
   }
   function scheduleOrder(first) {
-    // Today's pace sets the gap, kept inside a watchable window.
+    // EXPLODING = spam mode: an order every 0.6-3 s, often in bursts of 1-3.
+    if (S.vibe === "exploding") {
+      var w = first ? 1 : 0.6 + Math.random() * 2.4;
+      setTimeout(function () {
+        if (!document.hidden) {
+          var n = 1 + Math.floor(Math.random() * 3);
+          for (var i = 0; i < n; i++) newOrder();
+        }
+        scheduleOrder(false);
+      }, w * 1000);
+      return;
+    }
+    // Other vibes: today's pace sets the gap, kept inside a watchable window.
     var perDay = Math.max(1, D.o[T - 1] || D.o[T] || 1);
     var mean = Math.max(28, Math.min(240, 86400 / perDay));
     var wait = first ? 7 + Math.random() * 6 : -Math.log(1 - Math.random()) * mean;
