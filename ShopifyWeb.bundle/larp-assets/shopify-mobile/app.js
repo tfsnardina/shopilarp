@@ -88,13 +88,6 @@
   var payouts = P.pay.map(function (x) { return { ts: x[0], amt: x[1], st: x[2], n: x[3], fees: x[4], gross: x[5] }; });
   var HR = { y: P.hr.y, t: P.hr.t };
   var live = P.live;
-  // Start from zero everywhere: no orders, no sales, no customers, no visitors.
-  var PACE = Math.max(1, D.o[T - 1] || D.o[T] || 1); // keeps the pace of new live orders
-  Object.keys(D).forEach(function (k) { if (Array.isArray(D[k])) D[k] = D[k].map(function () { return 0; }); });
-  ["y", "t"].forEach(function (k) { HR[k] = HR[k].map(function (row) { return row.map(function () { return 0; }); }); });
-  Object.keys(live).forEach(function (k) { if (typeof live[k] === "number") live[k] = 0; });
-  orders = []; custs = []; payouts = []; S.payout = 0;
-  prods.forEach(function (p) { p.sold = 0; });
   var unread = 0;
   var notifs = [];
   orders.slice(0, 30).forEach(function (o) { notifs.push({ kind: "order", o: o, ts: o.ts, read: (S.now - o.ts) > 10 * HOUR }); });
@@ -472,7 +465,7 @@
       var k = best.getAttribute("data-met");
       if (k === homeMet) return;
       pickLock = true; setTimeout(function () { pickLock = false; }, 800);
-      hap(6); switchMetric(k, best);
+      hap(6); switchMetric(k, best, true);
     }
     sc.addEventListener("scroll", function () {
       clearTimeout(pt); pt = setTimeout(pick, 140);
@@ -498,7 +491,7 @@
       if (k >= 1) { el.style.scrollSnapType = "x mandatory"; if (el._wrap) el._wrap(); }
     })(t0);
   }
-  function switchMetric(k, src) {
+  function switchMetric(k, src, inPlace) {
     var old = homeMet; if (k === old) return;
     var host = $("#hchart"), mets = $("#mets"), R2 = rangeData(homeRange);
     if (reduce || !host || !host.animate) {
@@ -525,6 +518,7 @@
       var r = oldOn.getBoundingClientRect(), s0 = sc0.getBoundingClientRect(), cs = getComputedStyle(oldOn);
       gInfo = { l: r.left - s0.left + sc0.scrollLeft, t: r.top - s0.top + sc0.scrollTop, w: r.width, h: r.height, br: cs.borderRadius, bg: cs.backgroundColor, bd: cs.borderTopWidth + " solid " + cs.borderTopColor };
     }
+    var srcIdx = inPlace && src ? $$(".met[data-met]", mets).indexOf(src) : -1;
     var oldHTML = host.innerHTML;
     homeMet = k;
     mets.innerHTML = metStrip(R2); bindMetButtons(); layoutStrip();
@@ -533,6 +527,18 @@
       sc.style.scrollSnapType = "none";
       sc.scrollLeft = sl;
       if (getComputedStyle(sc).position === "static") sc.style.position = "relative";
+      if (inPlace && srcIdx >= 0) { // swipe: just select the tile where it already sits, no glide, no loop
+        var nt = $$(".met[data-met]", sc)[srcIdx];
+        if (nt) sc.scrollLeft += nt.getBoundingClientRect().left - sc.getBoundingClientRect().left;
+        requestAnimationFrame(function () { sc.style.scrollSnapType = "x mandatory"; });
+        drawChart(host, R2, homeMet, { h: CH });
+        var oldL0 = document.createElement("div"); oldL0.className = "hc-old";
+        oldL0.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none";
+        oldL0.innerHTML = oldHTML; host.style.position = "relative"; host.style.overflow = "hidden"; host.appendChild(oldL0);
+        oldL0.animate([{ transform: "translate3d(0,0,0)", opacity: 1 }, { transform: "translate3d(" + (-dir * W * 0.55) + "px,0,0)", opacity: 0 }], { duration: MS, easing: EASE, fill: "forwards" }).onfinish = function () { oldL0.remove(); host.style.overflow = ""; };
+        var sv0 = $("svg", host); if (sv0) sv0.animate([{ transform: "translate3d(" + dir * W + "px,0,0)" }, { transform: "translate3d(0,0,0)" }], { duration: MS, easing: EASE });
+        return;
+      }
       // tiles whose width changed (trend line appears/disappears) keep their on-screen position, then glide
       $$(".met[data-met]", sc).forEach(function (t, i) {
         var d = before[i] - t.getBoundingClientRect().left;
@@ -1574,7 +1580,7 @@
   }
   function scheduleOrder(first) {
     // Today's pace sets the gap, kept inside a watchable window.
-    var perDay = PACE;
+    var perDay = Math.max(1, D.o[T - 1] || D.o[T] || 1);
     var mean = Math.max(28, Math.min(240, 86400 / perDay));
     var wait = first ? 7 + Math.random() * 6 : -Math.log(1 - Math.random()) * mean;
     setTimeout(function () { if (!document.hidden) newOrder(); scheduleOrder(false); }, wait * 1000);
