@@ -1578,11 +1578,14 @@
     var gone = function () { b.classList.remove("on"); b.classList.add("out"); setTimeout(function () { b.remove(); }, 450); };
     setTimeout(gone, 5200);
   }
-  function scheduleOrder(first) {
-    // EXPLODING = spam mode: an order every 0.6-3 s, often in bursts of 1-3.
+  function larpVibe() {
     var vibe = S.vibe;
     if (!vibe) { try { vibe = (JSON.parse(localStorage.getItem("checker.settings.shopifyLarp") || "{}") || {}).vibe; } catch (e) { } }
-    if (vibe === "exploding") {
+    return vibe;
+  }
+  function scheduleOrder(first) {
+    // EXPLODING = spam mode: an order every 0.6-3 s, often in bursts of 1-3.
+    if (larpVibe() === "exploding") {
       var w = first ? 1 : 0.6 + Math.random() * 2.4;
       setTimeout(function () {
         if (!document.hidden) {
@@ -1599,16 +1602,26 @@
     var wait = first ? 7 + Math.random() * 6 : -Math.log(1 - Math.random()) * mean;
     setTimeout(function () { if (!document.hidden) newOrder(); scheduleOrder(false); }, wait * 1000);
   }
-  // Visitors right now drift a little.
+  // Visitors right now drift a little (EXPLODING: they climb fast, every ~1.2 s).
+  function showVisitors() {
+    var a = $("#liveN"); if (a) { a.textContent = count(live.visitors); a.parentNode.classList.add("tick"); setTimeout(function () { a.parentNode.classList.remove("tick"); }, 400); }
+    var b = $("#lvN"); if (b) b.textContent = count(live.visitors);
+  }
   setInterval(function () {
     var v = live.visitors;
     if (v <= 0) return;
+    if (larpVibe() === "exploding") {
+      // 88% up (+3 to +3+6% of current), 12% small dip -> strong upward trend
+      if (Math.random() < 0.88) live.visitors = v + 3 + Math.ceil(Math.random() * (3 + v * 0.06));
+      else live.visitors = Math.max(1, v - Math.ceil(Math.random() * Math.max(2, v * 0.02)));
+      showVisitors();
+      return;
+    }
     var d = Math.random() < 0.5 ? -1 : 1;
     if (Math.random() < 0.55) return;
     live.visitors = Math.max(1, v + d * (v > 40 ? Math.ceil(Math.random() * v * 0.04) : 1));
-    var a = $("#liveN"); if (a) { a.textContent = count(live.visitors); a.parentNode.classList.add("tick"); setTimeout(function () { a.parentNode.classList.remove("tick"); }, 400); }
-    var b = $("#lvN"); if (b) b.textContent = count(live.visitors);
-  }, 4200);
+    showVisitors();
+  }, 1200);
 
   /* РІвЂќР‚РІвЂќР‚ Actions РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   function copyText(s) { try { navigator.clipboard.writeText(s); } catch (e) { } toast("Copied"); }
