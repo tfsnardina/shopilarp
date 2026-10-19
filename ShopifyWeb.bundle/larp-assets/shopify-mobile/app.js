@@ -308,6 +308,10 @@
 
   /* РІвЂќР‚РІвЂќР‚ Count-up РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   function countTo(el, from, to, fmt, ms) {
+    el.style.fontVariantNumeric = "tabular-nums";
+    el.style.minWidth = ""; el.textContent = fmt(Math.max(from, to));
+    var fw = el.getBoundingClientRect().width;          // widest text of the animation, measured once
+    if (fw > 0) { el.style.display = "inline-block"; el.style.minWidth = Math.ceil(fw) + "px"; }
     if (reduce || from === to) { el.textContent = fmt(to); return; }
     var st = performance.now(); ms = ms || 900;
     (function step(now) {
@@ -428,9 +432,9 @@
     m.style.display = "flex"; m.style.overflow = "hidden";
     var lv = $(".met.live", m); if (lv) lv.style.flex = "none";
     sc.style.cssText = "flex:1 1 auto;min-width:0;display:flex;align-items:inherit;gap:" + (gap && gap !== "normal" ? gap : "0px") +
-      ";overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain";
-    $$(".met", sc).forEach(function (t) { t.style.flex = "none"; });
-    sc.addEventListener("touchstart", function () { if (sc._glide) { cancelAnimationFrame(sc._glide); sc._glide = 0; } }, { passive: true });
+      ";overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scroll-snap-type:x mandatory";
+    $$(".met", sc).forEach(function (t) { t.style.flex = "none"; t.style.scrollSnapAlign = "start"; t.style.scrollSnapStop = "always"; }); // one tile per swipe
+    sc.addEventListener("touchstart", function () { if (sc._glide) { cancelAnimationFrame(sc._glide); sc._glide = 0; } sc.style.scrollSnapType = "x mandatory"; }, { passive: true });
     var w0 = setWidth(sc);
     if (w0) sc.scrollLeft = w0;                      // rest on the middle copy
     var tm = 0;
@@ -456,12 +460,13 @@
   function glideScroll(el, to, ms) {
     if (el._glide) cancelAnimationFrame(el._glide);
     var from = el.scrollLeft, t0 = performance.now();
-    if (Math.abs(to - from) < 1) return;
+    if (Math.abs(to - from) < 1) { el.style.scrollSnapType = "x mandatory"; return; }
+    el.style.scrollSnapType = "none";                    // snapping would fight our own animation
     (function f(now) {
       var k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
       el.scrollLeft = from + (to - from) * e;
       el._glide = k < 1 ? requestAnimationFrame(f) : 0;
-      if (k >= 1 && el._wrap) el._wrap();
+      if (k >= 1) { el.style.scrollSnapType = "x mandatory"; if (el._wrap) el._wrap(); }
     })(t0);
   }
   function switchMetric(k, src) {
@@ -496,6 +501,7 @@
     mets.innerHTML = metStrip(R2); bindMetButtons(); layoutStrip();
     var sc = $(".mets-sc", mets);
     if (sc) {
+      sc.style.scrollSnapType = "none";
       sc.scrollLeft = sl;
       if (getComputedStyle(sc).position === "static") sc.style.position = "relative";
       // tiles whose width changed (trend line appears/disappears) keep their on-screen position, then glide
@@ -525,7 +531,7 @@
         });
         var to = Math.max(0, Math.min(sc.scrollWidth - sc.clientWidth, nOn.offsetLeft));
         glideScroll(sc, to, MS);
-      }
+      } else sc.style.scrollSnapType = "x mandatory";
     }
     // chart: old layer slides out (parallax + fade), new chart slides in from the side
     drawChart(host, R2, homeMet, { h: CH });
