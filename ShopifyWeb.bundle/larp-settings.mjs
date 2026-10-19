@@ -34,18 +34,18 @@ function cloneData(value) {
 }
 
 export const DEFAULT_SHOPIFY_LARP = {
-  internalName: '123',
-  storeName: "ddhhd's Store",
-  currency: 'USD',
-  country: 'US',
+  internalName: 'Tifiouse',
+  storeName: "Tifiouse's Store",
+  currency: 'EUR',
+  country: 'FR',
   convertFx: true,
-  totalSales: 48000,
-  orders: 340,
-  customers: 290,
-  sessions: 16200,
-  conversionRate: 2.1,
-  returningCustomersPct: 28,
-  payoutBalance: 1240,
+  totalSales: 0,
+  orders: 0,
+  customers: 0,
+  sessions: 0,
+  conversionRate: 0,
+  returningCustomersPct: 0,
+  payoutBalance: 0,
   vibe: 'growing',
   liveOrders: true,
   products: [
@@ -206,6 +206,7 @@ export function applyShopifyLarpSettings(base, settings) {
     scheduled[4] = Math.max(0, scheduled[5] - payoutCents)
   }
   st.pops = settings.liveOrders
+  st.vibe = settings.vibe
   st.now = Date.now()
 
   const salesTarget = moneyToCents(settings.totalSales, settings.currency)
