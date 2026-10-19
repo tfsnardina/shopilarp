@@ -1507,7 +1507,7 @@
   function setBell() { var b = $("#nb"); if (!b) return; b.textContent = unread > 99 ? "99+" : unread; b.hidden = !unread; }
   function weighted(list) { var t = list.reduce(function (a, x) { return a + x[1]; }, 0), r = Math.random() * t; for (var i = 0; i < list.length; i++) { r -= list[i][1]; if (r < 0) return list[i][0]; } return list[0][0]; }
   function newOrder() {
-    var TP = P.tpl || P.ord, src = TP[Math.floor(Math.random() * Math.min(TP.length, 60))];
+    var src = P.ord[Math.floor(Math.random() * Math.min(P.ord.length, 60))];
     if (!src) return;
     var o = mkOrder(src);
     var ts = nowMs();
