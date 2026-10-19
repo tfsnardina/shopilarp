@@ -14,7 +14,7 @@
   // Time runs on from the server's clock, so live orders keep realistic times.
   var t0 = Date.now(), nowMs = function () { return S.now + (Date.now() - t0); };
 
-  /* РІвЂќР‚РІвЂќР‚ Formatting РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Formatting РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function ic(n, c) { return '<i class="ic i-' + n + (c ? " " + c : "") + '"></i>'; }
   function money(c, opt) {
@@ -117,7 +117,7 @@
   }
   var VAT = S.country !== "US" && S.country !== "CA" ? 1 : 0;
 
-  /* РІвЂќР‚РІвЂќР‚ Metrics and ranges РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Metrics and ranges РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   function sum(a, i0, i1) { var s = 0; for (var i = Math.max(0, i0); i <= i1; i++) s += a[i] || 0; return s; }
   function agg(i0, i1) { return { s: sum(D.s, i0, i1), o: sum(D.o, i0, i1), se: sum(D.se, i0, i1), rc: sum(D.rc, i0, i1) }; }
   function aggH(h, a, b) { return { s: sum(h[0], a, b), o: sum(h[1], a, b), se: sum(h[2], a, b), rc: 0 }; }
@@ -306,7 +306,7 @@
     window.addEventListener("mouseup", function () { if (on) end(); });
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Count-up РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Count-up РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   function countTo(el, from, to, fmt, ms) {
     el.style.fontVariantNumeric = "tabular-nums";
     el.style.minWidth = ""; el.textContent = fmt(Math.max(from, to));
@@ -396,7 +396,7 @@
       '<div class="hm-sheet">' +
       '<h2 class="greet"><span>' + greeting() + "</span> Here's your activity</h2>" +
       '<div class="acts">' + cards.join("") + "</div>" +
-      '<div class="pulse"><div class="pl-h"><i class="pl-dot"><i></i></i>Sidekick Pulse<span class="pl-n">1 of ' + pc.length + '</span></div><div class="pl-track" id="pltrack">' +
+      '<div class="pulse"><div class="pl-h"><i class="pl-dot"><i></i></i>Sidekick Pulse</div><div class="pl-track" id="pltrack">' +
       pc.map(function (c) { return '<div class="pl-card"><h3>' + esc(c[0]) + "</h3><p>" + esc(c[1]) + '</p><button class="pl-btn" data-pulse="' + c[3] + '">' + esc(c[2]) + "</button></div>"; }).join("") +
       "</div></div>" +
       topProductsCard() +
@@ -412,8 +412,6 @@
         hap(6); switchMetric(k, b);
       });
     });
-    var track = $("#pltrack");
-    track.addEventListener("scroll", function () { var k = Math.round(track.scrollLeft / track.clientWidth); $(".pl-n", el).textContent = k + 1 + " of " + pc.length; }, { passive: true });
     countIn();
     layoutStrip();
     bindPtr();
@@ -450,7 +448,31 @@
       var W = setWidth(sc); if (!W || sc._glide) return;
       var x = sc.scrollLeft, maxX = sc.scrollWidth - sc.clientWidth;
       if (x < 6 || x > maxX - 6) { wrap(); return; } // about to hit a hard end: re-centre right away
-      clearTimeout(tm); tm = setTimeout(wrap, 120);   // otherwise wait until scrolling settles (keeps iOS momentum)
+      clearTimeout(tm); 
+      tm = setTimeout(function() {
+        wrap();
+        var scRect = sc.getBoundingClientRect();
+        var tiles = $$(".met[data-met]", sc);
+        var activeTile = null;
+        var minDistance = Infinity;
+
+        tiles.forEach(function(t) {
+          var r = t.getBoundingClientRect();
+          var dist = Math.abs((r.left + r.width / 2) - (scRect.left + scRect.width / 2));
+          if (dist < minDistance) {
+            minDistance = dist;
+            activeTile = t;
+          }
+        });
+
+        if (activeTile) {
+          var k = activeTile.getAttribute("data-met");
+          if (k && k !== homeMet) {
+            hap(6);
+            switchMetric(k, activeTile);
+          }
+        }
+      }, 120);   // otherwise wait until scrolling settles (keeps iOS momentum)
     }, { passive: true });
   }
   function setWidth(sc) { // pixel width of one copy of the tiles
@@ -759,7 +781,7 @@
     sc.addEventListener("touchcancel", function () { var had = cur; reset(); if (had) home(); });
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Orders РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Orders РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   var oFilter = "All", oShown = 40, oQuery = "";
   var badge = function (txt, kind) { return '<span class="bdg ' + kind + '">' + esc(txt) + "</span>"; };
   function payBadge(o) {
@@ -811,7 +833,7 @@
   function shipShort(m) { return m === "Express Shipping" ? "Express" : m === "Free Shipping" ? "Economy" : "Standard"; }
   function emptyState(t, s) { return '<div class="empty">' + ic("search") + "<b>" + esc(t) + "</b><span>" + esc(s) + "</span></div>"; }
 
-  /* РІвЂќР‚РІвЂќР‚ Products РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Products РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   var pFilter = "All", pQuery = "";
   function invLine(p) {
     var v = p.vars > 1 ? " \u00b7 " + p.vars + " variants" : "";
@@ -953,7 +975,7 @@
     });
   });
 
-  /* РІвЂќР‚РІвЂќР‚ Layers: pushed pages and sheets РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Layers: pushed pages and sheets РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   var stack = [];
   function push(el, kind) {
     layers.appendChild(el);
@@ -1053,7 +1075,7 @@
     $$(".opt", el).forEach(function (b) { b.addEventListener("click", function () { var v = b.getAttribute("data-o"); hap(6); pop(false); setTimeout(function () { cb(v); }, 180); }); });
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Order page РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Order page РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   function findOrder(n) { for (var i = 0; i < orders.length; i++) if (orders[i].n === n) return orders[i]; return null; }
   function addr(o) { return [esc(o.c ? o.c.name : ""), esc(o.street), esc(o.city + ", " + o.reg + " " + o.zip), esc(countryName())].join("<br>"); }
   function countryName() { return S.cname || { US: "United States", CA: "Canada", GB: "United Kingdom", AU: "Australia", DE: "Germany", FR: "France", NZ: "New Zealand", IE: "Ireland", ES: "Spain", IT: "Italy", NL: "Netherlands", SE: "Sweden", IN: "India", SG: "Singapore", JP: "Japan", BR: "Brazil", MX: "Mexico", AE: "United Arab Emirates" }[S.country] || "United States"; }
@@ -1155,7 +1177,7 @@
     rendered = {}; RENDER[current](); rendered[current] = 1;
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Product page РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Product page РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   function openProduct(i) {
     var p = prods[i]; if (!p) return;
     var vrows = p.vnames.length > 1 ? p.vnames.map(function (v, k) {
@@ -1172,7 +1194,7 @@
     page(body, { cls: "product", actions: '<button class="nb-c" data-act="share" aria-label="Share">' + ic("share") + '</button><button class="nb-c" data-act="prodmore" aria-label="More">' + ic("more") + "</button>" });
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Customers РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Customers РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   function lastOrderOf(c) { for (var i = 0; i < orders.length; i++) if (orders[i].c === c) return orders[i]; return null; }
   function custList() { return custs.slice().sort(function (a, b) { var la = lastOrderOf(a), lb = lastOrderOf(b); return (lb ? lb.ts : b.ts) - (la ? la.ts : a.ts); }); }
   function customersBody() {
@@ -1199,7 +1221,7 @@
   }
   function since(t) { var d = Math.max(1, Math.round((nowMs() - t) / DAY)); return d < 31 ? d + " day" + (d === 1 ? "" : "s") : d < 365 ? Math.round(d / 30) + " month" + (Math.round(d / 30) === 1 ? "" : "s") : Math.round(d / 365) + " year" + (Math.round(d / 365) === 1 ? "" : "s"); }
 
-  /* РІвЂќР‚РІвЂќР‚ Analytics РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Analytics РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   var anRange = "today";
   function openAnalytics() { navigate("analytics"); }
   function drawAnalytics(el) {
@@ -1263,12 +1285,12 @@
     }).join("");
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Live View РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Live View РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   function openLiveView() {
     var R = rangeData("today");
     var el = page('<div class="lvw"><div class="lv-top"><div class="lv-globe" id="lvglobe"></div><div class="lv-now"><span>Visitors right now</span><b id="lvN">' + count(live.visitors) + '</b></div></div>' +
       '<div class="lv-grid"><div><span>Total sales</span><b>' + money(R.tot.s) + "</b></div><div><span>Sessions</span><b>" + count(R.tot.se) + "</b></div><div><span>Orders</span><b>" + count(R.tot.o) + "</b></div><div><span>Page views</span><b>" + count(Math.round(R.tot.se * 3.4)) + "</b></div></div>" +
-      '<div class="an-c"><div class="an-t">Customer behavior</div><div class="beh"><div><span>Active carts</span><b>' + count(live.carts) + "</b></div><div><span>Checking out</span><b>" + count(live.checkingOut) + "</b></div><div><span>Purchased</span><b>" + count(live.purchased) + "</b></div></div></div>" +
+      '<div class="an-c"><div class="an-t">Customer behavior</div><div class="beh"><div><span>Active carts</span><b>" + count(live.carts) + "</b></div><div><span>Checking out</span><b>" + count(live.checkingOut) + "</b></div><div><span>Purchased</span><b>" + count(live.purchased) + "</b></div></div></div>" +
       '<div class="an-c"><div class="an-t">Sessions by location</div>' + locRows() + "</div></div>", { title: "Live View", cls: "liveview", notabs: true });
     globe($("#lvglobe", el));
   }
@@ -1461,7 +1483,7 @@
     return '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="#f4f1ff"/><path d="M8 17c0-7 5.5-11 12-11s12 4 12 11v3H8z" fill="#1e2a5a"/><ellipse cx="20" cy="23" rx="11.5" ry="11" fill="#fff"/><path d="M8.5 20.5h23v6.5H8.5z" fill="#6e3ff3" rx="3"/><circle cx="15" cy="23.6" r="2.6" fill="#fff"/><circle cx="25" cy="23.6" r="2.6" fill="#fff"/><circle cx="15.4" cy="23.8" r="1.2" fill="#1e2a5a"/><circle cx="25.4" cy="23.8" r="1.2" fill="#1e2a5a"/><path d="M17 29.5c1.8 1.3 4.2 1.3 6 0" stroke="#1e2a5a" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>';
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Live orders РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Live orders РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   var audio = null, audioOk = false;
   function unlockAudio() {
     if (audioOk) return;
@@ -1663,7 +1685,7 @@
   }
   function closeSheets() { while (stack.length && stack[stack.length - 1].kind === "sheet") pop(false); }
 
-  /* РІвЂќР‚РІвЂќР‚ Boot РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* РІвЂќР‚РІвЂќР‚ Boot РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   setTab("home");
   // Pre-render the other tabs while idle so the first switch is instant.
   var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 300); };
@@ -1674,4 +1696,3 @@
   if (seen || reduce) sp.remove(); else setTimeout(function () { sp.classList.add("out"); setTimeout(function () { sp.remove(); }, 420); }, 650);
   scheduleOrder(true);
 })();
-
