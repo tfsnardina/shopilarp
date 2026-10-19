@@ -47,7 +47,7 @@ enum NotificationPermission {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = .default
+        content.sound = UNNotificationSound(named: UNNotificationSoundName("cha-ching.caf"))
         let request = UNNotificationRequest(
             identifier: "shopify-order-\(UUID().uuidString)",
             content: content,
