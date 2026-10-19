@@ -40,14 +40,14 @@
   <section>
     <label>Total sales (30d)</label>
     <div class="chips" id="salesChips"></div>
-    <input id="totalSales" type="number" inputmode="decimal" min="0" step="0.01">
+    <input id="totalSales" value="0" type="number" inputmode="decimal" min="0" step="0.01">
     <div class="row">
-      <div><label>Orders</label><input id="orders" type="number" inputmode="numeric"></div>
-      <div><label>Customers</label><input id="customers" type="number" inputmode="numeric"></div>
-      <div><label>Sessions</label><input id="sessions" type="number" inputmode="numeric"></div>
-      <div><label>Conversion %</label><input id="conversionRate" type="number" inputmode="decimal" step="0.1"></div>
-      <div><label>Returning %</label><input id="returningCustomersPct" type="number" inputmode="decimal" step="0.1"></div>
-      <div><label>Payout</label><input id="payoutBalance" type="number" inputmode="decimal" step="0.01"></div>
+      <div><label>Orders</label><input id="orders" value="0" type="number" inputmode="numeric"></div>
+      <div><label>Customers</label><input id="customers" value="0" type="number" inputmode="numeric"></div>
+      <div><label>Sessions</label><input id="sessions" value="0" type="number" inputmode="numeric"></div>
+      <div><label>Conversion %</label><input id="conversionRate" value="0" type="number" inputmode="decimal" step="0.1"></div>
+      <div><label>Returning %</label><input id="returningCustomersPct" value="0" type="number" inputmode="decimal" step="0.1"></div>
+      <div><label>Payout</label><input id="payoutBalance" value="0" type="number" inputmode="decimal" step="0.01"></div>
     </div>
   </section>
   <section>
@@ -160,13 +160,23 @@ window.__LARP_BASE__ = {"st":{"name":"ddhhd's Store","ini":"DS","logo":"","cur":
           var ratio = target / sum;
           for (a = from; a <= last && a < arr.length; a++) arr[a] = Math.max(0, Math.round((arr[a] || 0) * ratio));
         }
-        if (filled('totalSales')) scale(d.s, Math.round(num('totalSales') * factor));
-        if (filled('orders')) scale(d.o, Math.round(num('orders')));
-        if (filled('sessions')) scale(d.se, Math.round(num('sessions')));
-        if (filled('customers')) st.custTotal = Math.round(num('customers'));
+        function zeroAll(arr) { if (!arr) return; for (var z = 0; z < arr.length; z++) arr[z] = 0; }
+        function zeroRow(row) { if (row) for (var z2 = 0; z2 < row.length; z2++) row[z2] = 0; }
+        var zSales = num('totalSales') === 0, zOrders = num('orders') === 0, zSess = num('sessions') === 0, zPay = num('payoutBalance') === 0, zCust = num('customers') === 0;
+        if (zSales) { ['s', 'g', 'dc', 'sh', 'tx', 'rt'].forEach(function (k) { zeroAll(d[k]); }); if (payload.hr) { zeroRow(payload.hr.t && payload.hr.t[0]); zeroRow(payload.hr.y && payload.hr.y[0]); } }
+        if (zOrders) { ['o', 'u', 'rc'].forEach(function (k) { zeroAll(d[k]); }); if (payload.hr) { zeroRow(payload.hr.t && payload.hr.t[1]); zeroRow(payload.hr.y && payload.hr.y[1]); }
+          payload.tpl = payload.tpl || payload.ord || []; payload.ord = []; }
+        if (zSess) { zeroAll(d.se); if (payload.hr) { zeroRow(payload.hr.t && payload.hr.t[2]); zeroRow(payload.hr.y && payload.hr.y[2]); }
+          if (payload.live) Object.keys(payload.live).forEach(function (k) { if (typeof payload.live[k] === 'number') payload.live[k] = 0; }); }
+        if (zCust) { payload.cus = []; st.custTotal = 0; }
+        if (zPay) { payload.pay = []; st.payout = 0; }
+        if (!zSales) scale(d.s, Math.round(num('totalSales') * factor));
+        if (!zOrders) scale(d.o, Math.round(num('orders')));
+        if (!zSess) scale(d.se, Math.round(num('sessions')));
+        if (!zCust) st.custTotal = Math.round(num('customers'));
         var live = field('liveOrders');
         if (live) st.pops = !!live.checked;
-        if (filled('payoutBalance')) {
+        if (!zPay) {
           var cents = Math.round(num('payoutBalance') * factor);
           st.payout = cents;
           var found = null;
@@ -193,7 +203,7 @@ window.__LARP_BASE__ = {"st":{"name":"ddhhd's Store","ini":"DS","logo":"","cur":
             var price = inputs[1] ? Number(inputs[1].value) || 0 : 0;
             var alloc = inputs[2] ? Number(inputs[2].value) || 0 : 0;
             var stock = inputs[3] ? Number(inputs[3].value) || 0 : 0;
-            var sold = Math.max(1, Math.round(orderCount * (alloc / 100) * 1.4));
+            var sold = zOrders ? 0 : Math.max(1, Math.round(orderCount * (alloc / 100) * 1.4));
             pro.push([title, Math.round(price * factor), 0, Math.round(stock), 1, ['Default'], 'Apparel', st.name, 'SKU-' + (1000 + r), 'Active', sold, Date.now() - 86400000 * 30, 233]);
           }
           payload.pro = pro;
