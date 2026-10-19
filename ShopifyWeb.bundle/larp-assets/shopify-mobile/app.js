@@ -503,7 +503,13 @@
     sc._ptrBound = true;
     var THRESH = 100, HOLD = 84, MAXPULL = 180;
     var x0 = null, y0 = null, pull = 0, shift = 0, axis = null, busy = false, spH = 28;
-    try { sc.style.overscrollBehaviorY = "contain"; } catch (e) {}
+    /* "none" (not "contain") is what disables WebKit's rubber-band on every scroller, top AND bottom
+       (no more native bounce moving the header, no black band under the content at the bottom). */
+    if (!document.getElementById("ptr-nobounce-css")) {
+      var nb = document.createElement("style"); nb.id = "ptr-nobounce-css";
+      nb.textContent = "html,body,[id^='s-']{overscroll-behavior-y:none}";
+      document.head.appendChild(nb);
+    }
     function ptrEl() { return $("#ptr", sc); }
     function bodyEls() {
       var out = [], top = $(".hm-top", sc), sheet = $(".hm-sheet", sc);
@@ -578,8 +584,10 @@
       if (y0 === null) return;
       var dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
       if (axis === null) {
-        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-        axis = (dy > 0 && Math.abs(dy) > Math.abs(dx) && sc.scrollTop <= 0) ? "y" : "x";
+        if (dx === 0 && dy === 0) return;
+        /* decide on the very FIRST move: iOS starts its native pan on the first uncancelled touchmove,
+           a later preventDefault would be ignored (that was the whole page bouncing, header included). */
+        axis = (dy > 0 && dy >= Math.abs(dx) && sc.scrollTop <= 0) ? "y" : "x";
       }
       if (axis !== "y") return;
       if (dy <= 0 || sc.scrollTop > 0) { // finger went back up: hand over to normal scrolling
