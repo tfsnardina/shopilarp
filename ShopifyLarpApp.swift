@@ -48,6 +48,8 @@ enum NotificationPermission {
         content.title = title
         content.body = body
         content.sound = UNNotificationSound(named: UNNotificationSoundName("cha-ching.caf"))
+        // Unique thread per order so iOS does not merge them into one group.
+        content.threadIdentifier = UUID().uuidString
         let request = UNNotificationRequest(
             identifier: "shopify-order-\(UUID().uuidString)",
             content: content,
