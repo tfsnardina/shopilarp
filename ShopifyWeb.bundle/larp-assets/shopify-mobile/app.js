@@ -338,7 +338,7 @@
   }
   function metStrip(R) {
     var liveBtn = '<button class="met live" data-act="liveview"><span>Live</span><b><i class="radar"><i></i></i><span id="liveN">' + count(live.visitors) + "</span></b></button>";
-    return liveBtn + '<div class="mets-sc">' + MET_ORDER.map(function (k) {
+    var tiles = MET_ORDER.map(function (k) {
       var M = MET[k], cv = M.v(R.tot), pv = M.v(R.ptot), c = change(cv, pv);
       var on = k === homeMet;
       var dir = c === null || Math.round(c) === 0 ? "fl" : c > 0 ? "up" : "dn";
@@ -348,7 +348,8 @@
       for (var i = 0; i < vals.length; i += step) sp.push(vals.slice(i, i + step).reduce(function (a, b) { return a + b; }, 0));
       return '<button class="met' + (on ? " on" : "") + '" data-met="' + k + '"><span>' + esc(M.t) + '</span><b><span class="mv">' + fmtMet(M.k, cv, true) + "</span>" +
         (on ? "" : sparkSvg(dir === "fl" ? [1, 1] : sp, dir)) + chgHtml(c) + "</b></button>";
-    }).join("") + "</div>";
+    }).join("");
+    return liveBtn + '<div class="mets-sc">' + tiles + tiles + tiles + "</div>"; // 3 copies: the strip loops forever
   }
   function pulseCards() {
     var R30 = rangeData("30d");
@@ -404,7 +405,7 @@
     $$(".met[data-met]", el).forEach(function (b) {
       b.addEventListener("click", function () {
         var k = b.getAttribute("data-met"); if (k === homeMet) { hap(5); $(".hm-top").classList.toggle("fold"); return; }
-        hap(6); switchMetric(k);
+        hap(6); switchMetric(k, b);
       });
     });
     var track = $("#pltrack");
@@ -430,6 +431,27 @@
       ";overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain";
     $$(".met", sc).forEach(function (t) { t.style.flex = "none"; });
     sc.addEventListener("touchstart", function () { if (sc._glide) { cancelAnimationFrame(sc._glide); sc._glide = 0; } }, { passive: true });
+    var w0 = setWidth(sc);
+    if (w0) sc.scrollLeft = w0;                      // rest on the middle copy
+    var tm = 0;
+    function wrap() {                                // identical copies => shifting by one set is invisible
+      var W = setWidth(sc); if (!W || sc._glide) return;
+      var x = sc.scrollLeft, n = x;
+      while (n < W) n += W;
+      while (n >= 2 * W) n -= W;
+      if (Math.abs(n - x) > 0.5) sc.scrollLeft = n;
+    }
+    sc._wrap = wrap;
+    sc.addEventListener("scroll", function () {
+      var W = setWidth(sc); if (!W || sc._glide) return;
+      var x = sc.scrollLeft, maxX = sc.scrollWidth - sc.clientWidth;
+      if (x < 6 || x > maxX - 6) { wrap(); return; } // about to hit a hard end: re-centre right away
+      clearTimeout(tm); tm = setTimeout(wrap, 120);   // otherwise wait until scrolling settles (keeps iOS momentum)
+    }, { passive: true });
+  }
+  function setWidth(sc) { // pixel width of one copy of the tiles
+    var t = $$(".met[data-met]", sc), n = MET_ORDER.length;
+    return t.length >= 2 * n ? t[n].offsetLeft - t[0].offsetLeft : 0;
   }
   function glideScroll(el, to, ms) {
     if (el._glide) cancelAnimationFrame(el._glide);
@@ -439,9 +461,10 @@
       var k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
       el.scrollLeft = from + (to - from) * e;
       el._glide = k < 1 ? requestAnimationFrame(f) : 0;
+      if (k >= 1 && el._wrap) el._wrap();
     })(t0);
   }
-  function switchMetric(k) {
+  function switchMetric(k, src) {
     var old = homeMet; if (k === old) return;
     var host = $("#hchart"), mets = $("#mets"), R2 = rangeData(homeRange);
     if (reduce || !host || !host.animate) {
@@ -450,13 +473,20 @@
     }
     var MS = 460, EASE = "cubic-bezier(.22,.9,.24,1)";
     $$(".hc-old,.met-ghost", $("#s-home")).forEach(function (n) { n.remove(); });
-    var dir = MET_ORDER.indexOf(k) > MET_ORDER.indexOf(old) ? 1 : -1;
     var sc0 = $(".mets-sc", mets), sl = sc0 ? sc0.scrollLeft : 0, W = host.clientWidth || 360;
+    var dir = MET_ORDER.indexOf(k) > MET_ORDER.indexOf(old) ? 1 : -1;
     if (sc0 && sc0._glide) { cancelAnimationFrame(sc0._glide); sc0._glide = 0; }
     // remember where every tile is on screen (FLIP) and what the old highlight pill looks like
-    var before = {}, gInfo = null;
-    $$(".met[data-met]", mets).forEach(function (t) { before[t.getAttribute("data-met")] = t.getBoundingClientRect().left; });
-    var oldOn = $(".met.on", mets);
+    var before = [], gInfo = null;
+    $$(".met[data-met]", mets).forEach(function (t, i) { before[i] = t.getBoundingClientRect().left; });
+    // the highlighted tile that is actually on screen (there are 3 copies)
+    var oldOn = null, scR0 = sc0 ? sc0.getBoundingClientRect() : null;
+    $$(".met.on", mets).forEach(function (t) {
+      var r = t.getBoundingClientRect();
+      if (scR0 && r.right > scR0.left && r.left < scR0.right && (!oldOn || r.left < oldOn.getBoundingClientRect().left)) oldOn = t;
+    });
+    if (!oldOn) oldOn = $(".met.on", mets);
+    if (src && oldOn) dir = src.getBoundingClientRect().left >= oldOn.getBoundingClientRect().left ? 1 : -1;
     if (oldOn && sc0) {
       var r = oldOn.getBoundingClientRect(), s0 = sc0.getBoundingClientRect(), cs = getComputedStyle(oldOn);
       gInfo = { l: r.left - s0.left + sc0.scrollLeft, t: r.top - s0.top + sc0.scrollTop, w: r.width, h: r.height, br: cs.borderRadius, bg: cs.backgroundColor, bd: cs.borderTopWidth + " solid " + cs.borderTopColor };
@@ -469,8 +499,8 @@
       sc.scrollLeft = sl;
       if (getComputedStyle(sc).position === "static") sc.style.position = "relative";
       // tiles whose width changed (trend line appears/disappears) keep their on-screen position, then glide
-      $$(".met[data-met]", sc).forEach(function (t) {
-        var d = before[t.getAttribute("data-met")] - t.getBoundingClientRect().left;
+      $$(".met[data-met]", sc).forEach(function (t, i) {
+        var d = before[i] - t.getBoundingClientRect().left;
         if (Math.abs(d) > 0.5) t.animate([{ transform: "translate3d(" + d + "px,0,0)" }, { transform: "translate3d(0,0,0)" }], { duration: MS, easing: EASE });
       });
       if (gInfo) { // old pill fades out
@@ -479,13 +509,22 @@
         sc.appendChild(g);
         g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: "ease-out", fill: "forwards" }).onfinish = function () { g.remove(); };
       }
-      var nOn = $(".met.on", sc);
+      var copies = $$(".met.on", sc), nOn = null;
+      if (copies.length) { // pick the copy in the travel direction (shortest way round the loop)
+        var best = Infinity;
+        copies.forEach(function (t) {
+          var d = t.offsetLeft - sl;                       // layout position: unaffected by FLIP transforms
+          var score = (dir > 0 ? d < -4 : d > 4) ? Math.abs(d) + 1e5 : Math.abs(d);
+          if (score < best) { best = score; nOn = t; }
+        });
+      }
       if (nOn) { // new pill fades in, strip docks the chosen tile next to Live
-        var nbg = getComputedStyle(nOn).backgroundColor;
-        nOn.animate([{ backgroundColor: "rgba(0,0,0,0)" }, { backgroundColor: nbg }], { duration: 320, easing: "ease-out" });
-        var tl = nOn.offsetLeft; // layout position (unaffected by the FLIP transforms); sc is the offsetParent
-        var to = Math.max(0, Math.min(sc.scrollWidth - sc.clientWidth, tl));
-        glideScroll(sc, to < 6 ? 0 : to, MS);
+        copies.forEach(function (t) {
+          var nbg = getComputedStyle(t).backgroundColor;
+          t.animate([{ backgroundColor: "rgba(0,0,0,0)" }, { backgroundColor: nbg }], { duration: 320, easing: "ease-out" });
+        });
+        var to = Math.max(0, Math.min(sc.scrollWidth - sc.clientWidth, nOn.offsetLeft));
+        glideScroll(sc, to, MS);
       }
     }
     // chart: old layer slides out (parallax + fade), new chart slides in from the side
@@ -504,15 +543,13 @@
     $$(".met[data-met]", $("#s-home")).forEach(function (b) {
       b.addEventListener("click", function () {
         var k = b.getAttribute("data-met"); if (k === homeMet) { hap(5); $(".hm-top").classList.toggle("fold"); return; }
-        hap(6); switchMetric(k);
+        hap(6); switchMetric(k, b);
       });
     });
   }
   function countIn() {
-    var mv = $(".met.on .mv");
-    if (!mv) return;
     var M = MET[homeMet], v = M.v(rangeData(homeRange).tot);
-    countTo(mv, 0, v, function (x) { return fmtMet(M.k, x, true); }, 1000);
+    $$(".met.on .mv").forEach(function (mv) { countTo(mv, 0, v, function (x) { return fmtMet(M.k, x, true); }, 1000); });
   }
   function rangeSheet() {
     optSheet("Date range", RANGES.map(function (r) { return r[1]; }), rangeLabel(homeRange), function (v) {
@@ -1474,14 +1511,13 @@
     if (!$("#s-home").innerHTML) return;
     var R = rangeData(homeRange);
     if (homeRange === "yday") return;
-    var mv = $(".met.on .mv");
-    if (mv) {
+    $$(".met.on .mv").forEach(function (mv) {
       var M = MET[homeMet], to = M.v(R.tot);
       var from = M.v({ s: R.tot.s - o.total, o: R.tot.o - 1, se: R.tot.se - 1, rc: 0 });
       mv.parentNode.parentNode.classList.add("bump");
       setTimeout(function () { mv.parentNode.parentNode.classList.remove("bump"); }, 700);
       countTo(mv, from, to, function (x) { return fmtMet(M.k, x, true); }, 1100);
-    }
+    });
     $$(".met[data-met]:not(.on) .mv").forEach(function (el) { var k = el.closest(".met").getAttribute("data-met"); el.textContent = fmtMet(MET[k].k, MET[k].v(R.tot), true); });
     var host = $("#hchart");
     if (host && host._g) drawChart(host, R, homeMet, { h: CH });
