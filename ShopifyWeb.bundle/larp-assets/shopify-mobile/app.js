@@ -1580,7 +1580,9 @@
   }
   function scheduleOrder(first) {
     // EXPLODING = spam mode: an order every 0.6-3 s, often in bursts of 1-3.
-    if (S.vibe === "exploding") {
+    var vibe = S.vibe;
+    if (!vibe) { try { vibe = (JSON.parse(localStorage.getItem("checker.settings.shopifyLarp") || "{}") || {}).vibe; } catch (e) { } }
+    if (vibe === "exploding") {
       var w = first ? 1 : 0.6 + Math.random() * 2.4;
       setTimeout(function () {
         if (!document.hidden) {
