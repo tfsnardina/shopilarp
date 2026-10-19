@@ -338,7 +338,7 @@
   }
   function metStrip(R) {
     var liveBtn = '<button class="met live" data-act="liveview"><span>Live</span><b><i class="radar"><i></i></i><span id="liveN">' + count(live.visitors) + "</span></b></button>";
-    return liveBtn + MET_ORDER.map(function (k) {
+    return liveBtn + '<div class="mets-sc">' + MET_ORDER.map(function (k) {
       var M = MET[k], cv = M.v(R.tot), pv = M.v(R.ptot), c = change(cv, pv);
       var on = k === homeMet;
       var dir = c === null || Math.round(c) === 0 ? "fl" : c > 0 ? "up" : "dn";
@@ -348,7 +348,7 @@
       for (var i = 0; i < vals.length; i += step) sp.push(vals.slice(i, i + step).reduce(function (a, b) { return a + b; }, 0));
       return '<button class="met' + (on ? " on" : "") + '" data-met="' + k + '"><span>' + esc(M.t) + '</span><b><span class="mv">' + fmtMet(M.k, cv, true) + "</span>" +
         (on ? "" : sparkSvg(dir === "fl" ? [1, 1] : sp, dir)) + chgHtml(c) + "</b></button>";
-    }).join("");
+    }).join("") + "</div>";
   }
   function pulseCards() {
     var R30 = rangeData("30d");
@@ -410,28 +410,33 @@
     var track = $("#pltrack");
     track.addEventListener("scroll", function () { var k = Math.round(track.scrollLeft / track.clientWidth); $(".pl-n", el).textContent = k + 1 + " of " + pc.length; }, { passive: true });
     countIn();
-    pinLive();
+    layoutStrip();
     bindPtr();
   }
   /* Metric switch (Total sales -> Orders -> ...): the chart slides sideways (old one out, new one in) and the
-     metrics strip glides so the chosen tile sits right next to the pinned "Live" tile; the highlight pill cross-fades. */
-  function hScroller() {
-    for (var e = $("#mets"); e && e !== document.body; e = e.parentElement) {
-      if (e.scrollWidth > e.clientWidth + 1 && /(auto|scroll)/.test(getComputedStyle(e).overflowX)) return e;
+     tiles glide inside their own scroller so the chosen tile docks right beside the "Live" tile - which never
+     moves and is never covered, because the tiles are clipped at the scroller edge instead of passing under it. */
+  function layoutStrip() {
+    var m = $("#mets"), sc = $(".mets-sc", m); if (!m || !sc) return;
+    if (!document.getElementById("mets-sc-css")) {
+      var st = document.createElement("style"); st.id = "mets-sc-css";
+      st.textContent = ".mets-sc::-webkit-scrollbar{display:none}";
+      document.head.appendChild(st);
     }
-    return $("#mets");
-  }
-  function pinLive() {
-    var lv = $("#mets .met.live"); if (!lv) return;
-    lv.style.position = "sticky"; lv.style.left = "0"; lv.style.zIndex = "3";
-    lv.style.background = "#000"; lv.style.boxShadow = "12px 0 12px 2px #000";
+    var gap = getComputedStyle(m).columnGap;
+    m.style.display = "flex"; m.style.overflow = "hidden";
+    var lv = $(".met.live", m); if (lv) lv.style.flex = "none";
+    sc.style.cssText = "flex:1 1 auto;min-width:0;display:flex;align-items:inherit;gap:" + (gap && gap !== "normal" ? gap : "0px") +
+      ";overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain";
+    $$(".met", sc).forEach(function (t) { t.style.flex = "none"; });
+    sc.addEventListener("touchstart", function () { if (sc._glide) { cancelAnimationFrame(sc._glide); sc._glide = 0; } }, { passive: true });
   }
   function glideScroll(el, to, ms) {
     if (el._glide) cancelAnimationFrame(el._glide);
     var from = el.scrollLeft, t0 = performance.now();
     if (Math.abs(to - from) < 1) return;
     (function f(now) {
-      var k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 4);
+      var k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
       el.scrollLeft = from + (to - from) * e;
       el._glide = k < 1 ? requestAnimationFrame(f) : 0;
     })(t0);
@@ -440,37 +445,48 @@
     var old = homeMet; if (k === old) return;
     var host = $("#hchart"), mets = $("#mets"), R2 = rangeData(homeRange);
     if (reduce || !host || !host.animate) {
-      homeMet = k; mets.innerHTML = metStrip(R2); bindMetButtons(); pinLive();
+      homeMet = k; mets.innerHTML = metStrip(R2); bindMetButtons(); layoutStrip();
       drawChart(host, R2, homeMet, { anim: true, h: CH }); return;
     }
-    var sc = hScroller(), MS = 460, EASE = "cubic-bezier(.22,.9,.24,1)";
+    var MS = 460, EASE = "cubic-bezier(.22,.9,.24,1)";
     $$(".hc-old,.met-ghost", $("#s-home")).forEach(function (n) { n.remove(); });
     var dir = MET_ORDER.indexOf(k) > MET_ORDER.indexOf(old) ? 1 : -1;
-    var sl = sc.scrollLeft, scR = sc.getBoundingClientRect(), W = host.clientWidth || 360;
-    var oldOn = $(".met.on", mets), gInfo = null;
-    if (oldOn) {
-      var r = oldOn.getBoundingClientRect(), cs = getComputedStyle(oldOn);
-      gInfo = { l: r.left - scR.left + sc.scrollLeft, t: r.top - scR.top + sc.scrollTop, w: r.width, h: r.height, br: cs.borderRadius, bg: cs.backgroundColor, bd: cs.borderTopWidth + " solid " + cs.borderTopColor };
+    var sc0 = $(".mets-sc", mets), sl = sc0 ? sc0.scrollLeft : 0, W = host.clientWidth || 360;
+    if (sc0 && sc0._glide) { cancelAnimationFrame(sc0._glide); sc0._glide = 0; }
+    // remember where every tile is on screen (FLIP) and what the old highlight pill looks like
+    var before = {}, gInfo = null;
+    $$(".met[data-met]", mets).forEach(function (t) { before[t.getAttribute("data-met")] = t.getBoundingClientRect().left; });
+    var oldOn = $(".met.on", mets);
+    if (oldOn && sc0) {
+      var r = oldOn.getBoundingClientRect(), s0 = sc0.getBoundingClientRect(), cs = getComputedStyle(oldOn);
+      gInfo = { l: r.left - s0.left + sc0.scrollLeft, t: r.top - s0.top + sc0.scrollTop, w: r.width, h: r.height, br: cs.borderRadius, bg: cs.backgroundColor, bd: cs.borderTopWidth + " solid " + cs.borderTopColor };
     }
     var oldHTML = host.innerHTML;
     homeMet = k;
-    mets.innerHTML = metStrip(R2); bindMetButtons(); pinLive();
-    sc.scrollLeft = sl;
-    if (getComputedStyle(sc).position === "static") sc.style.position = "relative";
-    // old pill fades out, new pill fades in
-    if (gInfo) {
-      var g = document.createElement("div"); g.className = "met-ghost";
-      g.style.cssText = "position:absolute;pointer-events:none;z-index:1;box-sizing:border-box;left:" + gInfo.l + "px;top:" + gInfo.t + "px;width:" + gInfo.w + "px;height:" + gInfo.h + "px;border-radius:" + gInfo.br + ";background:" + gInfo.bg + ";border:" + gInfo.bd;
-      sc.appendChild(g);
-      g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: "ease-out", fill: "forwards" }).onfinish = function () { g.remove(); };
-    }
-    var nOn = $(".met.on", mets), live = $(".met.live", mets);
-    if (nOn) {
-      var nbg = getComputedStyle(nOn).backgroundColor;
-      nOn.animate([{ backgroundColor: "rgba(0,0,0,0)" }, { backgroundColor: nbg }], { duration: 320, easing: "ease-out" });
-      var tl = nOn.getBoundingClientRect().left - sc.getBoundingClientRect().left + sc.scrollLeft;
-      var to = Math.max(0, Math.min(sc.scrollWidth - sc.clientWidth, tl - (live ? live.getBoundingClientRect().width : 0) - 4));
-      glideScroll(sc, to < 12 ? 0 : to, MS);
+    mets.innerHTML = metStrip(R2); bindMetButtons(); layoutStrip();
+    var sc = $(".mets-sc", mets);
+    if (sc) {
+      sc.scrollLeft = sl;
+      if (getComputedStyle(sc).position === "static") sc.style.position = "relative";
+      // tiles whose width changed (trend line appears/disappears) keep their on-screen position, then glide
+      $$(".met[data-met]", sc).forEach(function (t) {
+        var d = before[t.getAttribute("data-met")] - t.getBoundingClientRect().left;
+        if (Math.abs(d) > 0.5) t.animate([{ transform: "translate3d(" + d + "px,0,0)" }, { transform: "translate3d(0,0,0)" }], { duration: MS, easing: EASE });
+      });
+      if (gInfo) { // old pill fades out
+        var g = document.createElement("div"); g.className = "met-ghost";
+        g.style.cssText = "position:absolute;pointer-events:none;z-index:0;box-sizing:border-box;left:" + gInfo.l + "px;top:" + gInfo.t + "px;width:" + gInfo.w + "px;height:" + gInfo.h + "px;border-radius:" + gInfo.br + ";background:" + gInfo.bg + ";border:" + gInfo.bd;
+        sc.appendChild(g);
+        g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: "ease-out", fill: "forwards" }).onfinish = function () { g.remove(); };
+      }
+      var nOn = $(".met.on", sc);
+      if (nOn) { // new pill fades in, strip docks the chosen tile next to Live
+        var nbg = getComputedStyle(nOn).backgroundColor;
+        nOn.animate([{ backgroundColor: "rgba(0,0,0,0)" }, { backgroundColor: nbg }], { duration: 320, easing: "ease-out" });
+        var tl = nOn.offsetLeft; // layout position (unaffected by the FLIP transforms); sc is the offsetParent
+        var to = Math.max(0, Math.min(sc.scrollWidth - sc.clientWidth, tl));
+        glideScroll(sc, to < 6 ? 0 : to, MS);
+      }
     }
     // chart: old layer slides out (parallax + fade), new chart slides in from the side
     drawChart(host, R2, homeMet, { h: CH });
@@ -502,7 +518,7 @@
     optSheet("Date range", RANGES.map(function (r) { return r[1]; }), rangeLabel(homeRange), function (v) {
       RANGES.forEach(function (r) { if (r[1] === v) homeRange = r[0]; });
       var R = rangeData(homeRange);
-      $("#mets").innerHTML = metStrip(R); bindMetButtons(); pinLive();
+      $("#mets").innerHTML = metStrip(R); bindMetButtons(); layoutStrip();
       $("#rngL").textContent = rangeShort(homeRange);
       drawChart($("#hchart"), R, homeMet, { anim: true, h: CH });
       countIn();
