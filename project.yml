@@ -15,12 +15,15 @@ targets:
           - ShopifyWeb.bundle/**
           - Assets.xcassets/**
           - project.yml
+          - cha-ching.caf
           - "*.md"
           - sync-www.ps1
           - .git/**
           - .github/**
           - scripts/**
       - path: Assets.xcassets
+      - path: cha-ching.caf
+        buildPhase: resources
       - path: ShopifyWeb.bundle
         type: folder
         buildPhase: resources
