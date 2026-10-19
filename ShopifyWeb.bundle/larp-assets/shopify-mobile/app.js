@@ -404,27 +404,91 @@
     $$(".met[data-met]", el).forEach(function (b) {
       b.addEventListener("click", function () {
         var k = b.getAttribute("data-met"); if (k === homeMet) { hap(5); $(".hm-top").classList.toggle("fold"); return; }
-        hap(6); homeMet = k;
-        var R2 = rangeData(homeRange);
-        $("#mets").innerHTML = metStrip(R2);
-        bindMetButtons();
-        drawChart($("#hchart"), R2, homeMet, { anim: true, h: CH });
+        hap(6); switchMetric(k);
       });
     });
     var track = $("#pltrack");
     track.addEventListener("scroll", function () { var k = Math.round(track.scrollLeft / track.clientWidth); $(".pl-n", el).textContent = k + 1 + " of " + pc.length; }, { passive: true });
     countIn();
+    pinLive();
     bindPtr();
+  }
+  /* Metric switch (Total sales -> Orders -> ...): the chart slides sideways (old one out, new one in) and the
+     metrics strip glides so the chosen tile sits right next to the pinned "Live" tile; the highlight pill cross-fades. */
+  function hScroller() {
+    for (var e = $("#mets"); e && e !== document.body; e = e.parentElement) {
+      if (e.scrollWidth > e.clientWidth + 1 && /(auto|scroll)/.test(getComputedStyle(e).overflowX)) return e;
+    }
+    return $("#mets");
+  }
+  function pinLive() {
+    var lv = $("#mets .met.live"); if (!lv) return;
+    lv.style.position = "sticky"; lv.style.left = "0"; lv.style.zIndex = "3";
+    lv.style.background = "#000"; lv.style.boxShadow = "12px 0 12px 2px #000";
+  }
+  function glideScroll(el, to, ms) {
+    if (el._glide) cancelAnimationFrame(el._glide);
+    var from = el.scrollLeft, t0 = performance.now();
+    if (Math.abs(to - from) < 1) return;
+    (function f(now) {
+      var k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 4);
+      el.scrollLeft = from + (to - from) * e;
+      el._glide = k < 1 ? requestAnimationFrame(f) : 0;
+    })(t0);
+  }
+  function switchMetric(k) {
+    var old = homeMet; if (k === old) return;
+    var host = $("#hchart"), mets = $("#mets"), R2 = rangeData(homeRange);
+    if (reduce || !host || !host.animate) {
+      homeMet = k; mets.innerHTML = metStrip(R2); bindMetButtons(); pinLive();
+      drawChart(host, R2, homeMet, { anim: true, h: CH }); return;
+    }
+    var sc = hScroller(), MS = 460, EASE = "cubic-bezier(.22,.9,.24,1)";
+    $$(".hc-old,.met-ghost", $("#s-home")).forEach(function (n) { n.remove(); });
+    var dir = MET_ORDER.indexOf(k) > MET_ORDER.indexOf(old) ? 1 : -1;
+    var sl = sc.scrollLeft, scR = sc.getBoundingClientRect(), W = host.clientWidth || 360;
+    var oldOn = $(".met.on", mets), gInfo = null;
+    if (oldOn) {
+      var r = oldOn.getBoundingClientRect(), cs = getComputedStyle(oldOn);
+      gInfo = { l: r.left - scR.left + sc.scrollLeft, t: r.top - scR.top + sc.scrollTop, w: r.width, h: r.height, br: cs.borderRadius, bg: cs.backgroundColor, bd: cs.borderTopWidth + " solid " + cs.borderTopColor };
+    }
+    var oldHTML = host.innerHTML;
+    homeMet = k;
+    mets.innerHTML = metStrip(R2); bindMetButtons(); pinLive();
+    sc.scrollLeft = sl;
+    if (getComputedStyle(sc).position === "static") sc.style.position = "relative";
+    // old pill fades out, new pill fades in
+    if (gInfo) {
+      var g = document.createElement("div"); g.className = "met-ghost";
+      g.style.cssText = "position:absolute;pointer-events:none;z-index:1;box-sizing:border-box;left:" + gInfo.l + "px;top:" + gInfo.t + "px;width:" + gInfo.w + "px;height:" + gInfo.h + "px;border-radius:" + gInfo.br + ";background:" + gInfo.bg + ";border:" + gInfo.bd;
+      sc.appendChild(g);
+      g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: "ease-out", fill: "forwards" }).onfinish = function () { g.remove(); };
+    }
+    var nOn = $(".met.on", mets), live = $(".met.live", mets);
+    if (nOn) {
+      var nbg = getComputedStyle(nOn).backgroundColor;
+      nOn.animate([{ backgroundColor: "rgba(0,0,0,0)" }, { backgroundColor: nbg }], { duration: 320, easing: "ease-out" });
+      var tl = nOn.getBoundingClientRect().left - sc.getBoundingClientRect().left + sc.scrollLeft;
+      var to = Math.max(0, Math.min(sc.scrollWidth - sc.clientWidth, tl - (live ? live.getBoundingClientRect().width : 0) - 4));
+      glideScroll(sc, to < 12 ? 0 : to, MS);
+    }
+    // chart: old layer slides out (parallax + fade), new chart slides in from the side
+    drawChart(host, R2, homeMet, { h: CH });
+    var oldL = document.createElement("div"); oldL.className = "hc-old";
+    oldL.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none";
+    oldL.innerHTML = oldHTML;
+    host.style.position = "relative"; host.style.overflow = "hidden";
+    host.appendChild(oldL);
+    oldL.animate([{ transform: "translate3d(0,0,0)", opacity: 1 }, { transform: "translate3d(" + (-dir * W * 0.55) + "px,0,0)", opacity: 0 }], { duration: MS, easing: EASE, fill: "forwards" })
+      .onfinish = function () { oldL.remove(); host.style.overflow = ""; };
+    var sv = $("svg", host);
+    if (sv) sv.animate([{ transform: "translate3d(" + dir * W + "px,0,0)" }, { transform: "translate3d(0,0,0)" }], { duration: MS, easing: EASE });
   }
   function bindMetButtons() {
     $$(".met[data-met]", $("#s-home")).forEach(function (b) {
       b.addEventListener("click", function () {
         var k = b.getAttribute("data-met"); if (k === homeMet) { hap(5); $(".hm-top").classList.toggle("fold"); return; }
-        hap(6); homeMet = k;
-        var R2 = rangeData(homeRange);
-        $("#mets").innerHTML = metStrip(R2);
-        bindMetButtons();
-        drawChart($("#hchart"), R2, homeMet, { anim: true, h: CH });
+        hap(6); switchMetric(k);
       });
     });
   }
@@ -438,7 +502,7 @@
     optSheet("Date range", RANGES.map(function (r) { return r[1]; }), rangeLabel(homeRange), function (v) {
       RANGES.forEach(function (r) { if (r[1] === v) homeRange = r[0]; });
       var R = rangeData(homeRange);
-      $("#mets").innerHTML = metStrip(R); bindMetButtons();
+      $("#mets").innerHTML = metStrip(R); bindMetButtons(); pinLive();
       $("#rngL").textContent = rangeShort(homeRange);
       drawChart($("#hchart"), R, homeMet, { anim: true, h: CH });
       countIn();
