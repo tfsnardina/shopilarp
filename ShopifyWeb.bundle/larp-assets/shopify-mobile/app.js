@@ -11,6 +11,14 @@
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
   var app = $("#app"), layers = $("#layers"), toastEl = $("#toast"), bannerEl = $("#banner");
   if (bannerEl) bannerEl.style.display = "none";
+  // Hide any small version label (e.g. "v1.2") shown at the top.
+  (function hideVersion() {
+    var sel = "#ver,#version,#build,.ver,.version,.app-version,.build,.build-tag,.ver-tag,[data-version]";
+    $$(sel).forEach(function (e) { e.style.display = "none"; });
+    $$("body *").forEach(function (e) {
+      if (e.children.length === 0 && /^\s*(v|version\s*)?\d+(\.\d+){1,3}\s*$/i.test(e.textContent || "")) e.style.display = "none";
+    });
+  })();
   // Time runs on from the server's clock, so live orders keep realistic times.
   var t0 = Date.now(), nowMs = function () { return S.now + (Date.now() - t0); };
 
@@ -80,6 +88,13 @@
   var payouts = P.pay.map(function (x) { return { ts: x[0], amt: x[1], st: x[2], n: x[3], fees: x[4], gross: x[5] }; });
   var HR = { y: P.hr.y, t: P.hr.t };
   var live = P.live;
+  // Start from zero everywhere: no orders, no sales, no customers, no visitors.
+  var PACE = Math.max(1, D.o[T - 1] || D.o[T] || 1); // keeps the pace of new live orders
+  Object.keys(D).forEach(function (k) { if (Array.isArray(D[k])) D[k] = D[k].map(function () { return 0; }); });
+  ["y", "t"].forEach(function (k) { HR[k] = HR[k].map(function (row) { return row.map(function () { return 0; }); }); });
+  Object.keys(live).forEach(function (k) { if (typeof live[k] === "number") live[k] = 0; });
+  orders = []; custs = []; payouts = []; S.payout = 0;
+  prods.forEach(function (p) { p.sold = 0; });
   var unread = 0;
   var notifs = [];
   orders.slice(0, 30).forEach(function (o) { notifs.push({ kind: "order", o: o, ts: o.ts, read: (S.now - o.ts) > 10 * HOUR }); });
@@ -323,6 +338,7 @@
 
   /* РІвЂќР‚РІвЂќР‚ Home РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
   var homeRange = "30d", homeMet = "sales", CH = 172;
+  var pickLock = false;
   function greeting() { var h = curHour(); return h < 12 ? "Good morning!" : h < 18 ? "Good afternoon!" : "Good evening!"; }
   function unfulfilled() { return orders.filter(function (o) { return o.ful !== "Fulfilled" && o.pay !== "Refunded" && o.pay !== "Voided" && !o.archived; }); }
   function toCapture() { return orders.filter(function (o) { return o.pay === "Authorized"; }); }
@@ -446,7 +462,20 @@
       if (Math.abs(n - x) > 0.5) sc.scrollLeft = n;
     }
     sc._wrap = wrap;
+    var pt = 0;
+    // When a swipe lands on a tile, select it as if it had been tapped.
+    function pick() {
+      if (sc._glide || pickLock || !sc.isConnected) return;
+      var sr = sc.getBoundingClientRect(), best = null, bd = 1e9;
+      $$(".met[data-met]", sc).forEach(function (t) { var d = Math.abs(t.getBoundingClientRect().left - sr.left); if (d < bd) { bd = d; best = t; } });
+      if (!best || bd > 24) return;
+      var k = best.getAttribute("data-met");
+      if (k === homeMet) return;
+      pickLock = true; setTimeout(function () { pickLock = false; }, 800);
+      hap(6); switchMetric(k, best);
+    }
     sc.addEventListener("scroll", function () {
+      clearTimeout(pt); pt = setTimeout(pick, 140);
       var W = setWidth(sc); if (!W || sc._glide) return;
       var x = sc.scrollLeft, maxX = sc.scrollWidth - sc.clientWidth;
       if (x < 6 || x > maxX - 6) { wrap(); return; } // about to hit a hard end: re-centre right away
@@ -1545,7 +1574,7 @@
   }
   function scheduleOrder(first) {
     // Today's pace sets the gap, kept inside a watchable window.
-    var perDay = Math.max(1, D.o[T - 1] || D.o[T] || 1);
+    var perDay = PACE;
     var mean = Math.max(28, Math.min(240, 86400 / perDay));
     var wait = first ? 7 + Math.random() * 6 : -Math.log(1 - Math.random()) * mean;
     setTimeout(function () { if (!document.hidden) newOrder(); scheduleOrder(false); }, wait * 1000);
