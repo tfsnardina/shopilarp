@@ -3,6 +3,17 @@
   "use strict";
   var P = JSON.parse(document.getElementById("payload").textContent || "{}");
   var S = P.st, D = P.d;
+  // EMPTY START: a brand-new store (0 sales, 0 orders, no products, no customers).
+  // P.ord / P.pro stay in memory only as templates so new orders can still be generated.
+  var EMPTY = true;
+  try { if ((JSON.parse(localStorage.getItem("checker.settings.shopifyLarp") || "{}") || {}).emptyStore === false) EMPTY = false; } catch (e) { }
+  if (EMPTY) {
+    Object.keys(D).forEach(function (k) { if (Array.isArray(D[k])) D[k] = D[k].map(function () { return 0; }); });
+    if (P.hr) ["y", "t"].forEach(function (k) { if (Array.isArray(P.hr[k])) P.hr[k] = P.hr[k].map(function (row) { return Array.isArray(row) ? row.map(function () { return 0; }) : 0; }); });
+    S.custTotal = 0; S.payout = 0; S.lastN = 1000;
+    P.pay = [];
+    P.live = { visitors: 0, carts: 0, checkingOut: 0, purchased: 0 };
+  }
   var A = "./larp-assets/shopify-mobile";
   var DAY = 86400000, HOUR = 3600000;
   var N = S.n, T = N - 1;
@@ -74,16 +85,17 @@
   }
 
   /* РІвЂќР‚РІвЂќР‚ Data РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
-  var custs = P.cus.map(function (c) { return { name: c[0], email: c[1], phone: c[2], city: c[3], region: c[4], ts: c[5], n: c[6], spent: c[7], sub: !!c[8], tags: c[9] || [] }; });
-  var prods = P.pro.map(function (x, i) { return { i: i, title: x[0], price: x[1], compare: x[2], inv: x[3], vars: x[4], vnames: x[5] || [], type: x[6], vendor: x[7], sku: x[8], status: x[9], sold: x[10], ts: x[11], hue: x[12] }; });
+  var custs = EMPTY ? [] : P.cus.map(function (c) { return { name: c[0], email: c[1], phone: c[2], city: c[3], region: c[4], ts: c[5], n: c[6], spent: c[7], sub: !!c[8], tags: c[9] || [] }; });
+  var allProds = P.pro.map(function (x, i) { return { i: i, title: x[0], price: x[1], compare: x[2], inv: x[3], vars: x[4], vnames: x[5] || [], type: x[6], vendor: x[7], sku: x[8], status: x[9], sold: x[10], ts: x[11], hue: x[12] }; });
+  var prods = EMPTY ? [] : allProds;
   function mkOrder(o) {
     return {
-      n: o[0], ts: o[1], c: custs[o[2]] || null, items: o[3].map(function (x) { return { p: prods[x[0]] || prods[0], q: x[1], price: x[2] }; }),
+      n: o[0], ts: o[1], c: custs[o[2]] || null, items: o[3].map(function (x) { return { p: allProds[x[0]] || allProds[0], q: x[1], price: x[2] }; }),
       sub: o[4], disc: o[5], code: o[6], ship: o[7], shipM: o[8], tax: o[9], rate: o[10], total: o[11], refunded: o[12], pay: o[13], ful: o[14], ch: o[15],
       gw: o[16], card: o[17], l4: o[18], city: o[19], reg: o[20], zip: o[21], street: o[22], carrier: o[23], trk: o[24], fat: o[25], risk: o[26], note: o[27], archived: false,
     };
   }
-  var orders = P.ord.map(mkOrder);
+  var orders = EMPTY ? [] : P.ord.map(mkOrder);
   orders.forEach(function (o) { if (o.ful === "Fulfilled" && (nowMs() - o.ts) > 9 * DAY) o.archived = true; });
   var payouts = P.pay.map(function (x) { return { ts: x[0], amt: x[1], st: x[2], n: x[3], fees: x[4], gross: x[5] }; });
   var HR = { y: P.hr.y, t: P.hr.t };
@@ -1546,6 +1558,7 @@
     var src = custs[Math.floor(Math.random() * custs.length)] || { city: "Austin", region: "TX" };
     var c = { name: f + " " + l, email: (f + "." + l).toLowerCase() + Math.floor(Math.random() * 90 + 10) + "@gmail.com", phone: "", city: src.city, region: src.region, ts: nowMs(), n: 0, spent: 0, sub: Math.random() < 0.6, tags: [] };
     custs.unshift(c);
+    S.custTotal = (S.custTotal || 0) + 1;
     return c;
   }
   function bumpHome(o) {
@@ -1609,7 +1622,7 @@
   }
   setInterval(function () {
     var v = live.visitors;
-    if (v <= 0) return;
+    if (v <= 0 && larpVibe() !== "exploding") return;
     if (larpVibe() === "exploding") {
       // 88% up (+3 to +3+6% of current), 12% small dip -> strong upward trend
       if (Math.random() < 0.88) live.visitors = v + 3 + Math.ceil(Math.random() * (3 + v * 0.06));
