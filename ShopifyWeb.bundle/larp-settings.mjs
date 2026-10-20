@@ -59,7 +59,6 @@ function readSavedSettings(raw) {
   if (!raw) return null
   try {
     const merged = { ...DEFAULT_SHOPIFY_LARP, ...JSON.parse(raw) }
-    if (merged.emptyStore !== false) Object.assign(merged, { totalSales: 0, orders: 0, customers: 0, sessions: 0, conversionRate: 0, returningCustomersPct: 0, payoutBalance: 0 })
     if (!Array.isArray(merged.products) || !merged.products.length) {
       merged.products = cloneData(DEFAULT_SHOPIFY_LARP.products)
     }
