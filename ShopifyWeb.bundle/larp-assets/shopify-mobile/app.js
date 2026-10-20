@@ -5,14 +5,21 @@
   var S = P.st, D = P.d;
   // EMPTY START: a brand-new store (0 sales, 0 orders, no products, no customers).
   // P.ord / P.pro stay in memory only as templates so new orders can still be generated.
-  var EMPTY = true;
-  try { if ((JSON.parse(localStorage.getItem("checker.settings.shopifyLarp") || "{}") || {}).emptyStore === false) EMPTY = false; } catch (e) { }
+  var EMPTY = true, CFG = {};
+  try { CFG = JSON.parse(window.__LARP_SAVED_SETTINGS__ || localStorage.getItem("checker.settings.shopifyLarp") || "{}") || {}; } catch (e) { CFG = {}; }
+  if (CFG.emptyStore === false) EMPTY = false;
+  // Lists (orders / products / customers) always start empty. The NUMBERS follow the Preferences:
+  // all-zero Preferences => everything at 0; otherwise sales, orders, sessions... take the values you typed.
+  var WANT_ZERO = !(CFG.totalSales > 0 || CFG.orders > 0 || CFG.customers > 0 || CFG.sessions > 0 || CFG.payoutBalance > 0);
   if (EMPTY) {
-    Object.keys(D).forEach(function (k) { if (Array.isArray(D[k])) D[k] = D[k].map(function () { return 0; }); });
-    if (P.hr) ["y", "t"].forEach(function (k) { if (Array.isArray(P.hr[k])) P.hr[k] = P.hr[k].map(function (row) { return Array.isArray(row) ? row.map(function () { return 0; }) : 0; }); });
-    S.custTotal = 0; S.payout = 0; S.lastN = 1000;
-    P.pay = [];
-    P.live = { visitors: 0, carts: 0, checkingOut: 0, purchased: 0 };
+    S.lastN = 1000;
+    if (WANT_ZERO) {
+      Object.keys(D).forEach(function (k) { if (Array.isArray(D[k])) D[k] = D[k].map(function () { return 0; }); });
+      if (P.hr) ["y", "t"].forEach(function (k) { if (Array.isArray(P.hr[k])) P.hr[k] = P.hr[k].map(function (row) { return Array.isArray(row) ? row.map(function () { return 0; }) : 0; }); });
+      S.custTotal = 0; S.payout = 0;
+      P.pay = [];
+      P.live = { visitors: 0, carts: 0, checkingOut: 0, purchased: 0 };
+    }
   }
   var A = "./larp-assets/shopify-mobile";
   var DAY = 86400000, HOUR = 3600000;
