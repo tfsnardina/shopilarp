@@ -33,7 +33,7 @@
   // Time runs on from the server's clock, so live orders keep realistic times.
   var t0 = Date.now(), nowMs = function () { return S.now + (Date.now() - t0); };
 
-  /* РІвЂќР‚РІвЂќР‚ Formatting РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Formatting ──────────────────────────────────────────── */
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function ic(n, c) { return '<i class="ic i-' + n + (c ? " " + c : "") + '"></i>'; }
   function money(c, opt) {
@@ -84,7 +84,7 @@
     toastT = setTimeout(function () { toastEl.classList.remove("on"); }, 2400);
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Data РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Data ────────────────────────────────────────────────── */
   var custs = EMPTY ? [] : P.cus.map(function (c) { return { name: c[0], email: c[1], phone: c[2], city: c[3], region: c[4], ts: c[5], n: c[6], spent: c[7], sub: !!c[8], tags: c[9] || [] }; });
   var allProds = P.pro.map(function (x, i) { return { i: i, title: x[0], price: x[1], compare: x[2], inv: x[3], vars: x[4], vnames: x[5] || [], type: x[6], vendor: x[7], sku: x[8], status: x[9], sold: x[10], ts: x[11], hue: x[12] }; });
   var prods = EMPTY ? [] : allProds;
@@ -100,6 +100,57 @@
   var payouts = P.pay.map(function (x) { return { ts: x[0], amt: x[1], st: x[2], n: x[3], fees: x[4], gross: x[5] }; });
   var HR = { y: P.hr.y, t: P.hr.t };
   var live = P.live;
+  /* PERSISTENCE: new orders survive an app relaunch (stored inside the saved settings as __state). */
+  var STATE_V = 1, lastSnap = "";
+  function savedSettingsObj() {
+    try { return JSON.parse(window.__LARP_SAVED_SETTINGS__ || localStorage.getItem("checker.settings.shopifyLarp") || "{}") || {}; } catch (e) { return {}; }
+  }
+  function saveState() {
+    if (!EMPTY) return;
+    try {
+      var list = orders.slice(0, 300), cl = [];
+      list.forEach(function (o) { if (o.c && cl.indexOf(o.c) < 0) cl.push(o.c); });
+      var snap = {
+        v: STATE_V, D: D, hrT: HR.t, purchased: live.purchased, custTotal: S.custTotal, custs: cl,
+        orders: list.map(function (o) {
+          var c = Object.assign({}, o);
+          c.c = cl.indexOf(o.c);
+          c.items = o.items.map(function (x) { return [x.p ? x.p.i : 0, x.q, x.price]; });
+          return c;
+        }),
+      };
+      var str = JSON.stringify(snap);
+      if (str === lastSnap) return;
+      lastSnap = str;
+      var cfg = savedSettingsObj(); cfg.__state = snap;
+      var raw = JSON.stringify(cfg);
+      try { localStorage.setItem("checker.settings.shopifyLarp", raw); } catch (e1) { }
+      window.__LARP_SAVED_SETTINGS__ = raw;
+      try { window.webkit.messageHandlers.larpStore.postMessage({ settings: raw }); } catch (e2) { }
+    } catch (e) { }
+  }
+  (function restoreState() {
+    if (!EMPTY) return;
+    var snap = savedSettingsObj().__state;
+    if (!snap || snap.v !== STATE_V || !Array.isArray(snap.orders)) return;
+    try {
+      Object.keys(snap.D || {}).forEach(function (k) { if (D[k] && snap.D[k] && D[k].length === snap.D[k].length) D[k] = snap.D[k]; });
+      if (snap.hrT) HR.t = snap.hrT;
+      live.purchased = snap.purchased || 0;
+      S.custTotal = snap.custTotal || 0;
+      custs = (snap.custs || []).slice();
+      orders = snap.orders.map(function (c) {
+        var o = Object.assign({}, c);
+        o.c = custs[c.c] || null;
+        o.items = c.items.map(function (x) { return { p: allProds[x[0]] || allProds[0], q: x[1], price: x[2] }; });
+        return o;
+      });
+      lastSnap = JSON.stringify(snap);
+    } catch (e) { }
+  })();
+  setInterval(saveState, 3000);
+  window.addEventListener("pagehide", saveState);
+  document.addEventListener("visibilitychange", function () { if (document.hidden) saveState(); });
   var unread = 0;
   var notifs = [];
   orders.slice(0, 30).forEach(function (o) { notifs.push({ kind: "order", o: o, ts: o.ts, read: (S.now - o.ts) > 10 * HOUR }); });
@@ -107,7 +158,7 @@
   unread = Math.min(unread, 12);
   var units = function (o) { return o.items.reduce(function (a, x) { return a + x.q; }, 0); };
   function chName(ch) { return ch === "Instagram" || ch === "Facebook" ? "Facebook & Instagram" : ch; }
-  // Current push format: "Order #1013" / "$92.00, 1 item from Online Store вЂў Store".
+  // Current push format: "Order #1013" / "$92.00, 1 item from Online Store • Store".
   function pushBody(o) { var n = units(o); return money(o.total) + ", " + n + " item" + (n === 1 ? "" : "s") + " from " + chName(o.ch) + " \u2022 " + S.name; }
   function nativeOrderPush(o) {
     var payload = { type: "shopify_order", title: "Order #" + o.n, body: pushBody(o), orderNumber: o.n };
@@ -137,7 +188,7 @@
   }
   var VAT = S.country !== "US" && S.country !== "CA" ? 1 : 0;
 
-  /* РІвЂќР‚РІвЂќР‚ Metrics and ranges РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Metrics and ranges ──────────────────────────────────── */
   function sum(a, i0, i1) { var s = 0; for (var i = Math.max(0, i0); i <= i1; i++) s += a[i] || 0; return s; }
   function agg(i0, i1) { return { s: sum(D.s, i0, i1), o: sum(D.o, i0, i1), se: sum(D.se, i0, i1), rc: sum(D.rc, i0, i1) }; }
   function aggH(h, a, b) { return { s: sum(h[0], a, b), o: sum(h[1], a, b), se: sum(h[2], a, b), rc: 0 }; }
@@ -198,7 +249,7 @@
     return '<em class="' + (cls || "") + (r > 0 ? " up" : " dn") + '">' + (r > 0 ? "+" : "-") + Math.abs(r) + "%</em>";
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Chart РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Chart ───────────────────────────────────────────────── */
   function niceStep(v) {
     if (v <= 0) return 1;
     var e = Math.pow(10, Math.floor(Math.log10(v))), f = v / e;
@@ -326,7 +377,7 @@
     window.addEventListener("mouseup", function () { if (on) end(); });
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Count-up РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Count-up ────────────────────────────────────────────── */
   function countTo(el, from, to, fmt, ms) {
     el.style.fontVariantNumeric = "tabular-nums";
     el.style.minWidth = ""; el.textContent = fmt(Math.max(from, to));
@@ -341,7 +392,7 @@
     })(st);
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Home РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Home ────────────────────────────────────────────────── */
   var homeRange = "30d", homeMet = "sales", CH = 172;
   var pickLock = false;
   function greeting() { var h = curHour(); return h < 12 ? "Good morning!" : h < 18 ? "Good afternoon!" : "Good evening!"; }
@@ -629,10 +680,10 @@
       plbl = md(S.day0 + (base - 1) * DAY + 12 * HOUR) + ", " + xLabel(R, i);
     } else {
       var di = R.a + i * R.step, pdi = di - R.n * R.step;
-      lbl = md(S.day0 + di * DAY + 12 * HOUR) + (R.step > 1 ? " вЂ“ " + md(S.day0 + Math.min(T, di + R.step - 1) * DAY + 12 * HOUR) : "");
+      lbl = md(S.day0 + di * DAY + 12 * HOUR) + (R.step > 1 ? " – " + md(S.day0 + Math.min(T, di + R.step - 1) * DAY + 12 * HOUR) : "");
       plbl = md(S.day0 + pdi * DAY + 12 * HOUR);
     }
-    tip.innerHTML = '<div><i class="sw cur"></i><span>' + esc(lbl) + "</span><b>" + (cur == null ? "вЂ“" : fmtMet(M.k, cur)) + '</b></div><div><i class="sw prv"></i><span>' + esc(plbl) + "</span><b>" + (pv == null ? "вЂ“" : fmtMet(M.k, pv)) + "</b></div>";
+    tip.innerHTML = '<div><i class="sw cur"></i><span>' + esc(lbl) + "</span><b>" + (cur == null ? "–" : fmtMet(M.k, cur)) + '</b></div><div><i class="sw prv"></i><span>' + esc(plbl) + "</span><b>" + (pv == null ? "–" : fmtMet(M.k, pv)) + "</b></div>";
     var x = g.X(i), w = 210, host = $("#hchart");
     var left = Math.max(12, Math.min(host.clientWidth - w - 4, x - w / 2));
     tip.style.transform = "translateX(" + left + "px)";
@@ -806,7 +857,7 @@
     sc.addEventListener("touchcancel", function () { var had = cur; reset(); if (had) home(); });
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Orders РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Orders ──────────────────────────────────────────────── */
   var oFilter = "All", oShown = 40, oQuery = "";
   var badge = function (txt, kind) { return '<span class="bdg ' + kind + '">' + esc(txt) + "</span>"; };
   function payBadge(o) {
@@ -829,7 +880,7 @@
   function orderRow(o) {
     var n = units(o);
     return '<button class="orow" data-order="' + o.n + '"><div class="or1"><b>#' + o.n + "</b><b>" + money(o.total) + "</b></div>" +
-      '<div class="or2">' + esc(o.c ? o.c.name : "No customer") + " вЂў " + n + " item" + (n === 1 ? "" : "s") + " вЂў " + hmPad(o.ts) + "</div>" +
+      '<div class="or2">' + esc(o.c ? o.c.name : "No customer") + " • " + n + " item" + (n === 1 ? "" : "s") + " • " + hmPad(o.ts) + "</div>" +
       '<div class="or3">' + fulBadge(o) + payBadge(o) + (o.note ? ic("note", "on") : "") + "</div>" +
       '<div class="or4">' + esc(o.ch === "Point of Sale" ? "Point of Sale" : o.ful === "Fulfilled" || o.pay === "Refunded" ? o.shipM : "Fulfill by: " + mdy(o.ts + (o.shipM === "Express Shipping" ? 1 : 3) * DAY) + " \u2022 " + shipShort(o.shipM)) + "</div></button>";
   }
@@ -858,7 +909,7 @@
   function shipShort(m) { return m === "Express Shipping" ? "Express" : m === "Free Shipping" ? "Economy" : "Standard"; }
   function emptyState(t, s) { return '<div class="empty">' + ic("search") + "<b>" + esc(t) + "</b><span>" + esc(s) + "</span></div>"; }
 
-  /* РІвЂќР‚РІвЂќР‚ Products РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Products ────────────────────────────────────────────── */
   var pFilter = "All", pQuery = "";
   function invLine(p) {
     var v = p.vars > 1 ? " \u00b7 " + p.vars + " variants" : "";
@@ -881,7 +932,7 @@
     return '<button class="prow" data-prod="' + p.i + '">' + thumb(p, 44) + '<div class="pr-t"><b>' + esc(p.title) + "</b><span>" + invLine(p) + "</span></div>" + badge(p.status, p.status === "Active" ? "ok" : p.status === "Draft" ? "info" : "neu") + "</button>";
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Menu: drawer + sections under the РІвЂ°РЋ tab РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Menu: drawer + sections under the ≡ tab ───────────── */
   var DRAWER = [
     ["home", "Home", "d-home"],
     ["orders", "Orders", "d-orders", ["Drafts", "Abandoned checkouts"]],
@@ -972,7 +1023,7 @@
     el.innerHTML = head(t) + '<div class="sheet-body"><div class="soon">' + ic(({ growth: "marketing", discounts: "discount", content: "content", markets: "globe", onlinestore: "store", inbox: "d-inbox", pos: "pos", shop: "shop", social: "channels", apps: "apps" })[menuView] || "settings") + "<b>" + esc(t) + "</b><span>Manage " + esc(t.toLowerCase()) + " for " + esc(S.name) + ".</span></div></div>";
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Tabs РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Tabs ────────────────────────────────────────────────── */
   var current = "home", rendered = {};
   var RENDER = { home: renderHome, orders: renderOrders, products: renderProducts, menu: renderMenu };
   function setTab(name, keep) {
@@ -1000,7 +1051,7 @@
     });
   });
 
-  /* РІвЂќР‚РІвЂќР‚ Layers: pushed pages and sheets РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Layers: pushed pages and sheets ─────────────────────── */
   var stack = [];
   function push(el, kind) {
     layers.appendChild(el);
@@ -1100,7 +1151,7 @@
     $$(".opt", el).forEach(function (b) { b.addEventListener("click", function () { var v = b.getAttribute("data-o"); hap(6); pop(false); setTimeout(function () { cb(v); }, 180); }); });
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Order page РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Order page ──────────────────────────────────────────── */
   function findOrder(n) { for (var i = 0; i < orders.length; i++) if (orders[i].n === n) return orders[i]; return null; }
   function addr(o) { return [esc(o.c ? o.c.name : ""), esc(o.street), esc(o.city + ", " + o.reg + " " + o.zip), esc(countryName())].join("<br>"); }
   function countryName() { return S.cname || { US: "United States", CA: "Canada", GB: "United Kingdom", AU: "Australia", DE: "Germany", FR: "France", NZ: "New Zealand", IE: "Ireland", ES: "Spain", IT: "Italy", NL: "Netherlands", SE: "Sweden", IN: "India", SG: "Singapore", JP: "Japan", BR: "Brazil", MX: "Mexico", AE: "United Arab Emirates" }[S.country] || "United States"; }
@@ -1108,12 +1159,12 @@
     if (o.gw === "PayPal") return "PayPal";
     if (o.card === "apple_pay") return "Apple Pay";
     var b = { visa: "Visa", mastercard: "Mastercard", amex: "American Express", discover: "Discover" }[o.card] || "Card";
-    return b + " вЂўвЂўвЂўвЂў " + o.l4;
+    return b + " •••• " + o.l4;
   }
   function lineItems(o) {
     return o.items.map(function (x) {
       var v = x.p.vnames.length > 1 ? x.p.vnames[(o.n + x.p.i) % x.p.vnames.length] : "";
-      return '<div class="li">' + thumb(x.p, 48) + '<div class="li-t"><b>' + esc(x.p.title) + "</b>" + (v ? "<span>" + esc(v) + "</span>" : "") + "<em>" + money(x.price) + '</em></div><span class="li-q">Р“вЂ” ' + x.q + "</span></div>";
+      return '<div class="li">' + thumb(x.p, 48) + '<div class="li-t"><b>' + esc(x.p.title) + "</b>" + (v ? "<span>" + esc(v) + "</span>" : "") + "<em>" + money(x.price) + '</em></div><span class="li-q">× ' + x.q + "</span></div>";
     }).join("");
   }
   function openOrder(n) {
@@ -1121,7 +1172,7 @@
     var n_ = units(o);
     var ful = o.ful === "Fulfilled";
     var fulSec = '<div class="sec"><div class="sec-h">' + (ful ? badge("Fulfilled", "ok") : badge(o.ful, "att")) + '<span class="fl"></span>' + ic("more", "sm") + "</div>" +
-      '<div class="sec-sub">' + (o.ch === "Point of Sale" ? "Picked up in store" : "Ship to customer вЂў " + esc(o.city)) + "</div>" +
+      '<div class="sec-sub">' + (o.ch === "Point of Sale" ? "Picked up in store" : "Ship to customer • " + esc(o.city)) + "</div>" +
       lineItems(o) +
       (ful ? '<div class="trk">' + ic("truck") + "<div><b>" + esc(o.carrier) + "</b><span>" + esc(o.trk) + '</span></div><button class="lnk" data-act="track">Track</button></div>'
         : '<button class="btn-p" data-fulfill="' + o.n + '">Fulfill items</button>') + "</div>";
@@ -1144,7 +1195,7 @@
     var conv = '<div class="sec"><div class="sec-h"><h3>Conversion summary</h3></div><div class="cs"><div>' + ic("cart") + "<span>This is their " + ordinal(c ? Math.max(1, c.n) : 1) + " order</span></div><div>" + ic("globe") + "<span>1st session was " + (o.ch === "Online Store" ? "from Google" : "from " + esc(o.ch)) + "</span></div><div>" + ic("clock") + "<span>" + (2 + (o.n % 4)) + " sessions over " + (1 + (o.n % 3)) + " day" + (o.n % 3 ? "s" : "") + "</span></div></div></div>";
     var risk = '<div class="sec"><div class="sec-h"><h3>Order risk</h3></div><div class="risk r-' + o.risk.toLowerCase() + '"><div class="rb"><i></i><i></i><i></i></div><b>' + (o.risk === "Low" ? "Chargeback risk is low" : o.risk === "Medium" ? "Chargeback risk is medium" : "Chargeback risk is high") + "</b></div></div>";
     var tl = '<div class="sec"><div class="sec-h"><h3>Timeline</h3></div><div class="tl">' + timeline(o).map(function (e) { return '<div class="tle"><i></i><div><span>' + esc(e[1]) + "</span><em>" + esc(e[0]) + "</em></div></div>"; }).join("") + "</div></div>";
-    var body = '<div class="oh"><div class="oh-t"><h1>#' + o.n + "</h1>" + fulBadge(o) + payBadge(o) + '</div><p class="oh-s">' + esc(relAt(o.ts)) + " вЂў " + esc(o.ch === "Online Store" ? "Online store" : o.ch) + "</p></div>" +
+    var body = '<div class="oh"><div class="oh-t"><h1>#' + o.n + "</h1>" + fulBadge(o) + payBadge(o) + '</div><p class="oh-s">' + esc(relAt(o.ts)) + " • " + esc(o.ch === "Online Store" ? "Online store" : o.ch) + "</p></div>" +
       fulSec + paySec + contact + cust + notes + conv + risk + tl;
     var el = page(body, { cls: "order", actions: '<button class="nb-c" data-act="print" aria-label="Print">' + ic("print") + '</button><button class="nb-c" data-act="ordermore" aria-label="More">' + ic("more") + "</button>" });
     el.setAttribute("data-on", o.n);
@@ -1202,7 +1253,7 @@
     rendered = {}; RENDER[current](); rendered[current] = 1;
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Product page РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Product page ────────────────────────────────────────── */
   function openProduct(i) {
     var p = prods[i]; if (!p) return;
     var vrows = p.vnames.length > 1 ? p.vnames.map(function (v, k) {
@@ -1214,12 +1265,12 @@
       '<div class="sec"><div class="sec-h"><h3>Pricing</h3></div><div class="kv"><div><span>Price</span><span></span><b>' + money(p.price) + "</b></div>" + (p.compare ? "<div><span>Compare-at price</span><span></span><b class=\"strike\">" + money(p.compare) + "</b></div>" : "") + "</div></div>" +
       '<div class="sec"><div class="sec-h"><h3>Inventory</h3></div><div class="kv"><div><span>Available</span><span></span><b>' + count(p.inv) + "</b></div><div><span>SKU</span><span></span><b>" + esc(p.sku) + "</b></div><div><span>Sold (last 30 days)</span><span></span><b>" + count(p.sold) + "</b></div></div></div>" +
       (vrows ? '<div class="sec"><div class="sec-h"><h3>Variants</h3><span class="cnt">' + p.vnames.length + "</span></div>" + vrows + "</div>" : "") +
-      '<div class="sec"><div class="sec-h"><h3>Product organization</h3></div><div class="kv"><div><span>Type</span><span></span><b>' + esc(p.type || "вЂ“") + "</b></div><div><span>Vendor</span><span></span><b>" + esc(p.vendor) + "</b></div></div></div>" +
+      '<div class="sec"><div class="sec-h"><h3>Product organization</h3></div><div class="kv"><div><span>Type</span><span></span><b>' + esc(p.type || "–") + "</b></div><div><span>Vendor</span><span></span><b>" + esc(p.vendor) + "</b></div></div></div>" +
       '<div class="sec"><div class="sec-h"><h3>Sales channels</h3></div><div class="chs"><span>' + ic("store") + "Online Store</span><span>" + ic("shop") + "Shop</span><span>" + ic("pos") + "Point of Sale</span></div></div>";
     page(body, { cls: "product", actions: '<button class="nb-c" data-act="share" aria-label="Share">' + ic("share") + '</button><button class="nb-c" data-act="prodmore" aria-label="More">' + ic("more") + "</button>" });
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Customers РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Customers ───────────────────────────────────────────── */
   function lastOrderOf(c) { for (var i = 0; i < orders.length; i++) if (orders[i].c === c) return orders[i]; return null; }
   function custList() { return custs.slice().sort(function (a, b) { var la = lastOrderOf(a), lb = lastOrderOf(b); return (lb ? lb.ts : b.ts) - (la ? la.ts : a.ts); }); }
   function customersBody() {
@@ -1232,7 +1283,7 @@
   }
   function openCustomers() { navigate("customers"); }
   function custRow(c) {
-    return '<button class="crow" data-cust="' + custs.indexOf(c) + '"><span class="cav">' + esc(initials(c.name)) + "</span><div><b>" + esc(c.name) + "</b><span>" + esc(c.city + ", " + c.region) + " вЂў " + count(c.n) + " order" + (c.n === 1 ? "" : "s") + "</span></div><em>" + money(c.spent) + "</em></button>";
+    return '<button class="crow" data-cust="' + custs.indexOf(c) + '"><span class="cav">' + esc(initials(c.name)) + "</span><div><b>" + esc(c.name) + "</b><span>" + esc(c.city + ", " + c.region) + " • " + count(c.n) + " order" + (c.n === 1 ? "" : "s") + "</span></div><em>" + money(c.spent) + "</em></button>";
   }
   function openCustomer(i) {
     var c = custs[i]; if (!c) return;
@@ -1246,7 +1297,7 @@
   }
   function since(t) { var d = Math.max(1, Math.round((nowMs() - t) / DAY)); return d < 31 ? d + " day" + (d === 1 ? "" : "s") : d < 365 ? Math.round(d / 30) + " month" + (Math.round(d / 30) === 1 ? "" : "s") : Math.round(d / 365) + " year" + (Math.round(d / 365) === 1 ? "" : "s"); }
 
-  /* РІвЂќР‚РІвЂќР‚ Analytics РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Analytics ───────────────────────────────────────────── */
   var anRange = "today";
   function openAnalytics() { navigate("analytics"); }
   function drawAnalytics(el) {
@@ -1310,7 +1361,7 @@
     }).join("");
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Live View РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Live View ───────────────────────────────────────────── */
   function openLiveView() {
     var R = rangeData("today");
     var el = page('<div class="lvw"><div class="lv-top"><div class="lv-globe" id="lvglobe"></div><div class="lv-now"><span>Visitors right now</span><b id="lvN">' + count(live.visitors) + '</b></div></div>' +
@@ -1392,7 +1443,7 @@
     requestAnimationFrame(frame);
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Payouts РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Payouts ─────────────────────────────────────────────── */
   function financeBody() {
     var np = nextPayout();
     var paid = payouts.filter(function (p) { return p.st !== "Scheduled"; });
@@ -1418,7 +1469,7 @@
     });
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Notifications, search, Sidekick РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Notifications, search, Sidekick ─────────────────────── */
   function openNotifs() {
     var body = notifs.slice(0, 40).map(function (x) {
       var o = x.o;
@@ -1508,7 +1559,7 @@
     return '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="#f4f1ff"/><path d="M8 17c0-7 5.5-11 12-11s12 4 12 11v3H8z" fill="#1e2a5a"/><ellipse cx="20" cy="23" rx="11.5" ry="11" fill="#fff"/><path d="M8.5 20.5h23v6.5H8.5z" fill="#6e3ff3" rx="3"/><circle cx="15" cy="23.6" r="2.6" fill="#fff"/><circle cx="25" cy="23.6" r="2.6" fill="#fff"/><circle cx="15.4" cy="23.8" r="1.2" fill="#1e2a5a"/><circle cx="25.4" cy="23.8" r="1.2" fill="#1e2a5a"/><path d="M17 29.5c1.8 1.3 4.2 1.3 6 0" stroke="#1e2a5a" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>';
   }
 
-  /* РІвЂќР‚РІвЂќР‚ Live orders РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Live orders ─────────────────────────────────────────── */
   var audio = null, audioOk = false;
   function unlockAudio() {
     if (audioOk) return;
@@ -1636,7 +1687,7 @@
     showVisitors();
   }, 1200);
 
-  /* РІвЂќР‚РІвЂќР‚ Actions РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Actions ─────────────────────────────────────────────── */
   function copyText(s) { try { navigator.clipboard.writeText(s); } catch (e) { } toast("Copied"); }
   var SOON = { growth: "Growth", discounts: "Discounts", content: "Content", markets: "Markets", onlinestore: "Online Store", pos: "Point of Sale", shop: "Shop", social: "Facebook & Instagram", apps: "Apps", settings: "Settings", help: "Help Center", finance: "Finance" };
   document.addEventListener("click", function (e) {
@@ -1690,8 +1741,8 @@
       case "neworder": return optSheet("Create", ["Create order", "Create draft order"], "", function (v) { toast(v + " started"); });
       case "newproduct": return toast("Add product");
       case "scan": return toast("Camera access is needed to scan barcodes");
-      case "print": return toast("Preparing packing slipвЂ¦");
-      case "track": return toast("Opening trackingвЂ¦");
+      case "print": return toast("Preparing packing slip…");
+      case "track": return toast("Opening tracking…");
       case "email": case "phone": var pgc = t.closest(".page"); var on = pgc ? findOrder(+pgc.getAttribute("data-on")) : null; return toast(on && on.c ? (a === "email" ? on.c.email : on.c.phone || "No phone number") : "No contact details");
       case "ordermore": case "prodmore": case "custmore": return optSheet("More actions", a === "prodmore" ? ["Duplicate", "Archive product", "View on Online Store"] : a === "custmore" ? ["Edit customer", "Send account invite"] : ["Edit order", "Refund", "Print packing slip", "Archive"], "", function (v) { toast(v); });
       case "notifsettings": return toast("Notification settings");
@@ -1738,7 +1789,7 @@
   }
   function closeSheets() { while (stack.length && stack[stack.length - 1].kind === "sheet") pop(false); }
 
-  /* РІвЂќР‚РІвЂќР‚ Boot РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚РІвЂќР‚ */
+  /* ── Boot ────────────────────────────────────────────────── */
   setTab("home");
   // Pre-render the other tabs while idle so the first switch is instant.
   var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 300); };
@@ -1749,3 +1800,4 @@
   if (seen || reduce) sp.remove(); else setTimeout(function () { sp.classList.add("out"); setTimeout(function () { sp.remove(); }, 420); }, 650);
   scheduleOrder(true);
 })();
+
