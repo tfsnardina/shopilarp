@@ -34,10 +34,10 @@ function cloneData(value) {
 }
 
 export const DEFAULT_SHOPIFY_LARP = {
-  internalName: 'Tifiouse',
-  storeName: "Tifiouse's Store",
-  currency: 'EUR',
-  country: 'FR',
+  internalName: '123',
+  storeName: "ddhhd's Store",
+  currency: 'USD',
+  country: 'US',
   convertFx: true,
   totalSales: 0,
   orders: 0,
@@ -59,6 +59,7 @@ function readSavedSettings(raw) {
   if (!raw) return null
   try {
     const merged = { ...DEFAULT_SHOPIFY_LARP, ...JSON.parse(raw) }
+    if (merged.emptyStore !== false) Object.assign(merged, { totalSales: 0, orders: 0, customers: 0, sessions: 0, conversionRate: 0, returningCustomersPct: 0, payoutBalance: 0 })
     if (!Array.isArray(merged.products) || !merged.products.length) {
       merged.products = cloneData(DEFAULT_SHOPIFY_LARP.products)
     }
@@ -274,6 +275,8 @@ export function buildShopifyLarpPayload(settings) {
 }
 
 export function applyAndOpenApp(settings) {
+  settings = { ...settings }
+  delete settings.__state
   saveSettings(settings)
   const payload = buildShopifyLarpPayload(settings)
   const payloadRaw = JSON.stringify(payload)
