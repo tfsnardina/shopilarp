@@ -10,7 +10,7 @@
   if (CFG.emptyStore === false) EMPTY = false;
   // Lists (orders / products / customers) always start empty. The NUMBERS follow the Preferences:
   // all-zero Preferences => everything at 0; otherwise sales, orders, sessions... take the values you typed.
-  var WANT_ZERO = !(CFG.totalSales > 0 || CFG.orders > 0 || CFG.customers > 0 || CFG.sessions > 0 || CFG.payoutBalance > 0);
+  var WANT_ZERO = CFG.__zero !== undefined ? !!CFG.__zero : !(CFG.totalSales > 0 || CFG.orders > 0 || CFG.customers > 0 || CFG.sessions > 0 || CFG.payoutBalance > 0);
   if (EMPTY) {
     S.lastN = 1000;
     if (WANT_ZERO) {
@@ -109,6 +109,7 @@
   var live = P.live;
   /* PERSISTENCE: new orders survive an app relaunch (stored inside the saved settings as __state). */
   var STATE_V = 1, lastSnap = "";
+  var pend = { sales: 0, orders: 0, cust: 0, sess: 0 }; // growth not yet written into the Preferences
   function savedSettingsObj() {
     try { return JSON.parse(window.__LARP_SAVED_SETTINGS__ || localStorage.getItem("checker.settings.shopifyLarp") || "{}") || {}; } catch (e) { return {}; }
   }
@@ -127,9 +128,16 @@
         }),
       };
       var str = JSON.stringify(snap);
-      if (str === lastSnap) return;
+      if (str === lastSnap && !pend.orders && !pend.cust && !pend.sess) return;
       lastSnap = str;
       var cfg = savedSettingsObj(); cfg.__state = snap;
+      if (cfg.__zero === undefined) cfg.__zero = WANT_ZERO;
+      // Preferences follow the store: sales / orders / customers / sessions grow with every new order.
+      cfg.totalSales = Math.round(((Number(cfg.totalSales) || 0) + pend.sales) * 100) / 100;
+      cfg.orders = Math.round((Number(cfg.orders) || 0) + pend.orders);
+      cfg.customers = Math.round((Number(cfg.customers) || 0) + pend.cust);
+      cfg.sessions = Math.round((Number(cfg.sessions) || 0) + pend.sess);
+      pend = { sales: 0, orders: 0, cust: 0, sess: 0 };
       var raw = JSON.stringify(cfg);
       try { localStorage.setItem("checker.settings.shopifyLarp", raw); } catch (e1) { }
       window.__LARP_SAVED_SETTINGS__ = raw;
@@ -1592,7 +1600,8 @@
     // Today's numbers move with it.
     var h = curHour();
     D.s[T] += o.total; D.o[T] += 1; D.g[T] += o.sub; D.dc[T] += o.disc; D.sh[T] += o.ship; D.tx[T] += o.tax; D.u[T] += units(o);
-    D.se[T] += 1 + Math.floor(Math.random() * 3);
+    var addSe = 1 + Math.floor(Math.random() * 3); D.se[T] += addSe;
+    pend.sales += o.total / Math.pow(10, S.dec != null ? S.dec : 2); pend.orders += 1; pend.sess += addSe;
     HR.t[0][h] += o.total; HR.t[1][h] += 1; HR.t[2][h] += 1;
     live.purchased += 1;
     notifs.unshift({ kind: "order", o: o, ts: ts, read: false });
@@ -1617,6 +1626,7 @@
     var c = { name: f + " " + l, email: (f + "." + l).toLowerCase() + Math.floor(Math.random() * 90 + 10) + "@gmail.com", phone: "", city: src.city, region: src.region, ts: nowMs(), n: 0, spent: 0, sub: Math.random() < 0.6, tags: [] };
     custs.unshift(c);
     S.custTotal = (S.custTotal || 0) + 1;
+    pend.cust += 1;
     return c;
   }
   function bumpHome(o) {
