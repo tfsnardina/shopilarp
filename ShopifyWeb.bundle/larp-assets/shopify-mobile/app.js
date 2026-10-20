@@ -1749,4 +1749,3 @@
   if (seen || reduce) sp.remove(); else setTimeout(function () { sp.classList.add("out"); setTimeout(function () { sp.remove(); }, 420); }, 650);
   scheduleOrder(true);
 })();
-
