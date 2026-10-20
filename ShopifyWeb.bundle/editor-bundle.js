@@ -42,13 +42,13 @@ const DEFAULT_SHOPIFY_LARP = {
   currency: 'USD',
   country: 'US',
   convertFx: true,
-  totalSales: 48000,
-  orders: 340,
-  customers: 290,
-  sessions: 16200,
-  conversionRate: 2.1,
-  returningCustomersPct: 28,
-  payoutBalance: 1240,
+  totalSales: 0,
+  orders: 0,
+  customers: 0,
+  sessions: 0,
+  conversionRate: 0,
+  returningCustomersPct: 0,
+  payoutBalance: 0,
   vibe: 'growing',
   liveOrders: true,
   products: [
@@ -62,6 +62,7 @@ function readSavedSettings(raw) {
   if (!raw) return null
   try {
     const merged = { ...DEFAULT_SHOPIFY_LARP, ...JSON.parse(raw) }
+    if (merged.emptyStore !== false) Object.assign(merged, { totalSales: 0, orders: 0, customers: 0, sessions: 0, conversionRate: 0, returningCustomersPct: 0, payoutBalance: 0 })
     if (!Array.isArray(merged.products) || !merged.products.length) {
       merged.products = cloneData(DEFAULT_SHOPIFY_LARP.products)
     }
@@ -276,6 +277,8 @@ function buildShopifyLarpPayload(settings) {
 }
 
 function applyAndOpenApp(settings) {
+  settings = { ...settings }
+  delete settings.__state
   saveSettings(settings)
   const payload = buildShopifyLarpPayload(settings)
   const payloadRaw = JSON.stringify(payload)
