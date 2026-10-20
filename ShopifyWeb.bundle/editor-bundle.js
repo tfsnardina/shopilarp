@@ -278,6 +278,7 @@ function buildShopifyLarpPayload(settings) {
 function applyAndOpenApp(settings) {
   settings = { ...settings }
   delete settings.__state
+  delete settings.__zero
   saveSettings(settings)
   const payload = buildShopifyLarpPayload(settings)
   const payloadRaw = JSON.stringify(payload)
