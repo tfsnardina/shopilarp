@@ -8,7 +8,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-15
+    timeout-minutes: 30
 
     steps:
       # 1. Télécharger le dépôt
