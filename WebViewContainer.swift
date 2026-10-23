@@ -138,6 +138,11 @@ enum WebViewContainer {
                 }
                 return
             }
+            if message.name == "larpHaptic" {
+                let kind = (message.body as? String) ?? "light"
+                DispatchQueue.main.async { Haptics.play(kind) }
+                return
+            }
             if message.name == "larpStatusBar" {
                 let dark = (message.body as? String) == "dark"
                 DispatchQueue.main.async { [weak self] in self?.host?.setStatusBar(dark: dark) }
@@ -296,6 +301,7 @@ final class WebHostViewController: UIViewController {
         old?.removeScriptMessageHandler(forName: "larpStore")
         old?.removeScriptMessageHandler(forName: "shopifySchedule")
         old?.removeScriptMessageHandler(forName: "larpStatusBar")
+        old?.removeScriptMessageHandler(forName: "larpHaptic")
         let web = makeWebView()
         showWebView(web)
         lastLayoutInsets = .zero
@@ -309,6 +315,7 @@ final class WebHostViewController: UIViewController {
         config.userContentController.add(coordinator, name: "larpStore")
         config.userContentController.add(coordinator, name: "shopifySchedule")
         config.userContentController.add(coordinator, name: "larpStatusBar")
+        config.userContentController.add(coordinator, name: "larpHaptic")
         config.userContentController.addUserScript(
             WKUserScript(
                 source: WebViewContainer.nativeChromeScript(),
@@ -381,5 +388,26 @@ final class WebHostViewController: UIViewController {
     func setStatusBar(dark: Bool) {
         statusStyle = dark ? .darkContent : .lightContent
         setNeedsStatusBarAppearanceUpdate()
+    }
+}
+/// Taptic Engine feedback requested by the page (see hap() in app.js).
+enum Haptics {
+    private static let selection = UISelectionFeedbackGenerator()
+    private static let light = UIImpactFeedbackGenerator(style: .light)
+    private static let medium = UIImpactFeedbackGenerator(style: .medium)
+    private static let heavy = UIImpactFeedbackGenerator(style: .heavy)
+    private static let notify = UINotificationFeedbackGenerator()
+
+    static func play(_ kind: String) {
+        switch kind {
+        case "selection": selection.selectionChanged(); selection.prepare()
+        case "light": light.impactOccurred(); light.prepare()
+        case "medium": medium.impactOccurred(); medium.prepare()
+        case "heavy": heavy.impactOccurred(); heavy.prepare()
+        case "success": notify.notificationOccurred(.success); notify.prepare()
+        case "warning": notify.notificationOccurred(.warning); notify.prepare()
+        case "error": notify.notificationOccurred(.error); notify.prepare()
+        default: break
+        }
     }
 }
