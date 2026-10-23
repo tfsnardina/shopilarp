@@ -23,6 +23,14 @@ export const SHOPIFY_COUNTRIES = [
   { code: 'AU', name: 'Australia' },
   { code: 'DE', name: 'Germany' },
   { code: 'FR', name: 'France' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'IE', name: 'Ireland' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'NZ', name: 'New Zealand' },
+  { code: 'JP', name: 'Japan' },
 ]
 
 const FX_TO_USD = { USD: 1, EUR: 1.08, GBP: 1.27, CAD: 0.72, AUD: 0.65, JPY: 0.0067 }
@@ -171,7 +179,7 @@ export function applyShopifyLarpSettings(base, settings) {
   const from = Math.max(0, to - 29)
   const weights = vibeWeights(settings.vibe, to - from + 1)
   const cur = SHOPIFY_CURRENCIES.find(c => c.code === settings.currency) ?? SHOPIFY_CURRENCIES[0]
-  const handle = slugifyStoreHandle(settings.storeName)
+  const handle = settings.storeHandle || slugifyStoreHandle(settings.storeName)
   const initials =
     settings.storeName
       .split(/\s+/)
@@ -183,6 +191,7 @@ export function applyShopifyLarpSettings(base, settings) {
   st.name = settings.storeName
   st.ini = initials
   st.handle = handle
+  st.logo = settings.storeLogo || ''
   st.cur = cur.code
   st.sym = cur.sym
   st.tag = cur.tag
