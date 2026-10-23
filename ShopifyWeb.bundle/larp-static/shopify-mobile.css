@@ -704,3 +704,5 @@ html.checker-native .hm-top{display:block;height:auto;background:#000}
 html.checker-native .hm-hd{position:relative;top:auto}
 html.checker-native .hm-sheet{display:block;min-height:0;background:#fff;margin-top:14px;padding-bottom:calc(88px + var(--bot,0px))!important}
 html.checker-native #tabbar{bottom:calc(var(--bot,0px) + 8px)!important}
+
+.th.img{background:#fff;color:transparent}.th img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
