@@ -200,6 +200,7 @@
     if (!EMPTY) return;
     var snap = savedSettingsObj().__state;
     if (!snap || (snap.v !== 1 && snap.v !== 2) || !Array.isArray(snap.orders)) return;
+    if (!prods.length) return;   // no products => any saved order/customer comes from the old demo data: ignore it
     try {
       Object.keys(snap.D || {}).forEach(function (k) { if (D[k] && snap.D[k] && D[k].length === snap.D[k].length) D[k] = snap.D[k]; });
       if (snap.hrT) HR.t = snap.hrT;
@@ -1817,12 +1818,11 @@
     if (current === "products" && !stack.length) rendered.products = 0;
   }
   function newOrder() {
-    var lines = null;
-    if (prods.length) {
-      var pool = sellable();
-      if (!pool.length) return;          // everything is a draft or sold out: nothing to buy
-      lines = userLines(pool);
-    }
+    // No products in the store => nobody can buy anything: never fall back to the demo products.
+    if (!prods.length) return;
+    var pool = sellable();
+    if (!pool.length) return;            // everything is a draft or sold out: nothing to buy
+    var lines = userLines(pool);
     var o = makeOrder(lines, nowMs());
     if (o) commitOrder(o, false);
   }
@@ -1830,6 +1830,7 @@
   function consumeQueue() {
     var cfg = savedSettingsObj(), q = cfg.__queue;
     if (!Array.isArray(q) || !q.length) return;
+    if (!prods.length) { delete cfg.__queue; writeSettings(cfg); return; }   // no products: nothing to queue
     delete cfg.__queue;            // clear first so a crash can never replay it
     writeSettings(cfg);
     var jobs = [];
@@ -1844,8 +1845,8 @@
     var span = Math.max(60000, Math.min(2 * HOUR, sinceMidnight));
     var stamps = jobs.map(function () { return now - Math.random() * span; }).sort(function (a, b) { return a - b; });
     jobs.forEach(function (j, k) {
-      var p = j[0] || (prods.length ? userLines(sellable().length ? sellable() : prods)[0][0] : null);
-      var o = makeOrder(p ? [[p, j[1]]] : null, stamps[k]);
+      var p = j[0] || userLines(sellable().length ? sellable() : prods)[0][0];
+      var o = makeOrder([[p, j[1]]], stamps[k]);
       if (o) commitOrder(o, true);
     });
     saveState();
