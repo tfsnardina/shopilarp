@@ -138,6 +138,10 @@ enum WebViewContainer {
                 }
                 return
             }
+            if message.name == "shopifySchedule", let dict = message.body as? [String: Any] {
+                NotificationPermission.replaceScheduled(dict["items"] as? [[String: Any]] ?? [])
+                return
+            }
             guard message.name == "shopifyOrder",
                   let dict = message.body as? [String: Any] else { return }
             let title = (dict["title"] as? String) ?? "New order"
@@ -229,6 +233,7 @@ final class WebHostViewController: UIViewController {
         view.backgroundColor = .black
         view.insetsLayoutMarginsFromSafeArea = false
         coordinator.host = self
+        installLifecycleObservers()
         if #available(iOS 15.0, *) {
             view.keyboardLayoutGuide.followsUndockedKeyboard = false
         }
@@ -244,11 +249,47 @@ final class WebHostViewController: UIViewController {
         web.loadFileURL(entry.index, allowingReadAccessTo: entry.root)
     }
 
+    private var lifecycleObservers: [NSObjectProtocol] = []
+
+    /// When the app leaves the screen the page plans the orders/notifications for the time it is closed;
+    /// when it comes back, the orders that happened meanwhile are created and the plan is cancelled.
+    private func installLifecycleObservers() {
+        let center = NotificationCenter.default
+        let background = center.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            var task = UIBackgroundTaskIdentifier.invalid
+            task = UIApplication.shared.beginBackgroundTask {
+                UIApplication.shared.endBackgroundTask(task)
+                task = .invalid
+            }
+            self?.webView?.evaluateJavaScript("window.__larpPlanBg && window.__larpPlanBg()") { _, _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    if task != .invalid {
+                        UIApplication.shared.endBackgroundTask(task)
+                        task = .invalid
+                    }
+                }
+            }
+        }
+        let foreground = center.addObserver(
+            forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.webView?.evaluateJavaScript("window.__larpConsumeBg && window.__larpConsumeBg()", completionHandler: nil)
+        }
+        lifecycleObservers = [background, foreground]
+    }
+
+    deinit {
+        lifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
+    }
+
     func reloadShopHome() {
         guard let root = coordinator.wwwRoot else { return }
         let old = webView?.configuration.userContentController
         old?.removeScriptMessageHandler(forName: "shopifyOrder")
         old?.removeScriptMessageHandler(forName: "larpStore")
+        old?.removeScriptMessageHandler(forName: "shopifySchedule")
         let web = makeWebView()
         showWebView(web)
         lastLayoutInsets = .zero
@@ -260,6 +301,7 @@ final class WebHostViewController: UIViewController {
         config.defaultWebpagePreferences.allowsContentJavaScript = true
         config.userContentController.add(coordinator, name: "shopifyOrder")
         config.userContentController.add(coordinator, name: "larpStore")
+        config.userContentController.add(coordinator, name: "shopifySchedule")
         config.userContentController.addUserScript(
             WKUserScript(
                 source: WebViewContainer.nativeChromeScript(),
