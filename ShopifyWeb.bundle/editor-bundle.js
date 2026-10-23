@@ -26,6 +26,14 @@ const SHOPIFY_COUNTRIES = [
   { code: 'AU', name: 'Australia' },
   { code: 'DE', name: 'Germany' },
   { code: 'FR', name: 'France' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'IE', name: 'Ireland' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'NZ', name: 'New Zealand' },
+  { code: 'JP', name: 'Japan' },
 ]
 
 const FX_TO_USD = { USD: 1, EUR: 1.08, GBP: 1.27, CAD: 0.72, AUD: 0.65, JPY: 0.0067 }
@@ -183,7 +191,7 @@ function applyShopifyLarpSettings(base, settings) {
   const from = Math.max(0, to - 29)
   const weights = vibeWeights(settings.vibe, to - from + 1)
   const cur = SHOPIFY_CURRENCIES.find(c => c.code === settings.currency) ?? SHOPIFY_CURRENCIES[0]
-  const handle = slugifyStoreHandle(settings.storeName)
+  const handle = settings.storeHandle || slugifyStoreHandle(settings.storeName)
   const initials =
     settings.storeName
       .split(/\s+/)
@@ -195,6 +203,7 @@ function applyShopifyLarpSettings(base, settings) {
   st.name = settings.storeName
   st.ini = initials
   st.handle = handle
+  st.logo = settings.storeLogo || ''
   st.cur = cur.code
   st.sym = cur.sym
   st.tag = cur.tag
@@ -335,8 +344,6 @@ if (s.__state) s.__sig = sigOf(s)
 const $ = id => document.getElementById(id)
 
 function bindSelects() {
-  $('currency').innerHTML = SHOPIFY_CURRENCIES.map(c => `<option value="${c.code}">${c.label}</option>`).join('')
-  $('country').innerHTML = SHOPIFY_COUNTRIES.map(c => `<option value="${c.code}">${c.code} — ${c.name}</option>`).join('')
   $('salesChips').innerHTML = [1000, 10000, 100000, 1000000]
     .map(n => `<button type="button" class="chip" data-v="${n}">$${n >= 1e6 ? '1M' : n / 1000 + 'K'}</button>`)
     .join('')
@@ -344,10 +351,6 @@ function bindSelects() {
 
 function readForm() {
   s.internalName = $('internalName').value
-  s.storeName = $('storeName').value
-  s.currency = $('currency').value
-  s.country = $('country').value
-  s.convertFx = $('convertFx').checked
   s.totalSales = Number($('totalSales').value) || 0
   s.orders = Number($('orders').value) || 0
   s.customers = Number($('customers').value) || 0
@@ -361,10 +364,6 @@ function readForm() {
 
 function writeForm() {
   $('internalName').value = s.internalName
-  $('storeName').value = s.storeName
-  $('currency').value = s.currency
-  $('country').value = s.country
-  $('convertFx').checked = s.convertFx
   $('totalSales').value = s.totalSales
   $('orders').value = s.orders
   $('customers').value = s.customers
@@ -543,21 +542,6 @@ $('salesChips').addEventListener('click', e => {
   readForm()
 })
 
-$('currency').addEventListener('change', () => {
-  const to = $('currency').value
-  if (s.convertFx && to !== s.currency) {
-    const from = s.currency
-    s.currency = to
-    s.totalSales = convertShopifyMoney(s.totalSales, from, to)
-    s.payoutBalance = convertShopifyMoney(s.payoutBalance, from, to)
-    s.products = s.products.map(p => ({ ...p, price: convertShopifyMoney(p.price, from, to), compare: p.compare > 0 ? convertShopifyMoney(p.compare, from, to) : 0 }))
-  } else {
-    s.currency = to
-  }
-  writeForm()
-  readForm()
-})
-
 $('addProduct').addEventListener('click', () => {
   s.products.push({ id: `p-${Date.now()}`, title: 'New product', price: 25, compare: 0, allocationPct: 10, inventory: 100, variants: '', image: '' })
   s.products = normalizeProductAllocations(s.products)
@@ -603,6 +587,11 @@ function finish() {
   }
 }
 window.__larpApply = finish
+// Opened by "Edit store" in the app: apply the saved settings right away and go back to the shop.
+if (location.hash === '#apply') {
+  document.documentElement.style.visibility = 'hidden'
+  setTimeout(finish, 0)
+}
 
   } catch (error) {
     var message = error && error.message ? error.message : String(error)
