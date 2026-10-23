@@ -2003,7 +2003,8 @@
       case "select": return toast("Select products");
       case "ancompare": return optSheet("Compare to", ["Previous period", "Previous year", "No comparison"], "Previous period", function () { });
       case "ancur": return optSheet("Currency", [S.tag || S.cur + " " + S.sym.trim()], S.tag || S.cur + " " + S.sym.trim(), function () { });
-      case "account": return sheet("", '<div class="acct"><span class="av lg">' + ic("person") + "</span><b>" + esc(S.name) + ' owner</b><span class="muted">' + esc(S.handle) + '.myshopify.com</span><div class="mgroup">' + [["Manage account", "person", ""], ["Notifications", "bell", ""], ["Preferences", "settings", "larp-prefs"], ["Log out", "exit", ""]].map(function (r) { var act = r[2] ? ' data-act="' + r[2] + '"' : ""; return '<button class="mrow"' + act + ">" + ic(r[1]) + "<span>" + r[0] + "</span>" + ic("chev-right", "chev") + "</button>"; }).join("") + "</div></div>");
+      case "account": return acctPop();
+      case "account-old": return sheet("", '<div class="acct"><span class="av lg">' + ic("person") + "</span><b>" + esc(S.name) + ' owner</b><span class="muted">' + esc(S.handle) + '.myshopify.com</span><div class="mgroup">' + [["Manage account", "person", ""], ["Notifications", "bell", ""], ["Preferences", "settings", "larp-prefs"], ["Log out", "exit", ""]].map(function (r) { var act = r[2] ? ' data-act="' + r[2] + '"' : ""; return '<button class="mrow"' + act + ">" + ic(r[1]) + "<span>" + r[0] + "</span>" + ic("chev-right", "chev") + "</button>"; }).join("") + "</div></div>");
       case "larp-prefs": closeSheets(); closeAll(); location.href = "./editor.html"; return;
       case "locations": return optSheet("Location", ["All locations", "Shop location", "Warehouse"], "All locations", function () { });
       case "sort": return optSheet("Sort by", ["Date (newest first)", "Date (oldest first)", "Order number", "Total price"], "Date (newest first)", function () { });
@@ -2059,6 +2060,29 @@
       if (b && !b.classList.contains("on") && !edit) toast(b.textContent);
       el.classList.remove("on"); setTimeout(function () { el.remove(); }, 300);
       if (edit) setTimeout(openEditStore, 120);
+    });
+  }
+
+  // Tapping the profile photo (top left): account card, Add account, and "..." with Preferences.
+  function acctPop() {
+    var cfg = savedSettingsObj(), nm = cfg.accountName || "Malo Laboussole", em = cfg.accountEmail || "m.laboussole@icloud.com";
+    var el = document.createElement("div");
+    el.className = "spop acpop";
+    el.innerHTML = '<div class="sp-scrim"></div><div class="sp-card ac-card"><div class="ac-r on"><span class="av">' + ic("person") + '</span><div class="ac-t"><b>' + esc(nm) + "</b><span>" + esc(em) + '</span></div>' +
+      '<button type="button" class="ac-more" aria-label="Plus" aria-haspopup="true">' + ic("more") + '</button></div>' +
+      '<button type="button" class="ac-r ac-add">' + ic("plus-circle") + "<b>Ajouter un compte</b></button>" +
+      '<div class="ac-menu" hidden><button type="button" class="ac-pref">' + ic("settings") + "<span>Préférences</span></button></div></div>";
+    app.appendChild(el);
+    requestAnimationFrame(function () { requestAnimationFrame(function () { el.classList.add("on"); }); });
+    function close() { el.classList.remove("on"); setTimeout(function () { el.remove(); }, 300); }
+    el.addEventListener("click", function (e) {
+      var menu = $(".ac-menu", el);
+      if (e.target.closest(".ac-more")) { menu.hidden = !menu.hidden; hap(4); return; }
+      if (e.target.closest(".ac-pref")) { close(); setTimeout(function () { closeSheets(); closeAll(); location.href = "./editor.html"; }, 180); return; }
+      if (e.target.closest(".ac-menu")) return;
+      if (!menu.hidden && !e.target.closest(".ac-r")) { menu.hidden = true; return; }
+      if (e.target.closest(".ac-add")) toast("Ajouter un compte");
+      close();
     });
   }
 
