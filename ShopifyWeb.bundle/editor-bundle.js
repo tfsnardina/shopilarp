@@ -252,15 +252,16 @@ function applyShopifyLarpSettings(base, settings) {
       Math.max(0, Math.round(p.inventory)),
       Math.max(1, variants.length || 1),
       variants.length ? variants : ['Default'],
-      'General',
+      p.type || 'General',
       settings.storeName,
-      `${code}-${1000 + i}`,
-      'Active',
+      p.sku || `${code}-${1000 + i}`,
+      p.status || 'Active',
       Math.round(ordersTarget * (p.allocationPct / 100)),
-      Date.now() - 86400000 * 3,
+      Number(p.ts) || Date.now() - 86400000 * 3,
       hues[i % hues.length],
       p.image || '',
       p.allocationPct,
+      p.id || '',
     ]
   })
   return payload
