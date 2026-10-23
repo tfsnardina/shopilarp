@@ -530,7 +530,7 @@
     el.innerHTML =
       '<div class="hm-top">' +
       '<div class="ptr" id="ptr"><i></i></div>' +
-      '<header class="hm-hd"><button class="av" data-act="account" aria-label="Account">' + ic("person") + '</button>' +
+      '<header class="hm-hd"><button class="av" data-act="account" aria-label="Account">' + avHTML() + '</button>' +
       '<button class="store" data-act="stores">' + logoTile() + "<b>" + esc(S.name) + "</b></button>" +
       '<button class="bell" data-act="notifs" aria-label="Notifications">' + ic("bell") + '<span class="nb" id="nb"' + (unread ? "" : ' hidden') + ">" + unread + "</span></button></header>" +
       '<div class="mets" id="mets">' + metStrip(R) + "</div>" +
@@ -1772,8 +1772,8 @@
     o.ful = "Unfulfilled"; o.pay = Math.random() < 0.05 ? "Authorized" : "Paid"; o.fat = 0; o.carrier = ""; o.trk = ""; o.refunded = 0; o.archived = false; o.note = "";
     return o;
   }
-  function makeOrder(lines, ts) {
-    var src = P.ord[Math.floor(Math.random() * Math.min(P.ord.length, 60))];
+  function makeOrder(lines, ts, srcIdx) {
+    var src = P.ord[srcIdx != null ? srcIdx : Math.floor(Math.random() * Math.min(P.ord.length, 60))];
     if (!src) return null;
     var o = mkOrder(src);
     if (lines && lines.length) {
@@ -1852,6 +1852,67 @@
     });
     saveState();
   }
+  /* ── Orders while the app is closed ─────────────────────────
+     iOS freezes the page in the background, so those orders are planned in advance: each one becomes a local
+     notification (native side, with the cha-ching sound) AND a spec saved in the settings (__bg). When the app
+     opens again, the orders whose time has passed are created for real with the same number and amount. */
+  var BG_PACE = { exploding: [45, 10, 150], growing: [600, 90, 1500], steady: [1500, 300, 3600], declining: [2400, 600, 5400], newstore: [3600, 900, 7200], highrisk: [700, 60, 3000] };   // [mean, min, max] seconds between orders
+  var lastPlan = 0;
+  function nativeBg(items) {
+    try { window.webkit.messageHandlers.shopifySchedule.postMessage({ items: items }); return true; } catch (e) { return false; }
+  }
+  function planBg() {
+    if (Date.now() - lastPlan < 3000) return;
+    lastPlan = Date.now();
+    try {
+      var cfg = savedSettingsObj(), pool = prods.length ? sellable() : [];
+      if (S.pops === false || !pool.length) { if (cfg.__bg) { delete cfg.__bg; writeSettings(cfg); } nativeBg([]); return; }
+      var vibe = larpVibe(), pc = BG_PACE[vibe] || BG_PACE.growing;
+      var base = orders[0] ? orders[0].n : S.lastN, at = Date.now() + (vibe === "exploding" ? 12 + Math.random() * 20 : 25 + Math.random() * 50) * 1000;
+      var specs = [], items = [];
+      for (var i = 0; i < 60; i++) {
+        var lines = userLines(pool), idx = Math.floor(Math.random() * Math.min(P.ord.length, 60));
+        var o = makeOrder(lines, 0, idx); if (!o) break;
+        o.n = base + 1 + i;
+        o.ch = weighted([["Online Store", 74], ["Shop", 10], ["Instagram", 5], ["TikTok", 5], ["Facebook", 3], ["Google & YouTube", 3]]);
+        specs.push({ at: Math.round(at), n: o.n, src: idx, lines: lines.map(function (l) { return [l[0].title, l[1]]; }), pay: o.pay, ch: o.ch });
+        items.push({ at: Math.round(at), title: "Order #" + o.n, body: pushBody(o) });
+        at += 1000 * Math.min(pc[2], Math.max(pc[1], -Math.log(1 - Math.random()) * pc[0]));
+      }
+      cfg.__bg = specs; writeSettings(cfg);
+      nativeBg(items);
+    } catch (e) { }
+  }
+  function consumeBg(resumed) {
+    var cfg = savedSettingsObj(), q = cfg.__bg;
+    if (!Array.isArray(q) || !q.length) return;
+    delete cfg.__bg;                 // clear first so it can never replay twice
+    writeSettings(cfg);
+    nativeBg([]);                    // whatever has not fired yet is cancelled: the live page takes over again
+    lastPlan = 0;
+    var now = Date.now(), done = 0;
+    q.filter(function (sp) { return sp.at <= now; }).sort(function (a, b) { return a.at - b.at; }).forEach(function (sp) {
+      if (orders.some(function (x) { return x.n === sp.n; })) return;
+      var lines = (sp.lines || []).map(function (l) { var p = prods.filter(function (x) { return x.title === l[0]; })[0]; return p ? [p, l[1]] : null; }).filter(Boolean);
+      if (!lines.length) return;
+      var o = makeOrder(lines, nowMs() - (now - sp.at), sp.src);
+      if (!o) return;
+      o.n = sp.n; if (sp.pay) o.pay = sp.pay;
+      commitOrder(o, true);
+      if (sp.ch) o.ch = sp.ch;
+      notifs.unshift({ kind: "order", o: o, ts: o.ts, read: false }); unread += 1;
+      done++;
+    });
+    if (!done) return;
+    setBell(); saveState();
+    if (resumed) {
+      ["home", "orders", "products", "menu"].forEach(function (k) { rendered[k] = 0; });
+      if (!stack.length && RENDER[current]) { RENDER[current](); rendered[current] = 1; }
+    }
+  }
+  window.__larpPlanBg = planBg;
+  window.__larpConsumeBg = function () { consumeBg(true); };
+  document.addEventListener("visibilitychange", function () { if (document.hidden) planBg(); else consumeBg(true); });
   var FN = ["Ava", "Liam", "Mia", "Noah", "Zoe", "Ethan", "Chloe", "Lucas", "Isla", "Mason", "Aria", "Leo", "Nora", "Kai", "Ruby", "Owen", "Maya", "Eli"];
   var LN = ["Turner", "Brooks", "Reed", "Price", "Ward", "Hayes", "Ross", "Cole", "Gray", "James", "Bell", "Ortiz", "Diaz", "Long", "Patel", "Kim", "Nguyen", "Shah"];
   function newCustomer() {
@@ -2063,27 +2124,88 @@
     });
   }
 
-  // Tapping the profile photo (top left): account card, Add account, and "..." with Preferences.
+  // Profile (first name, last name, email, phone, photo) lives in the saved settings.
+  function profileOf(cfg) {
+    cfg = cfg || savedSettingsObj();
+    var first = cfg.accountFirst, last = cfg.accountLast;
+    if (first == null && last == null) {
+      if (cfg.accountName) { var parts = String(cfg.accountName).split(/\s+/); first = parts.shift() || ""; last = parts.join(" "); }
+      else { first = "Malo"; last = "Laboussole"; }
+    }
+    return { first: first || "", last: last || "", email: cfg.accountEmail != null ? cfg.accountEmail : "m.laboussole@icloud.com", phone: cfg.accountPhone || "", photo: cfg.accountPhoto || "" };
+  }
+  function avHTML() { var pr = profileOf(); return pr.photo ? '<img src="' + esc(pr.photo) + '" alt="">' : ic("person"); }
+  // Tapping the profile photo (top left): account card, Add account, and "..." with Profile + Preferences.
   function acctPop() {
-    var cfg = savedSettingsObj(), nm = cfg.accountName || "Malo Laboussole", em = cfg.accountEmail || "m.laboussole@icloud.com";
+    var pr = profileOf(), nm = (pr.first + " " + pr.last).trim() || "Mon compte";
     var el = document.createElement("div");
     el.className = "spop acpop";
-    el.innerHTML = '<div class="sp-scrim"></div><div class="sp-card ac-card"><div class="ac-r on"><span class="av">' + ic("person") + '</span><div class="ac-t"><b>' + esc(nm) + "</b><span>" + esc(em) + '</span></div>' +
+    el.innerHTML = '<div class="sp-scrim"></div><div class="sp-card ac-card"><div class="ac-r on"><span class="av">' + avHTML() + '</span><div class="ac-t"><b>' + esc(nm) + "</b><span>" + esc(pr.email) + '</span></div>' +
       '<button type="button" class="ac-more" aria-label="Plus" aria-haspopup="true">' + ic("more") + '</button></div>' +
       '<button type="button" class="ac-r ac-add">' + ic("plus-circle") + "<b>Ajouter un compte</b></button>" +
-      '<div class="ac-menu" hidden><button type="button" class="ac-pref">' + ic("settings") + "<span>Préférences</span></button></div></div>";
+      '<div class="ac-menu" hidden><button type="button" class="ac-pref" data-go="profile">' + ic("person") + "<span>Modifier le profil</span></button>" +
+      '<button type="button" class="ac-pref" data-go="prefs">' + ic("settings") + "<span>Préférences</span></button></div></div>";
     app.appendChild(el);
     requestAnimationFrame(function () { requestAnimationFrame(function () { el.classList.add("on"); }); });
     function close() { el.classList.remove("on"); setTimeout(function () { el.remove(); }, 300); }
     el.addEventListener("click", function (e) {
       var menu = $(".ac-menu", el);
       if (e.target.closest(".ac-more")) { menu.hidden = !menu.hidden; hap(4); return; }
-      if (e.target.closest(".ac-pref")) { close(); setTimeout(function () { closeSheets(); closeAll(); location.href = "./editor.html"; }, 180); return; }
+      var it = e.target.closest(".ac-pref");
+      if (it) {
+        close();
+        if (it.getAttribute("data-go") === "profile") setTimeout(openEditProfile, 120);
+        else setTimeout(function () { closeSheets(); closeAll(); location.href = "./editor.html"; }, 180);
+        return;
+      }
       if (e.target.closest(".ac-menu")) return;
       if (!menu.hidden && !e.target.closest(".ac-r")) { menu.hidden = true; return; }
       if (e.target.closest(".ac-add")) toast("Ajouter un compte");
       close();
     });
+  }
+  function openEditProfile() {
+    var pr = profileOf(), d = { photo: pr.photo }, saving = false;
+    var body = '<div class="np">' +
+      '<div class="np-c"><div class="np-l">Photo de profil</div><div class="np-media"><button type="button" class="np-ph round" id="epPh"></button><button type="button" class="np-rm" id="epRm" hidden>Supprimer la photo</button></div></div>' +
+      '<div class="np-c"><div class="np-l">Informations</div><div class="np-row">' +
+      '<label class="np-f"><span>Prénom</span><input id="epFirst" type="text" maxlength="40" value="' + esc(pr.first) + '" autocomplete="off" autocapitalize="words"></label>' +
+      '<label class="np-f"><span>Nom</span><input id="epLast" type="text" maxlength="40" value="' + esc(pr.last) + '" autocomplete="off" autocapitalize="words"></label></div>' +
+      '<label class="np-f"><span>Adresse e-mail</span><input id="epMail" type="email" inputmode="email" maxlength="80" value="' + esc(pr.email) + '" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></label>' +
+      '<label class="np-f"><span>Téléphone (facultatif)</span><input id="epTel" type="tel" inputmode="tel" maxlength="30" value="' + esc(pr.phone) + '" autocomplete="off"></label></div>' +
+      '<p class="np-err" id="epErr" hidden></p><button type="button" class="btn-p np-go" id="epGo">Enregistrer</button></div>' +
+      '<input type="file" id="epFile" accept="image/*" hidden>';
+    var el = page(body, { title: "Modifier le profil", modal: true, notabs: true, cls: "newprod", actions: '<button type="button" class="np-save" id="epSave">Enregistrer</button>' });
+    var g = function (id) { return $("#" + id, el); };
+    function showPh() {
+      var ph = g("epPh");
+      ph.classList.toggle("has", !!d.photo);
+      ph.innerHTML = d.photo ? '<img src="' + esc(d.photo) + '" alt="">' : ic("person") + "<span>Ajouter une photo</span>";
+      g("epRm").hidden = !d.photo;
+    }
+    showPh();
+    g("epPh").addEventListener("click", function () { g("epFile").value = ""; g("epFile").click(); });
+    g("epRm").addEventListener("click", function () { d.photo = ""; showPh(); });
+    g("epFile").addEventListener("change", function () {
+      var file = this.files && this.files[0]; if (!file) return;
+      resizeImg(file, function (data) { if (data) { d.photo = data; showPh(); } else toast("Impossible de charger cette photo"); });
+    });
+    function fail(m) { var eb = g("epErr"); eb.hidden = !m; eb.textContent = m || ""; }
+    function save() {
+      if (saving) return;
+      var first = g("epFirst").value.trim(), last = g("epLast").value.trim(), mail = g("epMail").value.trim(), tel = g("epTel").value.trim();
+      if (!first && !last) return fail("Entre au moins un prénom ou un nom.");
+      if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return fail("Adresse e-mail invalide.");
+      fail(""); saving = true; hap(10);
+      var cfg = savedSettingsObj();
+      cfg.accountFirst = first; cfg.accountLast = last; cfg.accountEmail = mail; cfg.accountPhone = tel; cfg.accountPhoto = d.photo;
+      writeSettings(cfg);
+      $$(".av[data-act=account]").forEach(function (a) { a.innerHTML = avHTML(); });
+      pop(false);
+      setTimeout(function () { toast("Profil enregistré"); }, 320);
+    }
+    g("epGo").addEventListener("click", save);
+    g("epSave").addEventListener("click", save);
   }
 
   /* ── Edit store: name, photo, URL, currency, region ─────────── */
@@ -2160,6 +2282,7 @@
   function closeSheets() { while (stack.length && stack[stack.length - 1].kind === "sheet") pop(false); }
 
   /* ── Boot ────────────────────────────────────────────────── */
+  consumeBg(false);
   consumeQueue();
   setTab("home");
   // Pre-render the other tabs while idle so the first switch is instant.
