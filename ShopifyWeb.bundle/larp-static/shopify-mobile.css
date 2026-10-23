@@ -742,3 +742,8 @@ html.checker-native #tabbar{bottom:calc(var(--bot,0px) + 8px)!important}
 .np-err{margin:-2px 4px 0;font-size:14px;font-weight:500;color:var(--crit)}
 .np-go{margin-top:2px}
 .np-go:disabled{opacity:.4;pointer-events:none}
+
+.np-f>select{width:100%;height:46px;padding:0 12px;border:1px solid #c9c9c9;border-radius:12px;background:#fff;color:var(--tx);font-size:16.5px;outline:0;-webkit-appearance:none;appearance:none;background-image:linear-gradient(45deg,transparent 50%,#616161 50%),linear-gradient(135deg,#616161 50%,transparent 50%);background-position:calc(100% - 20px) 20px,calc(100% - 15px) 20px;background-size:5px 5px;background-repeat:no-repeat}
+.np-f>select:focus{border-color:#303030;box-shadow:0 0 0 1px #303030}
+.np-in>input{flex:1;min-width:0;border:0;outline:0;background:transparent;height:100%;font-size:16.5px;color:var(--tx)}
+.np-in>i{font-style:normal;color:var(--tx3);font-size:15px;white-space:nowrap}
