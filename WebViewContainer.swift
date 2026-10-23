@@ -192,6 +192,17 @@ enum WebViewContainer {
             decidePolicyFor navigationAction: WKNavigationAction,
             decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
         ) {
+            // The seed script embeds the saved settings as they are *now*. Rebuild it before every navigation,
+            // otherwise the editor opens with the settings from when this web view was created (stale totals).
+            let controller = webView.configuration.userContentController
+            controller.removeAllUserScripts()
+            controller.addUserScript(
+                WKUserScript(
+                    source: WebViewContainer.nativeChromeScript(),
+                    injectionTime: .atDocumentStart,
+                    forMainFrameOnly: true
+                )
+            )
             decisionHandler(.allow)
         }
     }
