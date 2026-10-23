@@ -17,8 +17,6 @@ let s = loadSettings()
 const $ = id => document.getElementById(id)
 
 function bindSelects() {
-  $('currency').innerHTML = SHOPIFY_CURRENCIES.map(c => `<option value="${c.code}">${c.label}</option>`).join('')
-  $('country').innerHTML = SHOPIFY_COUNTRIES.map(c => `<option value="${c.code}">${c.code} — ${c.name}</option>`).join('')
   $('salesChips').innerHTML = [1000, 10000, 100000, 1000000]
     .map(n => `<button type="button" class="chip" data-v="${n}">$${n >= 1e6 ? '1M' : n / 1000 + 'K'}</button>`)
     .join('')
@@ -26,10 +24,6 @@ function bindSelects() {
 
 function readForm() {
   s.internalName = $('internalName').value
-  s.storeName = $('storeName').value
-  s.currency = $('currency').value
-  s.country = $('country').value
-  s.convertFx = $('convertFx').checked
   s.totalSales = Number($('totalSales').value) || 0
   s.orders = Number($('orders').value) || 0
   s.customers = Number($('customers').value) || 0
@@ -43,10 +37,6 @@ function readForm() {
 
 function writeForm() {
   $('internalName').value = s.internalName
-  $('storeName').value = s.storeName
-  $('currency').value = s.currency
-  $('country').value = s.country
-  $('convertFx').checked = s.convertFx
   $('totalSales').value = s.totalSales
   $('orders').value = s.orders
   $('customers').value = s.customers
@@ -106,21 +96,6 @@ $('salesChips').addEventListener('click', e => {
   const b = e.target.closest('.chip')
   if (!b) return
   s.totalSales = Number(b.dataset.v)
-  writeForm()
-  readForm()
-})
-
-$('currency').addEventListener('change', () => {
-  const to = $('currency').value
-  if (s.convertFx && to !== s.currency) {
-    const from = s.currency
-    s.currency = to
-    s.totalSales = convertShopifyMoney(s.totalSales, from, to)
-    s.payoutBalance = convertShopifyMoney(s.payoutBalance, from, to)
-    s.products = s.products.map(p => ({ ...p, price: convertShopifyMoney(p.price, from, to) }))
-  } else {
-    s.currency = to
-  }
   writeForm()
   readForm()
 })
