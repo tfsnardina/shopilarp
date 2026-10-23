@@ -93,8 +93,14 @@
 
   /* ── Data ────────────────────────────────────────────────── */
   var custs = EMPTY ? [] : P.cus.map(function (c) { return { name: c[0], email: c[1], phone: c[2], city: c[3], region: c[4], ts: c[5], n: c[6], spent: c[7], sub: !!c[8], tags: c[9] || [] }; });
-  var allProds = P.pro.map(function (x, i) { return { i: i, title: x[0], price: x[1], compare: x[2], inv: x[3], vars: x[4], vnames: x[5] || [], type: x[6], vendor: x[7], sku: x[8], status: x[9], sold: x[10], ts: x[11], hue: x[12] }; });
-  var prods = EMPTY ? [] : allProds;
+  var demoRaw = P.demoPro || P.pro, userRaw = P.demoPro ? P.pro : [];
+  function mkProd(x, i, hidden) {
+    var img = typeof x[13] === "string" && x[13].indexOf("data:image/") === 0 ? x[13] : "";
+    return { i: hidden ? -1 - i : i, title: x[0], price: x[1], compare: x[2], inv: x[3], vars: x[4], vnames: x[5] || [], type: x[6], vendor: x[7], sku: x[8], status: x[9], sold: x[10], ts: x[11], hue: x[12], img: img, share: x[14] > 0 ? x[14] : 0 };
+  }
+  var allProds = demoRaw.map(function (x, i) { return mkProd(x, i, EMPTY); });   // templates for generated orders
+  var prods = EMPTY ? userRaw.map(function (x, i) { return mkProd(x, i, false); }) : allProds;
+  prods.forEach(function (p) { p.baseInv = p.inv; });
   function mkOrder(o) {
     return {
       n: o[0], ts: o[1], c: custs[o[2]] || null, items: o[3].map(function (x) { return { p: allProds[x[0]] || allProds[0], q: x[1], price: x[2] }; }),
@@ -108,22 +114,39 @@
   var HR = { y: P.hr.y, t: P.hr.t };
   var live = P.live;
   /* PERSISTENCE: new orders survive an app relaunch (stored inside the saved settings as __state). */
-  var STATE_V = 1, lastSnap = "";
+  var STATE_V = 2, lastSnap = "";
   var pend = { sales: 0, orders: 0, cust: 0, sess: 0 }; // growth not yet written into the Preferences
   function savedSettingsObj() {
     try { return JSON.parse(window.__LARP_SAVED_SETTINGS__ || localStorage.getItem("checker.settings.shopifyLarp") || "{}") || {}; } catch (e) { return {}; }
+  }
+  function writeSettings(cfg) {
+    var raw = JSON.stringify(cfg);
+    try { localStorage.setItem("checker.settings.shopifyLarp", raw); } catch (e1) { }
+    window.__LARP_SAVED_SETTINGS__ = raw;
+    try { window.webkit.messageHandlers.larpStore.postMessage({ settings: raw }); } catch (e2) { }
+  }
+  function sigOf(c) {
+    return [c.totalSales, c.orders, c.customers, c.sessions, c.conversionRate, c.returningCustomersPct, c.payoutBalance]
+      .map(function (v) { return String(+(Number(v) || 0).toFixed(2)); })
+      .concat([String(c.currency == null ? "" : c.currency), String(c.country == null ? "" : c.country)]).join("|");
+  }
+  function lookupProd(title, price) {
+    var f = function (l) { return l.filter(function (p) { return p.title === title; })[0]; };
+    return f(prods) || f(allProds) || { i: -99, title: title || "Item", price: price || 0, compare: 0, inv: 0, vars: 1, vnames: ["Default"], type: "", vendor: S.name, sku: "", status: "Archived", sold: 0, ts: 0, hue: 233, img: "", share: 0 };
   }
   function saveState() {
     if (!EMPTY) return;
     try {
       var list = orders.slice(0, 300), cl = [];
       list.forEach(function (o) { if (o.c && cl.indexOf(o.c) < 0) cl.push(o.c); });
+      var inv = {};
+      prods.forEach(function (p) { inv[p.title] = [p.inv, p.baseInv, p.sold]; });
       var snap = {
-        v: STATE_V, D: D, hrT: HR.t, purchased: live.purchased, custTotal: S.custTotal, custs: cl,
+        v: STATE_V, D: D, hrT: HR.t, purchased: live.purchased, custTotal: S.custTotal, custs: cl, inv: inv,
         orders: list.map(function (o) {
           var c = Object.assign({}, o);
           c.c = cl.indexOf(o.c);
-          c.items = o.items.map(function (x) { return [x.p ? x.p.i : 0, x.q, x.price]; });
+          c.items = o.items.map(function (x) { return [x.p ? x.p.title : "", x.q, x.price]; });
           return c;
         }),
       };
@@ -137,27 +160,29 @@
       cfg.orders = Math.round((Number(cfg.orders) || 0) + pend.orders);
       cfg.customers = Math.round((Number(cfg.customers) || 0) + pend.cust);
       cfg.sessions = Math.round((Number(cfg.sessions) || 0) + pend.sess);
+      cfg.__sig = sigOf(cfg);
       pend = { sales: 0, orders: 0, cust: 0, sess: 0 };
-      var raw = JSON.stringify(cfg);
-      try { localStorage.setItem("checker.settings.shopifyLarp", raw); } catch (e1) { }
-      window.__LARP_SAVED_SETTINGS__ = raw;
-      try { window.webkit.messageHandlers.larpStore.postMessage({ settings: raw }); } catch (e2) { }
+      writeSettings(cfg);
     } catch (e) { }
   }
   (function restoreState() {
     if (!EMPTY) return;
     var snap = savedSettingsObj().__state;
-    if (!snap || snap.v !== STATE_V || !Array.isArray(snap.orders)) return;
+    if (!snap || (snap.v !== 1 && snap.v !== 2) || !Array.isArray(snap.orders)) return;
     try {
       Object.keys(snap.D || {}).forEach(function (k) { if (D[k] && snap.D[k] && D[k].length === snap.D[k].length) D[k] = snap.D[k]; });
       if (snap.hrT) HR.t = snap.hrT;
       live.purchased = snap.purchased || 0;
       S.custTotal = snap.custTotal || 0;
       custs = (snap.custs || []).slice();
+      prods.forEach(function (p) {
+        var r = snap.inv && snap.inv[p.title];
+        if (r && r[1] === p.baseInv) { p.inv = r[0]; p.sold = r[2] || 0; }   // stock edited in Preferences wins
+      });
       orders = snap.orders.map(function (c) {
         var o = Object.assign({}, c);
         o.c = custs[c.c] || null;
-        o.items = c.items.map(function (x) { return { p: allProds[x[0]] || allProds[0], q: x[1], price: x[2] }; });
+        o.items = c.items.map(function (x) { return { p: typeof x[0] === "number" ? (allProds[x[0]] || allProds[0]) : lookupProd(x[0], x[2]), q: x[1], price: x[2] }; });
         return o;
       });
       lastSnap = JSON.stringify(snap);
@@ -718,8 +743,8 @@
     }).join("") + "</div>";
   }
   function thumb(p, size) {
-    var cls = "th" + (size >= 60 ? " lg" : "");
-    return '<span class="' + cls + '" style="--h:' + p.hue + '">' + ic("image") + "</span>";
+    var cls = "th" + (size >= 60 ? " lg" : "") + (p.img ? " img" : "");
+    return '<span class="' + cls + '" style="--h:' + p.hue + '">' + (p.img ? '<img src="' + p.img + '" alt="">' : ic("image")) + "</span>";
   }
   function globeSvg(sz) {
     return '<svg class="globe" width="' + sz + '" height="' + sz + '" viewBox="0 0 64 64"><defs><radialGradient id="gg" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#3a3f47"/><stop offset="1" stop-color="#0d0f12"/></radialGradient></defs><circle cx="32" cy="32" r="30" fill="url(#gg)"/>' +
@@ -1178,7 +1203,7 @@
   }
   function lineItems(o) {
     return o.items.map(function (x) {
-      var v = x.p.vnames.length > 1 ? x.p.vnames[(o.n + x.p.i) % x.p.vnames.length] : "";
+      var v = x.p.vnames.length > 1 ? x.p.vnames[Math.abs(o.n + x.p.i) % x.p.vnames.length] : "";
       return '<div class="li">' + thumb(x.p, 48) + '<div class="li-t"><b>' + esc(x.p.title) + "</b>" + (v ? "<span>" + esc(v) + "</span>" : "") + "<em>" + money(x.price) + '</em></div><span class="li-q">× ' + x.q + "</span></div>";
     }).join("");
   }
@@ -1584,27 +1609,58 @@
   function chaChing() { if (!audioOk || !audio) return; try { audio.currentTime = 0; var p = audio.play(); if (p && p.catch) p.catch(function () { }); } catch (e) { } }
   function setBell() { var b = $("#nb"); if (!b) return; b.textContent = unread > 99 ? "99+" : unread; b.hidden = !unread; }
   function weighted(list) { var t = list.reduce(function (a, x) { return a + x[1]; }, 0), r = Math.random() * t; for (var i = 0; i < list.length; i++) { r -= list[i][1]; if (r < 0) return list[i][0]; } return list[0][0]; }
-  function newOrder() {
-    var src = P.ord[Math.floor(Math.random() * Math.min(P.ord.length, 60))];
-    if (!src) return;
-    var o = mkOrder(src);
-    var ts = nowMs();
+  function userLines() {
+    var total = prods.reduce(function (a, p) { return a + (p.share > 0 ? p.share : 1); }, 0);
+    function pick() {
+      var r = Math.random() * total;
+      for (var i = 0; i < prods.length; i++) { r -= prods[i].share > 0 ? prods[i].share : 1; if (r <= 0) return prods[i]; }
+      return prods[prods.length - 1];
+    }
+    var n = Math.random() < 0.22 && prods.length > 1 ? 2 : 1, lines = [], used = {};
+    for (var k = 0; k < n; k++) {
+      var p = pick();
+      if (used[p.title]) continue;
+      used[p.title] = 1;
+      lines.push([p, weighted([[1, 62], [2, 26], [3, 12]])]);
+    }
+    return lines;
+  }
+  function freshOrder(o, ts) {
     o.ts = ts; o.n = orders[0] ? orders[0].n + 1 : S.lastN + 1;
     o.ful = "Unfulfilled"; o.pay = Math.random() < 0.05 ? "Authorized" : "Paid"; o.fat = 0; o.carrier = ""; o.trk = ""; o.refunded = 0; o.archived = false; o.note = "";
+    return o;
+  }
+  function makeOrder(lines, ts) {
+    var src = P.ord[Math.floor(Math.random() * Math.min(P.ord.length, 60))];
+    if (!src) return null;
+    var o = mkOrder(src);
+    if (lines && lines.length) {
+      var ratio = (src[4] - src[5]) > 0 ? src[9] / (src[4] - src[5]) : 0;
+      o.items = lines.map(function (l) { return { p: l[0], q: l[1], price: l[0].price }; });
+      o.sub = o.items.reduce(function (a, x) { return a + x.price * x.q; }, 0);
+      o.disc = 0; o.code = "";
+      o.tax = Math.round(o.sub * ratio);
+      o.total = o.sub + o.ship + o.tax;
+    }
+    return freshOrder(o, ts);
+  }
+  function commitOrder(o, quiet) {
     // A fresh shopper most of the time.
     var pool = custs.slice(0, 40);
     o.c = Math.random() < 0.7 || !pool.length ? newCustomer() : pool[Math.floor(Math.random() * pool.length)];
     o.c.n += 1; o.c.spent += o.total;
     o.ch = weighted([["Online Store", 74], ["Shop", 10], ["Instagram", 5], ["TikTok", 5], ["Facebook", 3], ["Google & YouTube", 3]]);
     orders.unshift(o);
-    // Today's numbers move with it.
-    var h = curHour();
+    // The numbers move with it.
+    var h = L(o.ts).getUTCHours();
     D.s[T] += o.total; D.o[T] += 1; D.g[T] += o.sub; D.dc[T] += o.disc; D.sh[T] += o.ship; D.tx[T] += o.tax; D.u[T] += units(o);
     var addSe = 1 + Math.floor(Math.random() * 3); D.se[T] += addSe;
     pend.sales += o.total / Math.pow(10, S.dec != null ? S.dec : 2); pend.orders += 1; pend.sess += addSe;
     HR.t[0][h] += o.total; HR.t[1][h] += 1; HR.t[2][h] += 1;
     live.purchased += 1;
-    notifs.unshift({ kind: "order", o: o, ts: ts, read: false });
+    o.items.forEach(function (x) { if (x.p && x.p.i >= 0) { x.p.inv = Math.max(0, x.p.inv - x.q); x.p.sold += x.q; } });
+    if (quiet) return;
+    notifs.unshift({ kind: "order", o: o, ts: o.ts, read: false });
     unread += 1; setBell();
     // The owner can switch the pop-ups off; the order still lands quietly.
     if (S.pops !== false) {
@@ -1617,6 +1673,35 @@
       var list = $("#olist");
       if (list && orderMatches(o)) { renderOrders(); var row = $('[data-order="' + o.n + '"]', $("#s-orders")); if (row) row.classList.add("fresh"); }
     } else rendered.orders = 0;
+    if (current === "products" && !stack.length) rendered.products = 0;
+  }
+  function newOrder() {
+    var o = makeOrder(prods.length ? userLines() : null, nowMs());
+    if (o) commitOrder(o, false);
+  }
+  // Fake orders queued in Preferences are created once, silently, when the app opens.
+  function consumeQueue() {
+    var cfg = savedSettingsObj(), q = cfg.__queue;
+    if (!Array.isArray(q) || !q.length) return;
+    delete cfg.__queue;            // clear first so a crash can never replay it
+    writeSettings(cfg);
+    var jobs = [];
+    q.forEach(function (it) {
+      var p = it.title && it.title !== "*" ? prods.filter(function (x) { return x.title === it.title; })[0] || null : null;
+      var times = Math.max(1, Math.min(500, Math.round(Number(it.times) || 1))), qty = Math.max(1, Math.min(999, Math.round(Number(it.qty) || 1)));
+      for (var k = 0; k < times; k++) jobs.push([p, qty]);
+    });
+    if (!jobs.length) return;
+    var now = nowMs(), d = L(now);
+    var sinceMidnight = d.getUTCHours() * HOUR + d.getUTCMinutes() * 60000 + d.getUTCSeconds() * 1000;
+    var span = Math.max(60000, Math.min(2 * HOUR, sinceMidnight));
+    var stamps = jobs.map(function () { return now - Math.random() * span; }).sort(function (a, b) { return a - b; });
+    jobs.forEach(function (j, k) {
+      var p = j[0] || (prods.length ? userLines()[0][0] : null);
+      var o = makeOrder(p ? [[p, j[1]]] : null, stamps[k]);
+      if (o) commitOrder(o, true);
+    });
+    saveState();
   }
   var FN = ["Ava", "Liam", "Mia", "Noah", "Zoe", "Ethan", "Chloe", "Lucas", "Isla", "Mason", "Aria", "Leo", "Nora", "Kai", "Ruby", "Owen", "Maya", "Eli"];
   var LN = ["Turner", "Brooks", "Reed", "Price", "Ward", "Hayes", "Ross", "Cole", "Gray", "James", "Bell", "Ortiz", "Diaz", "Long", "Patel", "Kim", "Nguyen", "Shah"];
@@ -1807,6 +1892,7 @@
   function closeSheets() { while (stack.length && stack[stack.length - 1].kind === "sheet") pop(false); }
 
   /* ── Boot ────────────────────────────────────────────────── */
+  consumeQueue();
   setTab("home");
   // Pre-render the other tabs while idle so the first switch is instant.
   var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 300); };
