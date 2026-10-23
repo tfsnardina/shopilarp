@@ -6,7 +6,16 @@
   // EMPTY START: a brand-new store (0 sales, 0 orders, no products, no customers).
   // P.ord / P.pro stay in memory only as templates so new orders can still be generated.
   var EMPTY = true, CFG = {};
-  try { CFG = JSON.parse(window.__LARP_SAVED_SETTINGS__ || localStorage.getItem("checker.settings.shopifyLarp") || "{}") || {}; } catch (e) { CFG = {}; }
+  // The native layer injects the settings it had when the web view was created, which can be older than
+  // what this page saved since. Whichever copy (injected or localStorage) carries the newest __ts wins.
+  function readCfgFresh() {
+    var a = null, b = null;
+    try { a = JSON.parse(window.__LARP_SAVED_SETTINGS__ || "null"); } catch (e) { }
+    try { b = JSON.parse(localStorage.getItem("checker.settings.shopifyLarp") || "null"); } catch (e) { }
+    if (a && b) return (Number(b.__ts) || 0) > (Number(a.__ts) || 0) ? b : a;
+    return a || b || {};
+  }
+  try { CFG = readCfgFresh() || {}; } catch (e) { CFG = {}; }
   if (CFG.emptyStore === false) EMPTY = false;
   // Lists (orders / products / customers) always start empty. The NUMBERS follow the Preferences:
   // all-zero Preferences => everything at 0; otherwise sales, orders, sessions... take the values you typed.
@@ -16,8 +25,10 @@
     if (WANT_ZERO) {
       Object.keys(D).forEach(function (k) { if (Array.isArray(D[k])) D[k] = D[k].map(function () { return 0; }); });
       if (P.hr) ["y", "t"].forEach(function (k) { if (Array.isArray(P.hr[k])) P.hr[k] = P.hr[k].map(function (row) { return Array.isArray(row) ? row.map(function () { return 0; }) : 0; }); });
-      S.custTotal = 0; S.payout = 0;
-      P.pay = [];
+      S.custTotal = 0;
+      // A payout balance typed in Preferences is applied on its own; it does not need the other numbers.
+      if (!(CFG.payoutBalance > 0)) { S.payout = 0; P.pay = []; }
+      else P.pay = (P.pay || []).filter(function (r) { return r[2] === "Scheduled"; });   // keep only the scheduled payout, no fake history
       P.live = { visitors: 0, carts: 0, checkingOut: 0, purchased: 0 };
     }
   }
@@ -117,18 +128,20 @@
   var STATE_V = 2, lastSnap = "";
   var pend = { sales: 0, orders: 0, cust: 0, sess: 0 }; // growth not yet written into the Preferences
   function savedSettingsObj() {
-    try { return JSON.parse(window.__LARP_SAVED_SETTINGS__ || localStorage.getItem("checker.settings.shopifyLarp") || "{}") || {}; } catch (e) { return {}; }
+    try { return readCfgFresh() || {}; } catch (e) { return {}; }
   }
   function writeSettings(cfg) {
+    cfg.__ts = Date.now();   // freshness stamp: lets the editor tell this copy from a stale injected one
     var raw = JSON.stringify(cfg);
     try { localStorage.setItem("checker.settings.shopifyLarp", raw); } catch (e1) { }
     window.__LARP_SAVED_SETTINGS__ = raw;
     try { window.webkit.messageHandlers.larpStore.postMessage({ settings: raw }); } catch (e2) { }
   }
   function sigOf(c) {
-    return [c.totalSales, c.orders, c.customers, c.sessions, c.conversionRate, c.returningCustomersPct, c.payoutBalance]
+    // Only the numbers that define the store's history. Payout balance, country, products, name, vibe... apply on their own.
+    return [c.totalSales, c.orders, c.customers, c.sessions, c.conversionRate, c.returningCustomersPct]
       .map(function (v) { return String(+(Number(v) || 0).toFixed(2)); })
-      .concat([String(c.currency == null ? "" : c.currency), String(c.country == null ? "" : c.country)]).join("|");
+      .concat([String(c.currency == null ? "" : c.currency)]).join("|");
   }
   function lookupProd(title, price) {
     var f = function (l) { return l.filter(function (p) { return p.title === title; })[0]; };
@@ -1658,6 +1671,7 @@
     pend.sales += o.total / Math.pow(10, S.dec != null ? S.dec : 2); pend.orders += 1; pend.sess += addSe;
     HR.t[0][h] += o.total; HR.t[1][h] += 1; HR.t[2][h] += 1;
     live.purchased += 1;
+    if (live.visitors < 2) live.visitors = 2 + Math.floor(Math.random() * 4);   // someone is on the store when an order lands
     o.items.forEach(function (x) { if (x.p && x.p.i >= 0) { x.p.inv = Math.max(0, x.p.inv - x.q); x.p.sold += x.q; } });
     if (quiet) return;
     notifs.unshift({ kind: "order", o: o, ts: o.ts, read: false });
@@ -1746,7 +1760,7 @@
   }
   function larpVibe() {
     var vibe = S.vibe;
-    if (!vibe) { try { vibe = (JSON.parse(localStorage.getItem("checker.settings.shopifyLarp") || "{}") || {}).vibe; } catch (e) { } }
+    if (!vibe) { try { vibe = (readCfgFresh() || {}).vibe; } catch (e) { } }
     return vibe;
   }
   function scheduleOrder(first) {
@@ -1762,11 +1776,32 @@
       }, w * 1000);
       return;
     }
-    // Other vibes: today's pace sets the gap, kept inside a watchable window.
-    var perDay = Math.max(1, D.o[T - 1] || D.o[T] || 1);
-    var mean = Math.max(28, Math.min(240, 86400 / perDay));
-    var wait = first ? 7 + Math.random() * 6 : -Math.log(1 - Math.random()) * mean;
-    setTimeout(function () { if (!document.hidden) newOrder(); scheduleOrder(false); }, wait * 1000);
+    // Other vibes: each one has its own pace, independent of the (possibly empty) history, so orders keep coming.
+    //   mean  = average seconds between orders        min = never faster than this
+    //   max   = never wait longer than this (no long dead silences)
+    //   burst = chance that an order arrives together with 1-2 more (shoppers rarely arrive one by one)
+    var PACE = {
+      newstore: { mean: 75, min: 12, max: 180, burst: 0.05 },
+      declining: { mean: 50, min: 10, max: 150, burst: 0.08 },
+      steady: { mean: 32, min: 8, max: 100, burst: 0.12 },
+      growing: { mean: 20, min: 5, max: 70, burst: 0.18 }
+    };
+    var vibe = larpVibe(), wait, burstN = 1;
+    if (first) {
+      wait = 4 + Math.random() * 4;                       // the first order shows up within seconds
+    } else if (vibe === "highrisk") {
+      // Choppy: flurries of fast orders, then quiet stretches.
+      if (Math.random() < 0.35) { wait = 2 + Math.random() * 4; burstN = 1 + Math.floor(Math.random() * 2); }
+      else wait = 28 + Math.random() * 45;
+    } else {
+      var pc = PACE[vibe] || PACE.growing;
+      wait = Math.min(pc.max, Math.max(pc.min, -Math.log(1 - Math.random()) * pc.mean));
+      if (Math.random() < pc.burst) burstN = 2 + Math.floor(Math.random() * 2);
+    }
+    setTimeout(function () {
+      if (!document.hidden) { for (var i = 0; i < burstN; i++) newOrder(); }
+      scheduleOrder(false);
+    }, wait * 1000);
   }
   // Visitors right now drift a little (EXPLODING: they climb fast, every ~1.2 s).
   function showVisitors() {
