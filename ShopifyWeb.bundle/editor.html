@@ -12,6 +12,8 @@
     <button type="button" class="done js-done" onclick="window.__larpDone && window.__larpDone()">Done</button>
   </header>
   <p id="doneError"></p>
+  <!-- Moved to "Edit store". Kept hidden so an older editor-bundle.js still finds them and does not crash. -->
+  <div hidden aria-hidden="true"><input id="storeName"><select id="currency"></select><select id="country"></select><input type="checkbox" id="convertFx"></div>
   <section>
     <label>Internal name</label>
     <input id="internalName" maxlength="48" autocomplete="off">
