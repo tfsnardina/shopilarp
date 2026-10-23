@@ -57,6 +57,30 @@ enum NotificationPermission {
         )
         UNUserNotificationCenter.current().add(request)
     }
+
+    /// Orders planned by the page for when the app is closed. iOS allows 64 pending local notifications,
+    /// so we keep 60. Fixed identifiers: scheduling again replaces the previous plan, an empty list cancels it.
+    static let scheduledCount = 60
+
+    static func replaceScheduled(_ items: [[String: Any]]) {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(
+            withIdentifiers: (0..<scheduledCount).map { "shopify-bg-\($0)" }
+        )
+        let now = Date().timeIntervalSince1970
+        for (index, item) in items.prefix(scheduledCount).enumerated() {
+            guard let atMs = (item["at"] as? NSNumber)?.doubleValue else { continue }
+            let delay = atMs / 1000 - now
+            if delay < 1 { continue }
+            let content = UNMutableNotificationContent()
+            content.title = (item["title"] as? String) ?? "New order"
+            content.body = (item["body"] as? String) ?? ""
+            content.sound = UNNotificationSound(named: UNNotificationSoundName("cha-ching.caf"))
+            content.threadIdentifier = UUID().uuidString
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+            center.add(UNNotificationRequest(identifier: "shopify-bg-\(index)", content: content, trigger: trigger))
+        }
+    }
 }
 
 final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
