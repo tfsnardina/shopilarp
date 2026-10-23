@@ -51,20 +51,23 @@ const DEFAULT_SHOPIFY_LARP = {
   payoutBalance: 0,
   vibe: 'growing',
   liveOrders: true,
-  products: [
-    { id: 'p1', title: 'Classic Tee', price: 28, allocationPct: 40, inventory: 420 },
-    { id: 'p2', title: 'Everyday Hoodie', price: 54, allocationPct: 30, inventory: 180 },
-    { id: 'p3', title: 'Canvas Tote', price: 19, allocationPct: 30, inventory: 260 },
-  ],
+  productsV: 2,
+  products: [],
 }
 
 function readSavedSettings(raw) {
   if (!raw) return null
   try {
-    const merged = { ...DEFAULT_SHOPIFY_LARP, ...JSON.parse(raw) }
-    if (!Array.isArray(merged.products) || !merged.products.length) {
-      merged.products = cloneData(DEFAULT_SHOPIFY_LARP.products)
+    const saved = JSON.parse(raw)
+    const merged = { ...DEFAULT_SHOPIFY_LARP, ...saved }
+    if (!Array.isArray(merged.products)) merged.products = []
+    if (saved.productsV !== 2) {
+      // the old built-in demo products are no longer pre-filled
+      const demo = ['Classic Tee', 'Everyday Hoodie', 'Canvas Tote']
+      if (merged.products.length && merged.products.every(p => demo.includes(p.title) && /^p[123]$/.test(String(p.id || '')))) merged.products = []
+      merged.productsV = 2
     }
+    merged.products = merged.products.map(p => ({ compare: 0, variants: '', image: '', ...p }))
     return merged
   } catch {
     return null
@@ -231,25 +234,27 @@ function applyShopifyLarpSettings(base, settings) {
 
   const products = normalizeProductAllocations(settings.products)
   const basePros = payload.pro ?? []
+  payload.demoPro = cloneData(basePros) // hidden templates used to build realistic orders
   const hues = [233, 18, 142, 88, 201]
   payload.pro = products.map((p, i) => {
-    const prev = basePros[i]
-    const priceCents = moneyToCents(p.price, settings.currency)
-    const sold = Math.max(1, Math.round(ordersTarget * (p.allocationPct / 100) * 1.4))
+    const variants = String(p.variants || '').split(',').map(v => v.trim()).filter(Boolean).slice(0, 12)
+    const code = String(p.title || 'PRD').replace(/[^a-z0-9]/gi, '').slice(0, 3).toUpperCase() || 'PRD'
     return [
-      p.title,
-      priceCents,
-      prev?.[2] ?? 0,
-      Math.round(p.inventory),
-      prev?.[4] ?? 1,
-      prev?.[5] ?? ['Default'],
-      prev?.[6] ?? 'Apparel',
+      p.title || 'Untitled product',
+      moneyToCents(p.price, settings.currency),
+      p.compare > 0 ? moneyToCents(p.compare, settings.currency) : 0,
+      Math.max(0, Math.round(p.inventory)),
+      Math.max(1, variants.length || 1),
+      variants.length ? variants : ['Default'],
+      'General',
       settings.storeName,
-      prev?.[8] ?? `SKU-${1000 + i}`,
+      `${code}-${1000 + i}`,
       'Active',
-      sold,
-      prev?.[11] ?? Date.now() - 86400000 * 30,
-      prev?.[12] ?? hues[i % hues.length],
+      Math.round(ordersTarget * (p.allocationPct / 100)),
+      Date.now() - 86400000 * 3,
+      hues[i % hues.length],
+      p.image || '',
+      p.allocationPct,
     ]
   })
   return payload
@@ -275,10 +280,22 @@ function buildShopifyLarpPayload(settings) {
   return applyShopifyLarpSettings(loadShopifyLarpBase(), settings)
 }
 
+function sigOf(c) {
+  return [c.totalSales, c.orders, c.customers, c.sessions, c.conversionRate, c.returningCustomersPct, c.payoutBalance]
+    .map(v => String(+(Number(v) || 0).toFixed(2)))
+    .concat([String(c.currency == null ? '' : c.currency), String(c.country == null ? '' : c.country)])
+    .join('|')
+}
+
 function applyAndOpenApp(settings) {
   settings = { ...settings }
-  delete settings.__state
-  delete settings.__zero
+  // Same headline numbers as the running store => keep its orders; otherwise start fresh from the new numbers.
+  const keep = !!settings.__state && !!settings.__sig && settings.__sig === sigOf(settings)
+  if (!keep) {
+    delete settings.__state
+    delete settings.__zero
+    delete settings.__sig
+  }
   saveSettings(settings)
   const payload = buildShopifyLarpPayload(settings)
   const payloadRaw = JSON.stringify(payload)
@@ -360,15 +377,62 @@ function escAttr(value) {
   return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]))
 }
 
+function currencySym() {
+  const c = SHOPIFY_CURRENCIES.find(x => x.code === s.currency)
+  return c ? c.sym : '$'
+}
+
 function renderProducts() {
   s.products = normalizeProductAllocations(s.products)
-  $('products').innerHTML = s.products
-    .map(
-      (p, i) =>
-        `<div class="prod" data-i="${i}"><input data-f="title" placeholder="Name" value="${escAttr(p.title)}"><input data-f="price" type="number" inputmode="decimal" step="0.01" placeholder="Price" value="${escAttr(p.price)}"><input data-f="allocationPct" type="number" inputmode="numeric" placeholder="%" value="${escAttr(p.allocationPct)}"><input data-f="inventory" type="number" inputmode="numeric" placeholder="Stock" value="${escAttr(p.inventory)}"></div>`,
-    )
+  const sym = currencySym()
+  $('products').innerHTML = s.products.length
+    ? s.products
+        .map(
+          (p, i) =>
+            `<div class="prod" data-i="${i}"><button type="button" class="pimg" data-act="img" aria-label="Choose photo">${p.image ? `<img src="${p.image}" alt="">` : '+'}</button><div class="pf"><input data-f="title" placeholder="Product name" value="${escAttr(p.title)}"><div class="p2"><div><small>Price (${sym})</small><input data-f="price" type="number" inputmode="decimal" step="0.01" value="${escAttr(p.price)}"></div><div><small>Compare-at</small><input data-f="compare" type="number" inputmode="decimal" step="0.01" placeholder="optional" value="${p.compare > 0 ? escAttr(p.compare) : ''}"></div></div><div class="p2"><div><small>Stock</small><input data-f="inventory" type="number" inputmode="numeric" value="${escAttr(p.inventory)}"></div><div><small>Sales share %</small><input data-f="allocationPct" type="number" inputmode="numeric" value="${escAttr(p.allocationPct)}"></div></div><input data-f="variants" placeholder="Variants (S, M, L)" value="${escAttr(p.variants || '')}">${p.image ? '<button type="button" class="plink" data-act="rmimg">Remove photo</button>' : ''}</div><button type="button" class="pdel" data-act="del" aria-label="Delete product">\u2715</button></div>`,
+        )
+        .join('')
+    : '<p class="empty">No products yet. Tap \u201cAdd product\u201d.</p>'
+  $('prodMeta').textContent = s.products.length ? `Average item ${sym}${averageOrderItemValue(s.products).toFixed(2)}` : ''
+  renderFakeOrders()
+}
+
+function renderFakeOrders() {
+  const sel = $('foProduct')
+  const prev = sel.value || '*'
+  sel.innerHTML = '<option value="*">Any product</option>' + s.products.map(p => `<option value="${escAttr(p.title)}">${escAttr(p.title || 'Untitled product')}</option>`).join('')
+  sel.value = Array.from(sel.options).some(o => o.value === prev) ? prev : '*'
+  const q = Array.isArray(s.__queue) ? s.__queue : []
+  $('foList').innerHTML = q
+    .map((it, i) => `<div class="fq"><span>${it.times} order${it.times > 1 ? 's' : ''} \u00b7 ${it.qty} item${it.qty > 1 ? 's' : ''} each \u00b7 ${it.title === '*' ? 'Any product' : escAttr(it.title)}</span><button type="button" data-q="${i}" aria-label="Remove">\u2715</button></div>`)
     .join('')
-  $('prodMeta').textContent = `Average item $${averageOrderItemValue(s.products).toFixed(2)}`
+  const total = q.reduce((a, it) => a + it.times, 0)
+  $('foMeta').textContent = total ? `${total} order${total > 1 ? 's' : ''} queued. They are created when you tap Done.` : 'Queued orders are created in your store when you tap Done.'
+}
+
+function resizeImage(file, done) {
+  const reader = new FileReader()
+  reader.onerror = () => done('')
+  reader.onload = () => {
+    const img = new Image()
+    img.onerror = () => done('')
+    img.onload = () => {
+      try {
+        const size = 320
+        const canvas = document.createElement('canvas')
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext('2d')
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, size, size)
+        const side = Math.min(img.width, img.height)
+        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size)
+        done(canvas.toDataURL('image/jpeg', 0.8))
+      } catch { done('') }
+    }
+    img.src = reader.result
+  }
+  reader.readAsDataURL(file)
 }
 
 bindSelects()
@@ -376,13 +440,81 @@ writeForm()
 
 document.body.addEventListener('input', e => {
   const t = e.target
-  if (t.closest('.prod')) {
-    const row = t.closest('.prod')
+  const row = t.closest ? t.closest('.prod') : null
+  if (row) {
     const i = Number(row.dataset.i)
     const f = t.dataset.f
-    if (f) s.products[i][f] = f === 'title' ? t.value : Number(t.value) || 0
+    if (f && s.products[i]) {
+      s.products[i][f] = f === 'title' || f === 'variants' ? t.value : Number(t.value) || 0
+      if (f === 'title') renderFakeOrders()
+    }
   }
   readForm()
+})
+
+let pickIdx = -1
+let armTimer = null
+$('products').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]')
+  if (!b) return
+  const row = b.closest('.prod')
+  const i = Number(row.dataset.i)
+  const act = b.dataset.act
+  if (act === 'img') {
+    pickIdx = i
+    $('imgPick').value = ''
+    $('imgPick').click()
+  } else if (act === 'rmimg') {
+    s.products[i].image = ''
+    readForm()
+    writeForm()
+  } else if (act === 'del') {
+    if (!b.classList.contains('armed')) {
+      b.classList.add('armed')
+      b.textContent = 'Delete?'
+      clearTimeout(armTimer)
+      armTimer = setTimeout(() => {
+        b.classList.remove('armed')
+        b.textContent = '\u2715'
+      }, 2500)
+      return
+    }
+    s.products.splice(i, 1)
+    s.products = normalizeProductAllocations(s.products)
+    if (Array.isArray(s.__queue)) s.__queue = s.__queue.filter(q => q.title === '*' || s.products.some(p => p.title === q.title))
+    readForm()
+    writeForm()
+  }
+})
+
+$('imgPick').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0]
+  const idx = pickIdx
+  if (!file || idx < 0 || !s.products[idx]) return
+  resizeImage(file, data => {
+    if (data && s.products[idx]) {
+      s.products[idx].image = data
+      readForm()
+      writeForm()
+    }
+  })
+})
+
+$('foAdd').addEventListener('click', () => {
+  const qty = Math.max(1, Math.min(999, Math.round(Number($('foQty').value) || 1)))
+  const times = Math.max(1, Math.min(500, Math.round(Number($('foTimes').value) || 1)))
+  if (!Array.isArray(s.__queue)) s.__queue = []
+  s.__queue.push({ title: $('foProduct').value || '*', qty, times })
+  readForm()
+  renderFakeOrders()
+})
+
+$('foList').addEventListener('click', e => {
+  const b = e.target.closest('[data-q]')
+  if (!b || !Array.isArray(s.__queue)) return
+  s.__queue.splice(Number(b.dataset.q), 1)
+  readForm()
+  renderFakeOrders()
 })
 
 $('vibes').addEventListener('click', e => {
@@ -408,7 +540,7 @@ $('currency').addEventListener('change', () => {
     s.currency = to
     s.totalSales = convertShopifyMoney(s.totalSales, from, to)
     s.payoutBalance = convertShopifyMoney(s.payoutBalance, from, to)
-    s.products = s.products.map(p => ({ ...p, price: convertShopifyMoney(p.price, from, to) }))
+    s.products = s.products.map(p => ({ ...p, price: convertShopifyMoney(p.price, from, to), compare: p.compare > 0 ? convertShopifyMoney(p.compare, from, to) : 0 }))
   } else {
     s.currency = to
   }
@@ -417,7 +549,7 @@ $('currency').addEventListener('change', () => {
 })
 
 $('addProduct').addEventListener('click', () => {
-  s.products.push({ id: `p-${Date.now()}`, title: 'New product', price: 25, allocationPct: 10, inventory: 100 })
+  s.products.push({ id: `p-${Date.now()}`, title: 'New product', price: 25, compare: 0, allocationPct: 10, inventory: 100, variants: '', image: '' })
   s.products = normalizeProductAllocations(s.products)
   writeForm()
   readForm()
