@@ -2,12 +2,12 @@
 (function () {
   try {
 const SHOPIFY_VIBES = [
-  { id: 'growing', title: 'Growing', desc: 'Steady upward sales. Healthy store.' },
-  { id: 'steady', title: 'Steady', desc: 'Flat-ish — established store cruising.' },
-  { id: 'exploding', title: 'Exploding', desc: 'Hockey stick. Orders pouring in.' },
-  { id: 'declining', title: 'Declining', desc: 'Sales trending down.' },
-  { id: 'newstore', title: 'New store', desc: 'Tiny numbers, just launched.' },
-  { id: 'highrisk', title: 'High risk', desc: 'Choppy sales, lots of pending.' },
+  { id: 'growing', title: 'Growing', desc: 'Steady upward sales. An order every ~20s.' },
+  { id: 'steady', title: 'Steady', desc: 'Flat-ish, established store. An order every ~30s.' },
+  { id: 'exploding', title: 'Exploding', desc: 'Hockey stick. Orders pouring in every 1-3s.' },
+  { id: 'declining', title: 'Declining', desc: 'Sales trending down. An order every ~50s.' },
+  { id: 'newstore', title: 'New store', desc: 'Just launched. An order every ~75s.' },
+  { id: 'highrisk', title: 'High risk', desc: 'Choppy: flurries, then quiet spells.' },
 ]
 
 const SHOPIFY_CURRENCIES = [
@@ -77,7 +77,12 @@ function readSavedSettings(raw) {
 function loadSettings() {
   let stored = null
   try { stored = localStorage.getItem(STORAGE_KEY) } catch { /* file storage may be blocked */ }
-  return readSavedSettings(globalThis.__LARP_SAVED_SETTINGS__) || readSavedSettings(stored) || cloneData(DEFAULT_SHOPIFY_LARP)
+  // The native layer injects the settings it had when the web view was created: they can be older than what the
+  // shop saved since (new orders, grown totals). Whichever copy carries the newest __ts wins.
+  const injected = readSavedSettings(globalThis.__LARP_SAVED_SETTINGS__)
+  const local = readSavedSettings(stored)
+  if (injected && local) return (Number(local.__ts) || 0) > (Number(injected.__ts) || 0) ? local : injected
+  return injected || local || cloneData(DEFAULT_SHOPIFY_LARP)
 }
 
 const PAYLOAD_KEY = 'checker.shopifyLarp.payload'
@@ -87,6 +92,7 @@ function nativeStore() {
 }
 
 function saveSettings(settings) {
+  settings.__ts = Date.now()
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)) } catch { /* private mode */ }
 }
 
@@ -281,9 +287,10 @@ function buildShopifyLarpPayload(settings) {
 }
 
 function sigOf(c) {
-  return [c.totalSales, c.orders, c.customers, c.sessions, c.conversionRate, c.returningCustomersPct, c.payoutBalance]
+  // Payout balance, country, products, name, vibe, live orders... apply on their own and never reset the store.
+  return [c.totalSales, c.orders, c.customers, c.sessions, c.conversionRate, c.returningCustomersPct]
     .map(v => String(+(Number(v) || 0).toFixed(2)))
-    .concat([String(c.currency == null ? '' : c.currency), String(c.country == null ? '' : c.country)])
+    .concat([String(c.currency == null ? '' : c.currency)])
     .join('|')
 }
 
@@ -321,6 +328,8 @@ function applyAndOpenApp(settings) {
 }
 
 let s = loadSettings()
+// Baseline: the numbers the running store shows right now. Done only rebuilds the store if one of them is edited.
+if (s.__state) s.__sig = sigOf(s)
 
 const $ = id => document.getElementById(id)
 
