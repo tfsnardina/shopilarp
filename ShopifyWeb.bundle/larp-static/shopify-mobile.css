@@ -770,3 +770,15 @@ html.checker-native #tabbar{bottom:calc(var(--bot,0px) + 8px)!important}
 .ac-menu{min-width:230px}
 .np-ph.round{width:120px;height:120px;border-radius:50%}
 .np-ph.round.has{width:120px;height:120px;border-radius:50%;border:1px solid var(--bd2)}
+
+/* Loading screen after the launch logo: spinner on a white sheet, then the numbers shimmer for a moment. */
+#loading{position:absolute;inset:0;z-index:80;background:#000;transition:opacity .35s ease}
+#loading.out{opacity:0;pointer-events:none}
+#loading .ld-sheet{position:absolute;left:0;right:0;bottom:0;top:var(--top);background:#fff;border-radius:24px 24px 0 0;display:flex;align-items:center;justify-content:center}
+#loading svg{width:30px;height:30px;animation:ldspin 1s steps(12) infinite}
+@keyframes ldspin{to{transform:rotate(360deg)}}
+@keyframes shim{from{background-position:200% 0}to{background-position:-100% 0}}
+.skel .mv{color:transparent!important;-webkit-text-fill-color:transparent;background:linear-gradient(105deg,rgba(255,255,255,.28) 38%,#fff 50%,rgba(255,255,255,.28) 62%) 200% 0/250% 100%;-webkit-background-clip:text;background-clip:text;animation:shim 1.05s linear infinite}
+.skel .act b{color:transparent!important;-webkit-text-fill-color:transparent;background:linear-gradient(105deg,rgba(0,0,0,.16) 38%,rgba(0,0,0,.55) 50%,rgba(0,0,0,.16) 62%) 200% 0/250% 100%;-webkit-background-clip:text;background-clip:text;animation:shim 1.05s linear infinite}
+.skel #hchart{opacity:.3}
+#hchart{transition:opacity .5s ease}
