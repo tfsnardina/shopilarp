@@ -95,7 +95,14 @@
     if (s < 7 * 86400) return Math.floor(s / 86400) + "d ago";
     return md(t);
   }
-  function hap(ms) { try { if (navigator.vibrate) navigator.vibrate(ms || 8); } catch (e) { } }
+  // Haptics: on iPhone this goes to the native Taptic Engine (navigator.vibrate does not exist in iOS web views).
+  // Intensity follows the old millisecond hints: small taps = "selection", 7-9 = light, 10-13 = medium,
+  // 14+ or a pattern = success. Strings ("selection", "light", "medium", "heavy", "success", "warning", "error") work too.
+  function hap(a) {
+    var kind = typeof a === "string" ? a : Array.isArray(a) ? "success" : a >= 14 ? "success" : a >= 10 ? "medium" : a >= 7 ? "light" : "selection";
+    try { window.webkit.messageHandlers.larpHaptic.postMessage(kind); return; } catch (e) { }
+    try { if (navigator.vibrate) navigator.vibrate(typeof a === "number" ? a : a || 8); } catch (e2) { }
+  }
   var toastT;
   function toast(msg) {
     toastEl.textContent = msg; toastEl.classList.add("on"); clearTimeout(toastT);
@@ -1906,6 +1913,7 @@
     if (!done) return;
     setBell(); saveState();
     if (resumed) {
+      hap("success");
       ["home", "orders", "products", "menu"].forEach(function (k) { rendered[k] = 0; });
       if (!stack.length && RENDER[current]) { RENDER[current](); rendered[current] = 1; }
     }
@@ -2190,13 +2198,13 @@
       var file = this.files && this.files[0]; if (!file) return;
       resizeImg(file, function (data) { if (data) { d.photo = data; showPh(); } else toast("Impossible de charger cette photo"); });
     });
-    function fail(m) { var eb = g("epErr"); eb.hidden = !m; eb.textContent = m || ""; }
+    function fail(m) { var eb = g("epErr"); eb.hidden = !m; eb.textContent = m || ""; if (m) hap("error"); }
     function save() {
       if (saving) return;
       var first = g("epFirst").value.trim(), last = g("epLast").value.trim(), mail = g("epMail").value.trim(), tel = g("epTel").value.trim();
       if (!first && !last) return fail("Entre au moins un prénom ou un nom.");
       if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return fail("Adresse e-mail invalide.");
-      fail(""); saving = true; hap(10);
+      fail(""); saving = true; hap("success");
       var cfg = savedSettingsObj();
       cfg.accountFirst = first; cfg.accountLast = last; cfg.accountEmail = mail; cfg.accountPhone = tel; cfg.accountPhoto = d.photo;
       writeSettings(cfg);
@@ -2254,14 +2262,14 @@
     g("esUrl").addEventListener("input", function () { handleTouched = true; });
     g("esName").addEventListener("keydown", function (e) { if (e.key === "Enter") this.blur(); });
     g("esCur").addEventListener("change", hint);
-    function fail(m) { var eb = g("esErr"); eb.hidden = !m; eb.textContent = m || ""; }
+    function fail(m) { var eb = g("esErr"); eb.hidden = !m; eb.textContent = m || ""; if (m) hap("error"); }
     function save() {
       if (saving) return;
       var name = g("esName").value.trim(), handle = esSlug(g("esUrl").value), cur = g("esCur").value, country = g("esCountry").value;
       if (!name) return fail("Enter a store name.");
       if (!handle) return fail("Enter a valid web address (letters, numbers and dashes).");
       fail("");
-      saving = true; hap(10); frozen = true;
+      saving = true; hap("success"); frozen = true;
       var cfg = savedSettingsObj(), from = cfg.currency || S.cur || "USD";
       cfg.storeName = name; cfg.storeHandle = handle; cfg.storeLogo = d.logo; cfg.country = country; cfg.currency = cur;
       if (cur !== from) {
