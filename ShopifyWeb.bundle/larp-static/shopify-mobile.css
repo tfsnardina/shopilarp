@@ -766,3 +766,7 @@ html.checker-native #tabbar{bottom:calc(var(--bot,0px) + 8px)!important}
 .ac-pref{display:flex;align-items:center;gap:12px;width:100%;height:46px;padding:0 12px;border-radius:10px;font-size:16.5px;font-weight:550;text-align:left}
 .ac-pref .ic{width:20px;height:20px;color:var(--tx2)}
 .ac-pref:active{background:#f1f1f1}
+.av img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+.ac-menu{min-width:230px}
+.np-ph.round{width:120px;height:120px;border-radius:50%}
+.np-ph.round.has{width:120px;height:120px;border-radius:50%;border:1px solid var(--bd2)}
