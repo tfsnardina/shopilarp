@@ -107,11 +107,29 @@
   var demoRaw = P.demoPro || P.pro, userRaw = P.demoPro ? P.pro : [];
   function mkProd(x, i, hidden) {
     var img = typeof x[13] === "string" && x[13].indexOf("data:image/") === 0 ? x[13] : "";
-    return { i: hidden ? -1 - i : i, title: x[0], price: x[1], compare: x[2], inv: x[3], vars: x[4], vnames: x[5] || [], type: x[6], vendor: x[7], sku: x[8], status: x[9], sold: x[10], ts: x[11], hue: x[12], img: img, share: x[14] > 0 ? x[14] : 0 };
+    return { i: hidden ? -1 - i : i, title: x[0], price: x[1], compare: x[2], inv: x[3], vars: x[4], vnames: x[5] || [], type: x[6], vendor: x[7], sku: x[8], status: x[9], sold: x[10], ts: x[11], hue: x[12], img: img, share: x[14] > 0 ? x[14] : 0, pid: x[15] || "" };
   }
   var allProds = demoRaw.map(function (x, i) { return mkProd(x, i, EMPTY); });   // templates for generated orders
   var prods = EMPTY ? userRaw.map(function (x, i) { return mkProd(x, i, false); }) : allProds;
   prods.forEach(function (p) { p.baseInv = p.inv; });
+  var HUES = [233, 18, 142, 88, 201];
+  function splitVariants(v) { return String(v || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 12); }
+  // Products created in the app (or edited in Preferences) after the saved payload was built are added back,
+  // so a new product never disappears after a relaunch.
+  (function mergeSavedProducts() {
+    if (!EMPTY || !Array.isArray(CFG.products)) return;
+    var f = Math.pow(10, S.dec != null ? S.dec : 2), used = {};
+    CFG.products.forEach(function (c) {
+      if (!c || typeof c !== "object") return;
+      var m = null;
+      prods.forEach(function (p) { if (!m && !used[p.i] && ((c.id && p.pid === c.id) || (!p.pid && p.title === c.title))) m = p; });
+      if (m) { used[m.i] = 1; return; }
+      var vn = splitVariants(c.variants), idx = prods.length, title = String(c.title || "Untitled product");
+      var code = title.replace(/[^a-z0-9]/gi, "").slice(0, 3).toUpperCase() || "PRD";
+      var np = { i: idx, pid: c.id || "", title: title, price: Math.round((Number(c.price) || 0) * f), compare: c.compare > 0 ? Math.round(c.compare * f) : 0, inv: Math.max(0, Math.round(Number(c.inventory) || 0)), vars: Math.max(1, vn.length || 1), vnames: vn.length ? vn : ["Default"], type: c.type || "General", vendor: S.name, sku: c.sku || (code + "-" + (1000 + idx)), status: c.status || "Active", sold: 0, ts: Number(c.ts) || (S.now - 3 * DAY), hue: HUES[idx % HUES.length], img: typeof c.image === "string" && c.image.indexOf("data:image/") === 0 ? c.image : "", share: c.allocationPct > 0 ? c.allocationPct : 0 };
+      np.baseInv = np.inv; used[idx] = 1; prods.push(np);
+    });
+  })();
   function mkOrder(o) {
     return {
       n: o[0], ts: o[1], c: custs[o[2]] || null, items: o[3].map(function (x) { return { p: allProds[x[0]] || allProds[0], q: x[1], price: x[2] }; }),
@@ -969,9 +987,10 @@
     if (p.inv <= 0) return '<span class="neg">0 available</span>' + v;
     return count(p.inv) + " available" + v + (p.vars > 1 && p.inv < p.vars * 6 ? ' <span class="neg">(some out of stock)</span>' : "");
   }
+  function prodsSorted(l) { return EMPTY ? l.slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0) || a.i - b.i; }) : l; }
   function renderProducts() {
     var el = $("#s-products");
-    var list = prods.filter(function (p) { return (pFilter === "All" || p.status === pFilter) && (!pQuery || p.title.toLowerCase().indexOf(pQuery.toLowerCase()) >= 0); });
+    var list = prodsSorted(prods.filter(function (p) { return (pFilter === "All" || p.status === pFilter) && (!pQuery || p.title.toLowerCase().indexOf(pQuery.toLowerCase()) >= 0); }));
     el.innerHTML = '<div class="tab-top"><header class="th-hd"><button class="tt" data-act="prodviews">Products' + ic("chev-down") + '</button><span class="fl"></span><button class="hb" data-act="newproduct" aria-label="Add product">' + ic("plus-circle") + '</button><button class="hb txt" data-act="select">Select</button></header></div>' +
       '<div class="sheet-body">' +
       '<div class="sbar"><label class="sfield">' + ic("search") + '<input id="pq" type="search" placeholder="Filter products" value="' + esc(pQuery) + '" autocomplete="off"></label><button class="cb" data-act="sort" aria-label="Sort">' + ic("sort") + '</button><button class="cb" data-act="pfilter" aria-label="Filter">' + ic("filter") + "</button></div>" +
@@ -979,7 +998,7 @@
       '<div class="plist" id="plist">' + (list.length ? list.map(prodRow).join("") : emptyState("No products found", "Try changing the filters or search term")) + "</div></div>";
     $$(".chip", el).forEach(function (b) { b.addEventListener("click", function () { pFilter = b.getAttribute("data-pf"); hap(5); renderProducts(); }); });
     var q = $("#pq");
-    q.addEventListener("input", function () { pQuery = q.value; var l = prods.filter(function (p) { return (pFilter === "All" || p.status === pFilter) && p.title.toLowerCase().indexOf(pQuery.toLowerCase()) >= 0; }); $("#plist").innerHTML = l.length ? l.map(prodRow).join("") : emptyState("No products found", "Try changing the filters or search term"); });
+    q.addEventListener("input", function () { pQuery = q.value; var l = prodsSorted(prods.filter(function (p) { return (pFilter === "All" || p.status === pFilter) && p.title.toLowerCase().indexOf(pQuery.toLowerCase()) >= 0; })); $("#plist").innerHTML = l.length ? l.map(prodRow).join("") : emptyState("No products found", "Try changing the filters or search term"); });
   }
   function prodRow(p) {
     return '<button class="prow" data-prod="' + p.i + '">' + thumb(p, 44) + '<div class="pr-t"><b>' + esc(p.title) + "</b><span>" + invLine(p) + "</span></div>" + badge(p.status, p.status === "Active" ? "ok" : p.status === "Draft" ? "info" : "neu") + "</button>";
@@ -1313,7 +1332,7 @@
       var share = Math.floor(p.inv / p.vnames.length) + (k < p.inv % p.vnames.length ? 1 : 0);
       return '<div class="vr">' + thumb(p, 40) + "<div><b>" + esc(v) + "</b><span>" + count(share) + " available</span></div><em>" + money(p.price) + "</em></div>";
     }).join("") : "";
-    var body = '<div class="pimg">' + ic("image") + "</div>" +
+    var body = '<div class="pimg' + (p.img ? " has" : "") + '">' + (p.img ? '<img src="' + p.img + '" alt="">' : ic("image")) + "</div>" +
       '<div class="sec"><h1 class="pt">' + esc(p.title) + "</h1>" + badge(p.status, p.status === "Active" ? "ok" : "info") + "</div>" +
       '<div class="sec"><div class="sec-h"><h3>Pricing</h3></div><div class="kv"><div><span>Price</span><span></span><b>' + money(p.price) + "</b></div>" + (p.compare ? "<div><span>Compare-at price</span><span></span><b class=\"strike\">" + money(p.compare) + "</b></div>" : "") + "</div></div>" +
       '<div class="sec"><div class="sec-h"><h3>Inventory</h3></div><div class="kv"><div><span>Available</span><span></span><b>' + count(p.inv) + "</b></div><div><span>SKU</span><span></span><b>" + esc(p.sku) + "</b></div><div><span>Sold (last 30 days)</span><span></span><b>" + count(p.sold) + "</b></div></div></div>" +
@@ -1321,6 +1340,112 @@
       '<div class="sec"><div class="sec-h"><h3>Product organization</h3></div><div class="kv"><div><span>Type</span><span></span><b>' + esc(p.type || "–") + "</b></div><div><span>Vendor</span><span></span><b>" + esc(p.vendor) + "</b></div></div></div>" +
       '<div class="sec"><div class="sec-h"><h3>Sales channels</h3></div><div class="chs"><span>' + ic("store") + "Online Store</span><span>" + ic("shop") + "Shop</span><span>" + ic("pos") + "Point of Sale</span></div></div>";
     page(body, { cls: "product", actions: '<button class="nb-c" data-act="share" aria-label="Share">' + ic("share") + '</button><button class="nb-c" data-act="prodmore" aria-label="More">' + ic("more") + "</button>" });
+  }
+
+  /* ── New product ─────────────────────────────────────────── */
+  function parseNum(v) {
+    var t = String(v == null ? "" : v).trim().replace(",", ".");
+    if (!t) return null;
+    return /^-?\d*\.?\d+$/.test(t) ? parseFloat(t) : NaN;
+  }
+  function resizeImg(file, done) {
+    var rd = new FileReader();
+    rd.onerror = function () { done(""); };
+    rd.onload = function () {
+      var im = new Image();
+      im.onerror = function () { done(""); };
+      im.onload = function () {
+        try {
+          var cv = document.createElement("canvas"), sz = 320; cv.width = sz; cv.height = sz;
+          var cx = cv.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, sz, sz);
+          var side = Math.min(im.width, im.height);
+          cx.drawImage(im, (im.width - side) / 2, (im.height - side) / 2, side, side, 0, 0, sz, sz);
+          done(cv.toDataURL("image/jpeg", 0.8));
+        } catch (e) { done(""); }
+      };
+      im.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  }
+  function createProduct(d) {
+    var dec = S.dec != null ? S.dec : 2, f = Math.pow(10, dec), idx = prods.length;
+    var vn = splitVariants(d.vars), code = d.title.replace(/[^a-z0-9]/gi, "").slice(0, 3).toUpperCase() || "PRD";
+    var id = "p-" + Date.now(), share = Math.max(1, Math.round(100 / (idx + 1)));
+    var p = { i: idx, pid: id, title: d.title, price: Math.round(d.price * f), compare: d.compare > d.price ? Math.round(d.compare * f) : 0, inv: d.inv, vars: Math.max(1, vn.length || 1), vnames: vn.length ? vn : ["Default"], type: d.type || "General", vendor: d.vendor || S.name, sku: d.sku || (code + "-" + (1000 + idx)), status: d.status, sold: 0, ts: nowMs(), hue: HUES[idx % HUES.length], img: d.img, share: share };
+    p.baseInv = p.inv;
+    prods.push(p);
+    // Written into the saved settings too: Preferences lists it and Done keeps it.
+    var cfg = savedSettingsObj();
+    if (!Array.isArray(cfg.products)) cfg.products = [];
+    cfg.products.push({ id: id, title: p.title, price: d.price, compare: d.compare > d.price ? d.compare : 0, allocationPct: share, inventory: d.inv, variants: vn.join(", "), image: d.img, status: p.status, type: p.type, sku: p.sku, ts: p.ts });
+    writeSettings(cfg);
+    return p;
+  }
+  function openNewProduct() {
+    var d = { img: "", status: "Active" }, saving = false, sym = esc(S.sym);
+    var body = '<div class="np">' +
+      '<div class="np-c"><div class="np-l">Media</div><div class="np-media"><button type="button" class="np-ph" id="npPh">' + ic("image") + "<span>Add photo</span></button><button type=\"button\" class=\"np-rm\" id=\"npRm\" hidden>Remove photo</button></div></div>" +
+      '<div class="np-c"><label class="np-f"><span>Title</span><input id="npTitle" type="text" maxlength="255" placeholder="Short sleeve t-shirt" autocomplete="off" autocapitalize="sentences" enterkeyhint="done"></label>' +
+      '<div class="np-f"><span>Status</span><div class="np-seg" id="npSeg"><button type="button" class="on" data-s="Active">Active</button><button type="button" data-s="Draft">Draft</button></div><em class="np-hint" id="npSegH">Visible on your store and available to buy.</em></div></div>' +
+      '<div class="np-c"><div class="np-l">Pricing</div><div class="np-row"><label class="np-f"><span>Price</span><div class="np-in"><i>' + sym + '</i><input id="npPrice" inputmode="decimal" placeholder="0.00" autocomplete="off"></div></label>' +
+      '<label class="np-f"><span>Compare-at price</span><div class="np-in"><i>' + sym + '</i><input id="npComp" inputmode="decimal" placeholder="0.00" autocomplete="off"></div></label></div></div>' +
+      '<div class="np-c"><div class="np-l">Inventory</div><div class="np-row"><label class="np-f"><span>Quantity</span><input id="npInv" inputmode="numeric" placeholder="0" autocomplete="off"></label>' +
+      '<label class="np-f"><span>SKU (optional)</span><input id="npSku" type="text" autocomplete="off" autocapitalize="characters"></label></div></div>' +
+      '<div class="np-c"><div class="np-l">Variants</div><label class="np-f"><span>Options, separated by commas</span><input id="npVars" type="text" placeholder="S, M, L" autocomplete="off"></label></div>' +
+      '<div class="np-c"><div class="np-l">Product organization</div><div class="np-row"><label class="np-f"><span>Product type</span><input id="npType" type="text" autocomplete="off"></label>' +
+      '<label class="np-f"><span>Vendor</span><input id="npVendor" type="text" value="' + esc(S.name || "") + '" autocomplete="off"></label></div></div>' +
+      '<p class="np-err" id="npErr" hidden></p><button type="button" class="btn-p np-go" id="npGo" disabled>Save product</button></div>' +
+      '<input type="file" id="npFile" accept="image/*" hidden>';
+    var el = page(body, { title: "Add product", modal: true, notabs: true, cls: "newprod", actions: '<button type="button" class="np-save" id="npSave" disabled>Save</button>' });
+    var g = function (id) { return $("#" + id, el); };
+    function read() {
+      return { title: g("npTitle").value.trim(), price: parseNum(g("npPrice").value), compare: parseNum(g("npComp").value), inv: parseNum(g("npInv").value), sku: g("npSku").value.trim(), vars: g("npVars").value, type: g("npType").value.trim(), vendor: g("npVendor").value.trim() };
+    }
+    function check() {
+      var v = read(), err = "";
+      if (v.price !== null && (isNaN(v.price) || v.price < 0)) err = "Enter a valid price.";
+      else if (v.compare !== null && (isNaN(v.compare) || v.compare < 0)) err = "Enter a valid compare-at price.";
+      else if (v.compare !== null && v.compare > 0 && v.compare <= (v.price || 0)) err = "Compare-at price should be higher than the price.";
+      else if (v.inv !== null && (isNaN(v.inv) || v.inv < 0 || Math.floor(v.inv) !== v.inv)) err = "Quantity must be a whole number.";
+      var ok = !!v.title && !err;
+      var eb = g("npErr"); eb.hidden = !err; eb.textContent = err;
+      g("npGo").disabled = g("npSave").disabled = !ok;
+      return ok ? v : null;
+    }
+    function save() {
+      if (saving) return;
+      var v = check(); if (!v) return;
+      saving = true; hap(10);
+      createProduct({ title: v.title, price: v.price || 0, compare: v.compare || 0, inv: v.inv || 0, sku: v.sku, vars: v.vars, type: v.type, vendor: v.vendor, status: d.status, img: d.img });
+      pFilter = "All"; pQuery = ""; rendered.products = 0;
+      pop(false);
+      if (current === "products") renderProducts();
+      setTimeout(function () { toast("Product saved"); }, 320);
+    }
+    el.addEventListener("input", check);
+    g("npGo").addEventListener("click", save);
+    g("npSave").addEventListener("click", save);
+    g("npTitle").addEventListener("keydown", function (e) { if (e.key === "Enter") this.blur(); });
+    $$("#npSeg button", el).forEach(function (b) {
+      b.addEventListener("click", function () {
+        d.status = b.getAttribute("data-s"); hap(5);
+        $$("#npSeg button", el).forEach(function (x) { x.classList.toggle("on", x === b); });
+        g("npSegH").textContent = d.status === "Active" ? "Visible on your store and available to buy." : "Hidden from your store. It won’t receive orders.";
+      });
+    });
+    function showImg() {
+      var ph = g("npPh");
+      ph.classList.toggle("has", !!d.img);
+      ph.innerHTML = d.img ? '<img src="' + d.img + '" alt="">' : ic("image") + "<span>Add photo</span>";
+      g("npRm").hidden = !d.img;
+    }
+    g("npPh").addEventListener("click", function () { g("npFile").value = ""; g("npFile").click(); });
+    g("npRm").addEventListener("click", function () { d.img = ""; showImg(); });
+    g("npFile").addEventListener("change", function () {
+      var file = this.files && this.files[0]; if (!file) return;
+      resizeImg(file, function (data) { if (data) { d.img = data; showImg(); } else toast("Couldn’t load that photo"); });
+    });
+    setTimeout(function () { try { g("npTitle").focus({ preventScroll: true }); } catch (e) { } }, 520);
   }
 
   /* ── Customers ───────────────────────────────────────────── */
@@ -1622,14 +1747,16 @@
   function chaChing() { if (!audioOk || !audio) return; try { audio.currentTime = 0; var p = audio.play(); if (p && p.catch) p.catch(function () { }); } catch (e) { } }
   function setBell() { var b = $("#nb"); if (!b) return; b.textContent = unread > 99 ? "99+" : unread; b.hidden = !unread; }
   function weighted(list) { var t = list.reduce(function (a, x) { return a + x[1]; }, 0), r = Math.random() * t; for (var i = 0; i < list.length; i++) { r -= list[i][1]; if (r < 0) return list[i][0]; } return list[0][0]; }
-  function userLines() {
-    var total = prods.reduce(function (a, p) { return a + (p.share > 0 ? p.share : 1); }, 0);
+  function sellable() { return prods.filter(function (p) { return p.status === "Active" && p.inv > 0; }); }
+  function userLines(pool) {
+    pool = pool || prods;
+    var total = pool.reduce(function (a, p) { return a + (p.share > 0 ? p.share : 1); }, 0);
     function pick() {
       var r = Math.random() * total;
-      for (var i = 0; i < prods.length; i++) { r -= prods[i].share > 0 ? prods[i].share : 1; if (r <= 0) return prods[i]; }
-      return prods[prods.length - 1];
+      for (var i = 0; i < pool.length; i++) { r -= pool[i].share > 0 ? pool[i].share : 1; if (r <= 0) return pool[i]; }
+      return pool[pool.length - 1];
     }
-    var n = Math.random() < 0.22 && prods.length > 1 ? 2 : 1, lines = [], used = {};
+    var n = Math.random() < 0.22 && pool.length > 1 ? 2 : 1, lines = [], used = {};
     for (var k = 0; k < n; k++) {
       var p = pick();
       if (used[p.title]) continue;
@@ -1690,7 +1817,13 @@
     if (current === "products" && !stack.length) rendered.products = 0;
   }
   function newOrder() {
-    var o = makeOrder(prods.length ? userLines() : null, nowMs());
+    var lines = null;
+    if (prods.length) {
+      var pool = sellable();
+      if (!pool.length) return;          // everything is a draft or sold out: nothing to buy
+      lines = userLines(pool);
+    }
+    var o = makeOrder(lines, nowMs());
     if (o) commitOrder(o, false);
   }
   // Fake orders queued in Preferences are created once, silently, when the app opens.
@@ -1711,7 +1844,7 @@
     var span = Math.max(60000, Math.min(2 * HOUR, sinceMidnight));
     var stamps = jobs.map(function () { return now - Math.random() * span; }).sort(function (a, b) { return a - b; });
     jobs.forEach(function (j, k) {
-      var p = j[0] || (prods.length ? userLines()[0][0] : null);
+      var p = j[0] || (prods.length ? userLines(sellable().length ? sellable() : prods)[0][0] : null);
       var o = makeOrder(p ? [[p, j[1]]] : null, stamps[k]);
       if (o) commitOrder(o, true);
     });
@@ -1876,7 +2009,7 @@
       case "pfilter": return optSheet("Filter products", ["All", "Active", "Draft", "Archived"], pFilter, function (v) { pFilter = v; renderProducts(); });
       case "prodviews": return optSheet("Products", ["Products", "Collections", "Inventory", "Purchase orders", "Transfers", "Gift cards"], "Products", function (v) { if (v !== "Products") toast(v + " opens on the full admin"); });
       case "neworder": return optSheet("Create", ["Create order", "Create draft order"], "", function (v) { toast(v + " started"); });
-      case "newproduct": return toast("Add product");
+      case "newproduct": return openNewProduct();
       case "scan": return toast("Camera access is needed to scan barcodes");
       case "print": return toast("Preparing packing slip…");
       case "track": return toast("Opening tracking…");
