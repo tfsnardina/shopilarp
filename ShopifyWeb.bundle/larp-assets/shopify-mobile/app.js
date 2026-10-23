@@ -165,8 +165,9 @@
     var f = function (l) { return l.filter(function (p) { return p.title === title; })[0]; };
     return f(prods) || f(allProds) || { i: -99, title: title || "Item", price: price || 0, compare: 0, inv: 0, vars: 1, vnames: ["Default"], type: "", vendor: S.name, sku: "", status: "Archived", sold: 0, ts: 0, hue: 233, img: "", share: 0 };
   }
+  var frozen = false;   // set while "Edit store" rebuilds the store, so the old state is not written back
   function saveState() {
-    if (!EMPTY) return;
+    if (!EMPTY || frozen) return;
     try {
       var list = orders.slice(0, 300), cl = [];
       list.forEach(function (o) { if (o.c && cl.indexOf(o.c) < 0) cl.push(o.c); });
@@ -2044,19 +2045,93 @@
     });
     $("#qsgo", el).addEventListener("click", function () { if (!(parseFloat(amt) > 0)) return toast("Enter an amount"); toast("Hold the card near the top of your phone"); });
   }
-  // Tapping the store name drops a card from the top: the store, Add store, Edit stores.
+  // Tapping the store name drops a card from the top: the store, Add store, Edit store.
   function storePop() {
     var el = document.createElement("div");
     el.className = "spop";
-    el.innerHTML = '<div class="sp-scrim"></div><div class="sp-card"><div class="sp-r on">' + logoTile(true) + "<div><b>" + esc(S.name) + "</b><span>" + esc(S.handle.slice(0, 10)) + "-" + String(S.lastN * 13 % 99) + ".myshopify.com</span></div></div>" +
-      '<button class="sp-r">' + ic("plus-circle") + "<span>Add store</span></button><button class=\"sp-r\">" + ic("edit") + "<span>Edit stores</span></button></div>";
+    el.innerHTML = '<div class="sp-scrim"></div><div class="sp-card"><div class="sp-r on">' + logoTile(true) + "<div><b>" + esc(S.name) + "</b><span>" + esc(S.handle) + ".myshopify.com</span></div></div>" +
+      '<button class="sp-r">' + ic("plus-circle") + "<span>Add store</span></button><button class=\"sp-r\" data-edit-store>" + ic("edit") + "<span>Edit store</span></button></div>";
     app.appendChild(el);
     requestAnimationFrame(function () { requestAnimationFrame(function () { el.classList.add("on"); }); });
     el.addEventListener("click", function (e) {
       var b = e.target.closest(".sp-r");
-      if (b && !b.classList.contains("on")) toast(b.textContent);
+      var edit = b && b.hasAttribute("data-edit-store");
+      if (b && !b.classList.contains("on") && !edit) toast(b.textContent);
       el.classList.remove("on"); setTimeout(function () { el.remove(); }, 300);
+      if (edit) setTimeout(openEditStore, 120);
     });
+  }
+
+  /* ── Edit store: name, photo, URL, currency, region ─────────── */
+  var ES_CURS = [["USD", "$", "USD $", 2, "en-US", "US Dollar"], ["EUR", "\u20AC", "EUR \u20AC", 2, "de-DE", "Euro"], ["GBP", "\u00A3", "GBP \u00A3", 2, "en-GB", "British Pound"], ["JPY", "\u00A5", "JPY \u00A5", 0, "ja-JP", "Japanese Yen"], ["CAD", "$", "CAD $", 2, "en-CA", "Canadian Dollar"], ["AUD", "$", "AUD $", 2, "en-AU", "Australian Dollar"]];
+  var ES_FX = { USD: 1, EUR: 1.08, GBP: 1.27, CAD: 0.72, AUD: 0.65, JPY: 0.0067 };
+  var ES_COUNTRIES = [["US", "United States"], ["CA", "Canada"], ["GB", "United Kingdom"], ["AU", "Australia"], ["DE", "Germany"], ["FR", "France"], ["ES", "Spain"], ["IT", "Italy"], ["NL", "Netherlands"], ["BE", "Belgium"], ["IE", "Ireland"], ["CH", "Switzerland"], ["NZ", "New Zealand"], ["JP", "Japan"]];
+  function esSlug(t) { return String(t || "").toLowerCase().replace(/['\u2019]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48); }
+  function esFx(v, from, to) {
+    if (from === to || !(v > 0)) return v;
+    var usd = v * (ES_FX[from] || 1), r = usd / (ES_FX[to] || 1);
+    return to === "JPY" ? Math.round(r) : Math.round(r * 100) / 100;
+  }
+  function openEditStore() {
+    var d = { logo: S.logo || "", cur: S.cur || "USD", country: S.country || "US" }, saving = false, handleTouched = false;
+    var curOpts = ES_CURS.map(function (c) { return '<option value="' + c[0] + '"' + (c[0] === d.cur ? " selected" : "") + ">" + c[0] + " " + c[1] + " \u00B7 " + c[5] + "</option>"; }).join("");
+    var cOpts = ES_COUNTRIES.map(function (c) { return '<option value="' + c[0] + '"' + (c[0] === d.country ? " selected" : "") + ">" + esc(c[1]) + "</option>"; }).join("");
+    var body = '<div class="np">' +
+      '<div class="np-c"><div class="np-l">Store profile</div><div class="np-media"><button type="button" class="np-ph" id="esPh"></button><button type="button" class="np-rm" id="esRm" hidden>Remove photo</button></div>' +
+      '<label class="np-f"><span>Store name</span><input id="esName" type="text" maxlength="80" value="' + esc(S.name) + '" autocomplete="off" autocapitalize="words" enterkeyhint="done"></label></div>' +
+      '<div class="np-c"><div class="np-l">Store URL</div><label class="np-f"><span>Web address</span><div class="np-in"><input id="esUrl" type="text" value="' + esc(S.handle) + '" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="url"><i>.myshopify.com</i></div></label></div>' +
+      '<div class="np-c"><div class="np-l">Currency and region</div>' +
+      '<label class="np-f"><span>Store currency</span><select id="esCur">' + curOpts + "</select></label>" +
+      '<label class="np-f"><span>Region</span><select id="esCountry">' + cOpts + "</select></label>" +
+      '<em class="np-hint" id="esHint"></em></div>' +
+      '<p class="np-err" id="esErr" hidden></p><button type="button" class="btn-p np-go" id="esGo">Save</button></div>' +
+      '<input type="file" id="esFile" accept="image/*" hidden>';
+    var el = page(body, { title: "Edit store", modal: true, notabs: true, cls: "newprod", actions: '<button type="button" class="np-save" id="esSave">Save</button>' });
+    var g = function (id) { return $("#" + id, el); };
+    function showLogo() {
+      var ph = g("esPh");
+      ph.classList.toggle("has", !!d.logo);
+      ph.innerHTML = d.logo ? '<img src="' + esc(d.logo) + '" alt="">' : ic("image") + "<span>Add store photo</span>";
+      g("esRm").hidden = !d.logo;
+    }
+    function hint() {
+      var c = g("esCur").value;
+      g("esHint").textContent = c !== S.cur ? "Changing currency rebuilds the store with the new currency: orders start fresh and amounts are converted." : "";
+    }
+    showLogo(); hint();
+    g("esPh").addEventListener("click", function () { g("esFile").value = ""; g("esFile").click(); });
+    g("esRm").addEventListener("click", function () { d.logo = ""; showLogo(); });
+    g("esFile").addEventListener("change", function () {
+      var file = this.files && this.files[0]; if (!file) return;
+      resizeImg(file, function (data) { if (data) { d.logo = data; showLogo(); } else toast("Couldn\u2019t load that photo"); });
+    });
+    g("esUrl").addEventListener("input", function () { handleTouched = true; });
+    g("esName").addEventListener("keydown", function (e) { if (e.key === "Enter") this.blur(); });
+    g("esCur").addEventListener("change", hint);
+    function fail(m) { var eb = g("esErr"); eb.hidden = !m; eb.textContent = m || ""; }
+    function save() {
+      if (saving) return;
+      var name = g("esName").value.trim(), handle = esSlug(g("esUrl").value), cur = g("esCur").value, country = g("esCountry").value;
+      if (!name) return fail("Enter a store name.");
+      if (!handle) return fail("Enter a valid web address (letters, numbers and dashes).");
+      fail("");
+      saving = true; hap(10); frozen = true;
+      var cfg = savedSettingsObj(), from = cfg.currency || S.cur || "USD";
+      cfg.storeName = name; cfg.storeHandle = handle; cfg.storeLogo = d.logo; cfg.country = country; cfg.currency = cur;
+      if (cur !== from) {
+        if (cfg.convertFx !== false) {
+          cfg.totalSales = esFx(Number(cfg.totalSales) || 0, from, cur);
+          cfg.payoutBalance = esFx(Number(cfg.payoutBalance) || 0, from, cur);
+          if (Array.isArray(cfg.products)) cfg.products = cfg.products.map(function (p) { var q = Object.assign({}, p); q.price = esFx(Number(p.price) || 0, from, cur); if (p.compare > 0) q.compare = esFx(Number(p.compare), from, cur); return q; });
+        }
+        delete cfg.__state; delete cfg.__zero; delete cfg.__sig;   // old amounts are in the old currency: start the history again
+      }
+      writeSettings(cfg);
+      toast("Saving store\u2026");
+      setTimeout(function () { location.href = "./editor.html#apply"; }, 250);
+    }
+    g("esGo").addEventListener("click", save);
+    g("esSave").addEventListener("click", save);
   }
   function closeSheets() { while (stack.length && stack[stack.length - 1].kind === "sheet") pop(false); }
 
