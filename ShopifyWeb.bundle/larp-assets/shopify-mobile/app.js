@@ -2297,7 +2297,8 @@
   if (seen) { sp.remove(); shimmer(1100); }
   else {
     var spokes = "";
-    for (var k = 0; k < 12; k++) spokes += '<rect x="13.8" y="2" width="2.6" height="8" rx="1.3" transform="rotate(' + (k * 30) + ' 15 15)" fill="#8e8e93" opacity="' + (0.18 + 0.82 * (k / 11)).toFixed(2) + '"/>';
+    var BARS = 8;   // number of bars of the spinner
+    for (var k = 0; k < BARS; k++) spokes += '<rect x="13.7" y="2" width="2.8" height="8" rx="1.4" transform="rotate(' + (k * 360 / BARS) + ' 15 15)" fill="#8e8e93" opacity="' + (0.18 + 0.82 * (k / (BARS - 1))).toFixed(2) + '"/>';
     var ld = document.createElement("div");
     ld.id = "loading";
     ld.innerHTML = '<div class="ld-sheet"><svg viewBox="0 0 30 30" aria-hidden="true">' + spokes + "</svg></div>";
