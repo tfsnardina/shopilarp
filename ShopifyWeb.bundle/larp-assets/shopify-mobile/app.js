@@ -2291,14 +2291,26 @@
   window.addEventListener("resize", function () { moveInd(); if (current === "home") { var h = $("#hchart"); if (h && h._g) drawChart(h, h._g.R, homeMet, { h: CH }); } });
   var sp = $("#splash"), seen = false;
   try { seen = sessionStorage.getItem("sh-splash") === "1"; sessionStorage.setItem("sh-splash", "1"); } catch (e) { }
-  // White launch screen with the Shopify bag: visible for 1 second, then it fades out. The status bar turns dark meanwhile.
+  // Launch: white screen with the Shopify bag (1 s) -> spinner on a white sheet -> numbers shimmer for a moment.
   function statusBar(mode) { try { window.webkit.messageHandlers.larpStatusBar.postMessage(mode); } catch (e) { } }
-  if (seen) sp.remove();
+  function shimmer(ms) { app.classList.add("skel"); setTimeout(function () { app.classList.remove("skel"); }, ms); }
+  if (seen) { sp.remove(); shimmer(1100); }
   else {
+    var spokes = "";
+    for (var k = 0; k < 12; k++) spokes += '<rect x="13.8" y="2" width="2.6" height="8" rx="1.3" transform="rotate(' + (k * 30) + ' 15 15)" fill="#8e8e93" opacity="' + (0.18 + 0.82 * (k / 11)).toFixed(2) + '"/>';
+    var ld = document.createElement("div");
+    ld.id = "loading";
+    ld.innerHTML = '<div class="ld-sheet"><svg viewBox="0 0 30 30" aria-hidden="true">' + spokes + "</svg></div>";
+    app.appendChild(ld);
     statusBar("dark");
+    app.classList.add("skel");
     setTimeout(function () {
       statusBar("light");
-      if (reduce) sp.remove(); else { sp.classList.add("out"); setTimeout(function () { sp.remove(); }, 420); }
+      sp.classList.add("out"); setTimeout(function () { sp.remove(); }, 420);   // reveals the spinner screen
+      setTimeout(function () {
+        ld.classList.add("out"); setTimeout(function () { ld.remove(); }, 380);  // reveals the home with shimmering numbers
+        setTimeout(function () { app.classList.remove("skel"); }, 1200);
+      }, 900);
     }, 1000);
   }
   scheduleOrder(true);
