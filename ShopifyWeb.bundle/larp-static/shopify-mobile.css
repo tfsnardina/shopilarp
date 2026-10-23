@@ -110,8 +110,8 @@ b{font-weight:650}
 
 
 /* в”Ђв”Ђ Splash в”Ђв”Ђ */
-#splash{position:absolute;inset:0;z-index:90;background:#000;display:flex;align-items:center;justify-content:center;transition:opacity .4s ease}
-#splash .ic{width:64px;height:64px;color:#95bf47}
+#splash{position:absolute;inset:0;z-index:90;background:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .4s ease}
+#splash img{width:104px;height:auto;display:block;-webkit-user-select:none;user-select:none;pointer-events:none}
 #splash.out{opacity:0}
 
 /* в”Ђв”Ђ Tab bar в”Ђв”Ђ */
