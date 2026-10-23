@@ -58,8 +58,20 @@
   <section>
     <label>Products</label>
     <div id="products"></div>
-    <button type="button" id="addProduct" class="secondary">Add product</button>
+    <button type="button" id="addProduct" class="secondary">+ Add product</button>
     <p id="prodMeta"></p>
+    <input type="file" id="imgPick" accept="image/*" hidden>
+  </section>
+  <section>
+    <label>Create fake orders</label>
+    <select id="foProduct"></select>
+    <div class="row">
+      <div><label>Quantity per order</label><input id="foQty" type="number" inputmode="numeric" min="1" value="1"></div>
+      <div><label>Number of orders</label><input id="foTimes" type="number" inputmode="numeric" min="1" value="1"></div>
+    </div>
+    <button type="button" id="foAdd" class="secondary">Add to queue</button>
+    <div id="foList"></div>
+    <p id="foMeta"></p>
   </section>
   <button type="button" id="exportBtn" class="ghost">Export JSON</button>
   <div class="dock">
