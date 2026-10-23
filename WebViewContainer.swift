@@ -138,6 +138,11 @@ enum WebViewContainer {
                 }
                 return
             }
+            if message.name == "larpStatusBar" {
+                let dark = (message.body as? String) == "dark"
+                DispatchQueue.main.async { [weak self] in self?.host?.setStatusBar(dark: dark) }
+                return
+            }
             if message.name == "shopifySchedule", let dict = message.body as? [String: Any] {
                 NotificationPermission.replaceScheduled(dict["items"] as? [[String: Any]] ?? [])
                 return
@@ -290,6 +295,7 @@ final class WebHostViewController: UIViewController {
         old?.removeScriptMessageHandler(forName: "shopifyOrder")
         old?.removeScriptMessageHandler(forName: "larpStore")
         old?.removeScriptMessageHandler(forName: "shopifySchedule")
+        old?.removeScriptMessageHandler(forName: "larpStatusBar")
         let web = makeWebView()
         showWebView(web)
         lastLayoutInsets = .zero
@@ -302,6 +308,7 @@ final class WebHostViewController: UIViewController {
         config.userContentController.add(coordinator, name: "shopifyOrder")
         config.userContentController.add(coordinator, name: "larpStore")
         config.userContentController.add(coordinator, name: "shopifySchedule")
+        config.userContentController.add(coordinator, name: "larpStatusBar")
         config.userContentController.addUserScript(
             WKUserScript(
                 source: WebViewContainer.nativeChromeScript(),
@@ -367,5 +374,12 @@ final class WebHostViewController: UIViewController {
         refreshWebLayout()
     }
 
-    override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
+    private var statusStyle: UIStatusBarStyle = .lightContent
+    override var preferredStatusBarStyle: UIStatusBarStyle { statusStyle }
+
+    /// Dark status bar while the white launch screen is shown, light (for the black header) afterwards.
+    func setStatusBar(dark: Bool) {
+        statusStyle = dark ? .darkContent : .lightContent
+        setNeedsStatusBarAppearanceUpdate()
+    }
 }
