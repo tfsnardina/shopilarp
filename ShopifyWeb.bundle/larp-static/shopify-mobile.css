@@ -555,6 +555,23 @@ em.flat{color:#8a8a8a}
 .po-r b{display:block;font-size:16px;font-weight:550}
 .po-r span{font-size:14px;color:var(--tx2)}
 .po-a{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.po-next .btn-p{margin-top:14px}
+.po-next .btn-p span,.tr-b .btn-p span{font-size:17px;color:#fff;margin:0}
+.btn-p:disabled{opacity:.45;pointer-events:none}
+.btn-p b{font-weight:inherit;margin-left:6px}
+.sh.notifs.payouts .sh-b,.sh.notifs.payout .sh-b,.sh.notifs.transfer .sh-b{background:#fff}
+.tr-b{padding:6px 16px 8px}
+.tr-bal{padding:14px 16px;border-radius:16px;background:var(--bg2);border:1px solid var(--bd2)}
+.tr-bal span{display:block;font-size:14px;color:var(--tx2)}
+.tr-bal b{display:block;font-size:28px;font-weight:700;letter-spacing:-.5px;margin-top:4px}
+.tr-amt{position:relative}
+.tr-amt input{padding-right:64px}
+.tr-max{position:absolute;right:6px;top:50%;transform:translateY(-50%);height:34px;padding:0 12px;border-radius:9px;background:#f1f1f1;font-size:14.5px;font-weight:600;color:var(--tx)}
+.tr-max:active{background:#e4e4e4}
+.tr-err{margin:12px 2px 0;font-size:14.5px;color:#c70a24}
+.tr-err[hidden]{display:none}
+.tr-note{margin:12px 2px 0;font-size:13.5px;color:var(--tx2);text-align:center}
+html.ios-bold .tr-bal b{font-weight:850}
 .po-d{text-align:center;padding:12px 16px 20px}
 .po-d span{color:var(--tx2)}
 .po-d h1{margin:6px 0 10px;font-size:34px;font-weight:700;letter-spacing:-.8px}
