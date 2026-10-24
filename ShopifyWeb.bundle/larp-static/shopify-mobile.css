@@ -198,8 +198,14 @@ em.flat{color:#8a8a8a}
 .hpill{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:12px;background:#141414;border:1px solid #2f2f2f;color:#fff;font-size:16px;font-weight:450}
 .hpill .ic{width:20px;height:20px}
 .hpill:active{background:#222}
-.hchart{transition:height .35s var(--ease),opacity .25s,margin .35s var(--ease)}
-.hm-top.fold .hchart{height:0!important;opacity:0;margin-top:0}
+.hchart{transition:height .6s var(--ease),opacity .4s ease,margin .6s var(--ease),transform .6s var(--ease),filter .5s ease}
+.hm-top.anim .hchart,.hm-top.fold .hchart{overflow:hidden}
+.hm-top.fold .hchart{height:0!important;opacity:0;margin-top:0;transform:translateY(-22px) scaleY(.82);transform-origin:50% 0;filter:blur(5px)}
+.hm-top.fold .tip{opacity:0;pointer-events:none}
+.hm-top .hpills{transition:transform .6s var(--ease)}
+.hm-top.anim .hpills{will-change:transform}
+.hm-top.anim .met.on{animation:foldbump .5s var(--ease)}
+@keyframes foldbump{40%{transform:scale(.97)}100%{transform:none}}
 .rng{display:inline-flex;align-items:center;gap:4px;margin:6px 0 0 16px;padding:6px 10px 6px 12px;border-radius:999px;background:#1a1a1a;color:#c6c6c6;font-size:13.5px;font-weight:550}
 .rng .ic{width:16px;height:16px}
 .rng.lt{background:var(--bg);color:var(--tx);margin:0 0 12px}
@@ -856,7 +862,7 @@ html.checker-native #tabbar{bottom:calc(var(--bot,0px) + 8px)!important}
 .skel .mv{color:transparent!important;-webkit-text-fill-color:transparent;background:linear-gradient(105deg,rgba(255,255,255,.28) 38%,#fff 50%,rgba(255,255,255,.28) 62%) 200% 0/250% 100%;-webkit-background-clip:text;background-clip:text;animation:shim 1.05s linear infinite}
 .skel .act b{color:transparent!important;-webkit-text-fill-color:transparent;background:linear-gradient(105deg,rgba(0,0,0,.16) 38%,rgba(0,0,0,.55) 50%,rgba(0,0,0,.16) 62%) 200% 0/250% 100%;-webkit-background-clip:text;background-clip:text;animation:shim 1.05s linear infinite}
 .skel #hchart{opacity:.3}
-#hchart{transition:opacity .5s ease}
+#hchart{transition:height .6s var(--ease),opacity .4s ease,margin .6s var(--ease),transform .6s var(--ease),filter .5s ease}
 
 /* iOS Bold Text: html.ios-bold is set by the native app */
 html.ios-bold body{font-weight:600}
