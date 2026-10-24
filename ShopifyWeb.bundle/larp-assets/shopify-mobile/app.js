@@ -576,6 +576,7 @@
      moves and is never covered, because the tiles are clipped at the scroller edge instead of passing under it. */
   function layoutStrip() {
     var m = $("#mets"), sc = $(".mets-sc", m); if (!m || !sc) return;
+    if (window.I18N) window.I18N.apply(m);           // translate first: widths (and so scroll offsets) must be measured on the final text
     if (!document.getElementById("mets-sc-css")) {
       var st = document.createElement("style"); st.id = "mets-sc-css";
       st.textContent = ".mets-sc::-webkit-scrollbar{display:none}";
