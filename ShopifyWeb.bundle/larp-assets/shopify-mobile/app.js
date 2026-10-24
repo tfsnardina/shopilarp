@@ -3,6 +3,42 @@
   "use strict";
   var P = JSON.parse(document.getElementById("payload").textContent || "{}");
   var S = P.st, D = P.d;
+  /* Store in France: the base data is American (cities, states, ZIP codes, +1 phones). Swap it, once, for French
+     cities / regions / postcodes / streets / phones. Every US city always maps to the same French city, so a
+     customer and their orders stay in the same place, and new orders (built from these templates) are French too. */
+  (function localizeFR() {
+    if (!S || S.country !== "FR") return;
+    var CITIES = [
+      ["Paris", "Île-de-France", "75", 5], ["Lyon", "Auvergne-Rhône-Alpes", "69", 3], ["Marseille", "Provence-Alpes-Côte d'Azur", "13", 3],
+      ["Toulouse", "Occitanie", "31", 2], ["Nice", "Provence-Alpes-Côte d'Azur", "06", 2], ["Nantes", "Pays de la Loire", "44", 2],
+      ["Montpellier", "Occitanie", "34", 1], ["Strasbourg", "Grand Est", "67", 1], ["Bordeaux", "Nouvelle-Aquitaine", "33", 2],
+      ["Lille", "Hauts-de-France", "59", 2], ["Rennes", "Bretagne", "35", 1], ["Grenoble", "Auvergne-Rhône-Alpes", "38", 1],
+      ["Dijon", "Bourgogne-Franche-Comté", "21", 1], ["Rouen", "Normandie", "76", 1], ["Toulon", "Provence-Alpes-Côte d'Azur", "83", 1],
+      ["Angers", "Pays de la Loire", "49", 1], ["Reims", "Grand Est", "51", 1], ["Tours", "Centre-Val de Loire", "37", 1]
+    ];
+    var POOL = []; CITIES.forEach(function (c) { for (var i = 0; i < c[3]; i++) POOL.push(c); });
+    var STREETS = ["rue de la République", "avenue Victor Hugo", "boulevard Voltaire", "rue Pasteur", "rue Jean Jaurès", "avenue de la Gare", "rue Nationale", "avenue du Général de Gaulle", "rue des Lilas", "rue Saint-Michel", "rue Gambetta", "avenue Jean Moulin", "boulevard Haussmann", "rue du Commerce", "rue Victor Hugo", "impasse des Roses", "rue de la Paix", "boulevard Saint-Germain", "avenue des Écoles", "rue des Tilleuls", "rue Émile Zola", "rue du Moulin", "avenue de la Liberté", "rue Carnot"];
+    function hash(s) { var h = 2166136261; s = String(s); for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+    function pad(n, w) { n = String(n); while (n.length < w) n = "0" + n; return n; }
+    function cityOf(city, reg) { return POOL[hash(city + "|" + reg) % POOL.length]; }
+    function zipOf(c, h) {
+      if (c[2] === "75") return "750" + pad(1 + (h % 20), 2);
+      if (c[2] === "69") return "6900" + (1 + (h % 9));
+      if (c[2] === "13") return "130" + pad(1 + (h % 16), 2);
+      return c[2] + (h % 4) + "00";
+    }
+    function phoneOf(p) {
+      if (!p) return p;
+      var h = hash(p), d = pad(h % 100000000, 8);
+      return "+33 " + (h % 3 ? "6" : "7") + " " + d.slice(0, 2) + " " + d.slice(2, 4) + " " + d.slice(4, 6) + " " + d.slice(6, 8);
+    }
+    (P.cus || []).forEach(function (c) { var f = cityOf(c[3], c[4]); c[2] = phoneOf(c[2]); c[3] = f[0]; c[4] = f[1]; });
+    (P.ord || []).forEach(function (o) {
+      var f = cityOf(o[19], o[20]), h = hash(o[0] + "|" + o[19] + "|" + o[22]);
+      o[19] = f[0]; o[20] = f[1]; o[21] = zipOf(f, h);
+      o[22] = (1 + (h % 120)) + " " + STREETS[(h >>> 8) % STREETS.length];
+    });
+  })();
   // EMPTY START: a brand-new store (0 sales, 0 orders, no products, no customers).
   // P.ord / P.pro stay in memory only as templates so new orders can still be generated.
   var EMPTY = true, CFG = {};
@@ -1236,7 +1272,7 @@
 
   /* ── Order page ──────────────────────────────────────────── */
   function findOrder(n) { for (var i = 0; i < orders.length; i++) if (orders[i].n === n) return orders[i]; return null; }
-  function addr(o) { return [esc(o.c ? o.c.name : ""), esc(o.street), esc(o.city + ", " + o.reg + " " + o.zip), esc(countryName())].join("<br>"); }
+  function addr(o) { return [esc(o.c ? o.c.name : ""), esc(o.street), esc(S.country === "FR" ? o.zip + " " + o.city : o.city + ", " + o.reg + " " + o.zip), esc(countryName())].join("<br>"); }
   function countryName() { return S.cname || { US: "United States", CA: "Canada", GB: "United Kingdom", AU: "Australia", DE: "Germany", FR: "France", NZ: "New Zealand", IE: "Ireland", ES: "Spain", IT: "Italy", NL: "Netherlands", SE: "Sweden", IN: "India", SG: "Singapore", JP: "Japan", BR: "Brazil", MX: "Mexico", AE: "United Arab Emirates" }[S.country] || "United States"; }
   function cardLabel(o) {
     if (o.gw === "PayPal") return "PayPal";
@@ -1568,7 +1604,18 @@
   }
   var LAND_MASK = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/gP8DAAAAAAAAAAAAAAAAAAAAAAD8/////wcAAAAAAAAHAAAAAAAAAAAArP/8//8fAPADAAAA4AMAAAAAAAAA4ADMh////wAABgAACADwAAAAAAAAAADwUT8A/v8PAAAAABwA/n8AOAAAAAAA+LPvD8D/fwAAAAAwIPz//wMDAADAAwD5w/4H+P8HAAAcAIP7/////z8Afv4HB//P////////8+Fv+QAAAAAAgMAPAAAAAODDB+D//x8ALAAEAAAAAAAAIPz///+///uf//v/7////////////wfw/////xE88AEAAP7+////////////gP////8HeAAcAADw5////////////ADgAf//f4AvAAAAAH78////////v8QAAAyA//8/+AcAAIBB4/////////8ADwAAAPD//9//AQAAPBT/////////A3AAAAAA/v///T8AAGD3//////////8DAwAAAMD/////AwAA+P//////////PwAAAAAA+P///2MAAAD///////////8CAAAAAAD///8/CAAA4P//////////JwAAAAAA8P///wcAAAD+/+nz/////38AAAAAAAD///8HAAAA/tgPPP//////MQAAAAAA8P//PwAAAOBH9v/n/////wcBAAAAAAD///8BAAAAPgD7f/7///8xEAAAAAAA4P//DwAAAMB5Iv//////f8YBAAAAAAD+//8AAAAA+AcA//////8jDwAAAAAAgP//AwAAAOD/Afj/////fwgAAAAAAADw/x8AAAAA/n////////8HAAAAAAAAAP4HAwAAAPD////7////fwAAAAAAAACgHyAAAACA//9/f/////8DAAAAAAAAAPQBAAAAAPz///8v////PwAAAAAAAAAAHiAAAADA/////g////8EAAAAAAAAAOAjCAAAAP7//9//4D//AgAAAAAAAAAAPAMGAADA/////Qf84BcAAAAAAAAAAAA/AAAAAPz//78fgAf+QAAAAAAAAAAAgA8AAADg////+wA4gB8EAAAAAAAAAADAAAAAAP7///8BgAP4gQAAAAAAAAAAAAgPAADA////7wAwgAwIAAAAAAAAAAAA/w8AAPj///8HAAUIAAEAAAAAAAAAAID/AQAA////fwBAAAEQAAAAAAAAAAAA+P8AAODj//8DAAA0GAAAAAAAAAAAAID/HwAAAPj/HwAAgMMBAAAAAAAAAAAA/P8BAACA//8AAAA4HwAAAAAAAAAAAMD/fwAAAPz/BwAAAOMFAQAAAAAAAAAA/P8/AACA/z8AAABgbvABAAAAAAAAAOD//w8AAPD/AwAAAAQAfAIAAAAAAAAA/P//AQAA/z8AAACAA4APAAAAAAAAAMD//x8AAPD/AwAAAAAQsAEAAAAAAAAA+P//AAAA/j8AAAAAAAAAAAAAAAAAAAD//wcAAPD/QwAAAACAIwAAAAAAAAAA8P9/AAAA/z8GAAAAAD8GAAAAAAAAAAD8/wcAAPD/cQAAAAD4fwAAAAAAAAAAgP8/AAAA/w8HAAAAgP8PAAAAAAAAAAD4/wMAAOD/MAAAAAD//wEAAAAAAAAAgP8fAAAA/g8DAAAA+P8/AAAAAAAAAAD4PwAAAOB/MAAAAID//wMAAAAAAAAAwP8DAAAA/gcAAAAA+P9/AAAAAAAAAAD8HwAAAMA/AAAAAID//wcAAAAAAAAAwP8BAAAA+AEAAAAA8P9/AAAAAAAAAAD8DwAAAIAPAAAAAAAf/gMAAAAAAAAAwH8AAAAAAAAAAAAAEIA/AAAAAAAAAAD+AwAAAAAAAAAAAAAA8AEgAAAAAAAA4A8AAAAAAAAAAAAAAAAAAAYAAAAAAAB+AAAAAAAAAAAAAAAAgAAwAAAAAAAA4AMAAAAAAAAAAAAAAAAIgAEAAAAAAAAeAAAAAAAAAAAAAAAAAAAOAAAAAAAA8AEAAAAAAAAAAAAAAAAAAAAAAAAAAAAfAAAAAAAAAAAAAAAAAAAAAAAAAAAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAD8APj///8HAAAAAAAAAAA0AAAAAADA/f/h/////w8AAAAAAAAA4AcAAED5////z///////fwAAAAAAvAb+AADA//////////////8HAAD4/////wMAAP7/////////////HwCA+f////8BAID///////////////8AAPL/////BwAO////////////////HwAA/v/////vePj//////////////38AAOD/////////////////////////PwAAeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
   // A dotted globe that turns slowly, with visitor pings on recent cities.
-  var CITY = { "Los Angeles": [34, -118], "New York": [40.7, -74], Brooklyn: [40.6, -73.9], Chicago: [41.9, -87.6], Houston: [29.8, -95.4], Dallas: [32.8, -96.8], Austin: [30.3, -97.7], Miami: [25.8, -80.2], Orlando: [28.5, -81.4], Atlanta: [33.7, -84.4], Phoenix: [33.4, -112], Seattle: [47.6, -122.3], "San Diego": [32.7, -117.2], "San Francisco": [37.8, -122.4], Denver: [39.7, -105], Boston: [42.4, -71], Nashville: [36.2, -86.8], Charlotte: [35.2, -80.8], "Las Vegas": [36.2, -115.1], Portland: [45.5, -122.7], Columbus: [40, -83], Philadelphia: [40, -75.2], Minneapolis: [45, -93.3], Tampa: [28, -82.5], "San Antonio": [29.4, -98.5], Detroit: [42.3, -83], Raleigh: [35.8, -78.6], "Salt Lake City": [40.8, -111.9], Newark: [40.7, -74.2], Sacramento: [38.6, -121.5], Toronto: [43.7, -79.4], Vancouver: [49.3, -123.1], Montreal: [45.5, -73.6], Calgary: [51, -114], Ottawa: [45.4, -75.7], Edmonton: [53.5, -113.5], Mississauga: [43.6, -79.6], Winnipeg: [49.9, -97.1], London: [51.5, -0.1], Manchester: [53.5, -2.2], Birmingham: [52.5, -1.9], Leeds: [53.8, -1.5], Glasgow: [55.9, -4.3], Bristol: [51.5, -2.6], Liverpool: [53.4, -3], Edinburgh: [56, -3.2], Sydney: [-33.9, 151.2], Melbourne: [-37.8, 145], Brisbane: [-27.5, 153], Perth: [-32, 115.9], Adelaide: [-34.9, 138.6], "Gold Coast": [-28, 153.4], Berlin: [52.5, 13.4], Munich: [48.1, 11.6], Hamburg: [53.6, 10], Cologne: [50.9, 7], Frankfurt: [50.1, 8.7], Paris: [48.9, 2.35], Lyon: [45.8, 4.8], Marseille: [43.3, 5.4], Toulouse: [43.6, 1.4], Nice: [43.7, 7.3] };
+  var CITY = { "Los Angeles": [34, -118], "New York": [40.7, -74], Brooklyn: [40.6, -73.9], Chicago: [41.9, -87.6], Houston: [29.8, -95.4], Dallas: [32.8, -96.8], Austin: [30.3, -97.7], Miami: [25.8, -80.2], Orlando: [28.5, -81.4], Atlanta: [33.7, -84.4], Phoenix: [33.4, -112], Seattle: [47.6, -122.3], "San Diego": [32.7, -117.2], "San Francisco": [37.8, -122.4], Denver: [39.7, -105], Boston: [42.4, -71], Nashville: [36.2, -86.8], Charlotte: [35.2, -80.8], "Las Vegas": [36.2, -115.1], Portland: [45.5, -122.7], Columbus: [40, -83], Philadelphia: [40, -75.2], Minneapolis: [45, -93.3], Tampa: [28, -82.5], "San Antonio": [29.4, -98.5], Detroit: [42.3, -83], Raleigh: [35.8, -78.6], "Salt Lake City": [40.8, -111.9], Newark: [40.7, -74.2], Sacramento: [38.6, -121.5], Toronto: [43.7, -79.4], Vancouver: [49.3, -123.1], Montreal: [45.5, -73.6], Calgary: [51, -114], Ottawa: [45.4, -75.7], Edmonton: [53.5, -113.5], Mississauga: [43.6, -79.6], Winnipeg: [49.9, -97.1], London: [51.5, -0.1], Manchester: [53.5, -2.2], Birmingham: [52.5, -1.9], Leeds: [53.8, -1.5], Glasgow: [55.9, -4.3], Bristol: [51.5, -2.6], Liverpool: [53.4, -3], Edinburgh: [56, -3.2], Sydney: [-33.9, 151.2], Melbourne: [-37.8, 145], Brisbane: [-27.5, 153], Perth: [-32, 115.9], Adelaide: [-34.9, 138.6], "Gold Coast": [-28, 153.4], Berlin: [52.5, 13.4], Munich: [48.1, 11.6], Hamburg: [53.6, 10], Cologne: [50.9, 7], Frankfurt: [50.1, 8.7], Paris: [48.9, 2.35], Lyon: [45.8, 4.8], Marseille: [43.3, 5.4], Toulouse: [43.6, 1.4], Nice: [43.7, 7.3], Nantes: [47.2, -1.55], Montpellier: [43.6, 3.9], Strasbourg: [48.6, 7.75], Bordeaux: [44.8, -0.6], Lille: [50.6, 3.05], Rennes: [48.1, -1.7], Grenoble: [45.2, 5.7], Dijon: [47.3, 5], Rouen: [49.45, 1.1], Toulon: [43.1, 5.9], Angers: [47.5, -0.55], Reims: [49.25, 4.05], Tours: [47.4, 0.7] };
+  // Metropolitan France + Corsica outline ([lat, lon]), used to draw a zoomed, dotted map of France in Live View.
+  var FR_OUT = [[51.05, 2.37], [50.95, 1.85], [50.7, 1.6], [50.2, 1.55], [49.93, 1.08], [49.5, 0.1], [49.4, -0.2], [49.3, -1.1], [49.7, -1.6], [49.2, -1.6], [48.65, -1.55], [48.65, -2], [48.8, -3.4], [48.7, -4.3], [48.4, -4.75], [48.05, -4.7], [47.85, -3.9], [47.7, -3.4], [47.5, -3.1], [47.5, -2.5], [47.25, -2.2], [47, -2.2], [46.4, -1.2], [46.15, -1.15], [45.55, -1.05], [44.65, -1.25], [43.6, -1.45], [43.35, -1.78], [42.8, -0.7], [42.8, 0.7], [42.85, 1.4], [42.45, 1.7], [42.5, 2], [42.43, 3.17], [42.7, 3.05], [43.1, 3.05], [43.4, 3.7], [43.4, 4.6], [43.3, 5.35], [43.1, 6], [43.4, 6.75], [43.65, 7], [43.78, 7.5], [44.1, 7.7], [44.4, 6.9], [44.85, 6.65], [45.1, 7.05], [45.5, 6.85], [46.2, 6.1], [46.45, 6], [47, 7], [47.55, 7.6], [48, 7.55], [48.6, 8.2], [49, 8.2], [49.2, 7], [49.5, 6.35], [49.55, 5.4], [49.9, 4.85], [50.15, 4.2], [50.3, 3.6], [50.7, 3.2], [50.85, 2.9]];
+  var CORSICA_OUT = [[43, 9.45], [42.65, 9.5], [41.9, 9.4], [41.4, 9.2], [41.4, 8.8], [41.9, 8.6], [42.5, 8.6], [42.95, 9.35]];
+  function inPoly(lat, lon, poly) {
+    var c = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      var a = poly[i], b = poly[j];
+      if ((a[0] > lat) !== (b[0] > lat) && lon < ((b[1] - a[1]) * (lat - a[0])) / (b[0] - a[0]) + a[1]) c = !c;
+    }
+    return c;
+  }
   function globe(host) {
     var size = Math.min(host.clientWidth || 300, 320);
     var cv = document.createElement("canvas"), dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -1578,11 +1625,12 @@
     var pts = orders.slice(0, 40).map(function (o) { return CITY[o.city]; }).filter(Boolean);
     var home = pts[0] || [39, -98];
     var lon0 = -home[1] - 10, R = size / 2 - 6, cx = size / 2, cy = size / 2;
-    var dots = [];
+    var dots = [], FR = S.country === "FR", Z = FR ? 8.6 : 1;   // France: zoomed in on a dotted map of the country
+    if (FR) for (var fla = 41; fla <= 51.4; fla += 0.35) for (var flo = -5.4; flo <= 9.8; flo += 0.5) if (inPoly(fla, flo, FR_OUT) || inPoly(fla, flo, CORSICA_OUT)) dots.push([fla, flo]);
     // Land dots come from a 2-degree land mask of Natural Earth's 110m land
     // (world-atlas), bit-packed: 180 columns from 180W, 90 rows from 90N.
     var bits = atob(LAND_MASK);
-    for (var r = 0; r < 90; r++) {
+    for (var r = 0; r < (FR ? 0 : 90); r++) {
       var la = 89 - r * 2;
       if (la < -58) continue;
       for (var cIdx = 0; cIdx < 180; cIdx++) {
@@ -1590,27 +1638,30 @@
         if (bits.charCodeAt(k >> 3) & (1 << (k & 7))) dots.push([la, -179 + cIdx * 2]);
       }
     }
-    var tilt = 0.32;
+    var tilt = FR ? 0.81 : 0.32;
     function proj(lat, lon, rot) {
       var p = (lat * Math.PI) / 180, l = ((lon + rot) * Math.PI) / 180;
       var x = Math.cos(p) * Math.sin(l), y = Math.sin(p), z = Math.cos(p) * Math.cos(l);
       var y2 = y * Math.cos(tilt) - z * Math.sin(tilt), z2 = y * Math.sin(tilt) + z * Math.cos(tilt);
-      return [cx + x * R, cy - y2 * R, z2];
+      return [cx + x * R * Z, cy - y2 * R * Z, z2];
     }
-    var rot = lon0, last = performance.now(), alive = true;
+    var rot = FR ? -2.5 : lon0, last = performance.now(), alive = true;
     function frame(now) {
       if (!host.isConnected) { alive = false; return; }
       var dt = now - last; last = now;
-      if (!reduce) rot += dt * 0.004;
+      if (FR) rot = -2.5 + (reduce ? 0 : Math.sin(now / 3500) * 1.1);   // France stays in view, only a gentle sway
+      else if (!reduce) rot += dt * 0.004;
       ctx.clearRect(0, 0, size, size);
       var g = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.1, cx, cy, R);
       g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#eef0f3");
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+      if (FR) { ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip(); }
+      var ds = FR ? 3.2 : 1.8;
       for (var i = 0; i < dots.length; i++) {
         var q = proj(dots[i][0], dots[i][1], rot);
         if (q[2] <= 0) continue;
         ctx.fillStyle = "rgba(118,126,138," + (0.3 + q[2] * 0.6).toFixed(2) + ")";
-        ctx.fillRect(q[0] - 0.9, q[1] - 0.9, 1.8, 1.8);
+        ctx.fillRect(q[0] - ds / 2, q[1] - ds / 2, ds, ds);
       }
       var tt = now / 1000;
       for (var k = 0; k < pts.length; k++) {
@@ -1627,6 +1678,7 @@
           ctx.fillStyle = "rgba(0,148,213," + (0.25 + a * 0.75).toFixed(2) + ")"; ctx.beginPath(); ctx.arc(c[0], c[1], 2.4 + a, 0, Math.PI * 2); ctx.fill();
         }
       }
+      if (FR) ctx.restore();
       if (alive) requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
