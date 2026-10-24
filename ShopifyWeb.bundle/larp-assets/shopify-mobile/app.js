@@ -1748,27 +1748,28 @@
     return p.st === "In transit" ? "In transit" : "Paid";
   }
   function payList() { return payouts.filter(function (p) { return p.st !== "Scheduled"; }).sort(function (a, b) { return b.ts - a.ts; }); }
+  var ARW = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>';
+  var BAG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 11H7L6 8zM9 8V7a3 3 0 016 0v1"/></svg>';
+  var BANK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>';
   function payRowHtml(p, k) {
-    var st = payStatus(p);
-    var sub = p.bank ? "<span>Bank transfer</span> <span>" + esc(p.bank) + "</span>" : "<span>" + count(p.n) + " order" + (p.n === 1 ? "" : "s") + "</span>";
-    return '<button class="po-r" data-po="' + k + '"><div><b>' + esc(mdLong(p.ts)) + "</b>" + sub + '</div><div class="po-a"><b>' + money(p.amt) + "</b>" + badge(st, st === "In transit" ? "info" : "ok") + "</div></button>";
-  }
-  function payCard(label, em) {
-    var bal = payBal();
-    return '<div class="po-next"><span>' + label + "</span><b>" + money(bal) + "</b>" + (em || "") +
-      '<button class="btn-p po-tr" data-act="transfer"' + (bal > 0 ? "" : " disabled") + "><span>Transfer</span></button></div>";
-  }
-  function financeBody() {
-    var np = nextPayout();
-    var em = np ? "<em>Next payout " + md(np.ts) + " to the account " + (payBank.iban ? esc(bankLabel(payBank.iban)) : "ending in " + String(1000 + (S.lastN * 7) % 9000).slice(-4)) + "</em>" : "";
-    return payCard("Payout balance", em) +
-      '<div class="sec po"><div class="sec-h"><h3>Recent payouts</h3></div>' + payList().slice(0, 20).map(payRowHtml).join("") + "</div>";
+    var st = payStatus(p), tr = st === "In transit";
+    var sub = p.bank ? "<span>" + esc(mdLong(p.ts)) + " • " + esc(p.bank) + "</span>" : "<span>" + esc(mdLong(p.ts)) + " • " + count(p.n) + " order" + (p.n === 1 ? "" : "s") + "</span>";
+    return '<button class="pv-r pv-x" style="--d:' + (0.32 + Math.min(k, 8) * 0.06) + 's" data-po="' + k + '"><span class="pv-ic' + (p.bank ? "" : " o") + (tr ? " tr" : "") + '">' + (p.bank ? ARW : BAG) + '</span><div><b>' + (p.bank ? "Bank transfer" : "Payout") + "</b>" + sub + '</div><div class="po-a"><b>' + money(p.amt) + "</b>" + badge(st, tr ? "info" : "ok") + "</div></button>";
   }
   function payoutsHtml() {
-    var np = nextPayout();
-    return payCard("Next payout", np ? "<em>Estimated " + md(np.ts) + "</em>" : "") +
-      '<div class="sec"><div class="sec-h"><h3>Payouts</h3></div>' + payList().slice(0, 30).map(payRowHtml).join("") + "</div>";
+    var np = nextPayout(), bal = payBal(), list = payList();
+    var sent = transfers.reduce(function (a, t) { return a + t.amt; }, 0);
+    var moving = transfers.filter(function (t) { return payStatus(t) === "In transit"; }).reduce(function (a, t) { return a + t.amt; }, 0);
+    var hero = '<div class="pv-hero pv-x"><div class="pv-top"><span class="pv-lb"><i></i>Available balance</span>' + (np ? '<span class="pv-chip">Estimated ' + md(np.ts) + "</span>" : "") + "</div>" +
+      '<b class="pv-bal" id="pvBal">' + money(bal) + "</b>" +
+      '<div class="pv-acc">' + BANK + "<span>" + (payBank.iban ? esc(bankLabel(payBank.iban)) : "No bank account yet") + "</span></div>" +
+      '<button class="pv-go" data-act="transfer"' + (bal > 0 ? "" : " disabled") + ">" + ARW + "<span>Transfer</span></button></div>";
+    var stats = transfers.length ? '<div class="pv-stats pv-x" style="--d:.2s"><div><span>In transit</span><b>' + money(moving) + "</b></div><div><span>Transferred</span><b>" + money(sent) + "</b></div></div>" : "";
+    var rows = list.length ? list.slice(0, 30).map(payRowHtml).join("") :
+      '<div class="pv-empty pv-x" style="--d:.3s"><span class="pv-eic">' + ARW + "</span><b>No payouts yet</b><span>Your transfers will show up here.</span></div>";
+    return hero + stats + '<div class="pv-list pv-x" style="--d:.28s"><h3>Payouts</h3>' + rows + "</div>";
   }
+  function financeBody() { return payoutsHtml(); }
   function bindPayouts(el) {
     $$("[data-po]", el).forEach(function (b) {
       b.addEventListener("click", function () { var p = payList()[+b.getAttribute("data-po")]; if (p) payDetail(p); });
@@ -1777,6 +1778,10 @@
   function openPayouts() {
     payEl = sheet("Payouts", payoutsHtml(), { navClose: true, cls: "notifs payouts" });
     bindPayouts(payEl);
+    var sb = $(".sh-b", payEl); sb.classList.add("pv-in");
+    setTimeout(function () { sb.classList.remove("pv-in"); }, 1800);
+    var bn = $("#pvBal", payEl); if (bn && payBal() > 0) countTo(bn, 0, payBal(), money, 1000);
+    setTimeout(function () { hap("light"); }, 120);
   }
   function payDetail(p) {
     var st = payStatus(p);
