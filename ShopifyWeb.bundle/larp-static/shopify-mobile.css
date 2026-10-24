@@ -211,7 +211,7 @@ em.flat{color:#8a8a8a}
 .greet{margin:0 var(--g);font-size:min(22px,5.15vw);line-height:1.25;font-weight:550;color:var(--tx);letter-spacing:-.35px}
 .greet span{color:var(--tx2)}
 .acts{display:flex;gap:10px;overflow-x:auto;padding:16px var(--g) 4px;scroll-snap-type:x mandatory;scroll-padding:0 var(--g)}
-.act{position:relative;flex:none;width:166px;height:68.5px;padding:13px 14px 0;border-radius:16px;border:1px solid var(--bd2);background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04);scroll-snap-align:start;transition:transform .15s}
+.act{position:relative;flex:none;width:auto;min-width:166px;max-width:260px;height:68.5px;padding:13px 50px 0 14px;text-align:left;border-radius:16px;border:1px solid var(--bd2);background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04);scroll-snap-align:start;transition:transform .15s}
 .act:active{transform:scale(.97)}
 .act span{display:block;font-size:13.5px;line-height:17px;color:var(--tx2);white-space:nowrap}
 .act b{display:block;margin-top:5px;font-size:15.5px;line-height:20px;font-weight:650;letter-spacing:-.1px}
