@@ -71,6 +71,7 @@ enum WebViewContainer {
         return """
         window.__CHECKER_NATIVE__=true;
         document.documentElement.classList.add('checker-native');
+        document.documentElement.classList.toggle('ios-bold', \(UIAccessibility.isBoldTextEnabled ? "true" : "false"));
         (function(){
           var settings = \(jsStringLiteral(settings));
           var payload = \(jsStringLiteral(payload));
@@ -244,6 +245,7 @@ final class WebHostViewController: UIViewController {
         view.insetsLayoutMarginsFromSafeArea = false
         coordinator.host = self
         installLifecycleObservers()
+        installBoldTextObserver()
         if #available(iOS 15.0, *) {
             view.keyboardLayoutGuide.followsUndockedKeyboard = false
         }
@@ -292,6 +294,19 @@ final class WebHostViewController: UIViewController {
 
     deinit {
         lifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
+    }
+
+    /// Mirrors the iOS "Bold Text" accessibility setting into the page (html.ios-bold).
+    private func installBoldTextObserver() {
+        let obs = NotificationCenter.default.addObserver(
+            forName: UIAccessibility.boldTextStatusDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            let on = UIAccessibility.isBoldTextEnabled ? "true" : "false"
+            self?.webView?.evaluateJavaScript(
+                "document.documentElement.classList.toggle('ios-bold', \(on))", completionHandler: nil
+            )
+        }
+        lifecycleObservers.append(obs)
     }
 
     func reloadShopHome() {
