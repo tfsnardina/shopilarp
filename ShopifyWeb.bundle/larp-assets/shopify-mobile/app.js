@@ -239,9 +239,10 @@
   var units = function (o) { return o.items.reduce(function (a, x) { return a + x.q; }, 0); };
   function chName(ch) { return ch === "Instagram" || ch === "Facebook" ? "Facebook & Instagram" : ch; }
   // Current push format: "Order #1013" / "$92.00, 1 item from Online Store • Store".
+  function L10n(t) { return window.I18N ? window.I18N.tr(t) : t; }
   function pushBody(o) { var n = units(o); return money(o.total) + ", " + n + " item" + (n === 1 ? "" : "s") + " from " + chName(o.ch) + " \u2022 " + S.name; }
   function nativeOrderPush(o) {
-    var payload = { type: "shopify_order", title: "Order #" + o.n, body: pushBody(o), orderNumber: o.n };
+    var payload = { type: "shopify_order", title: L10n("Order #" + o.n), body: L10n(pushBody(o)), orderNumber: o.n };
     try {
       if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.shopifyOrder) {
         window.webkit.messageHandlers.shopifyOrder.postMessage(payload);
@@ -1713,12 +1714,12 @@
     var el = page(body, { cls: "sidekick", title: "New conversation", titleChev: true, notabs: true, actions: '<button class="nb-c" data-act="sknew" aria-label="Private chat">' + ic("view") + "</button>" });
     var log = $("#sklog", el), qi = $("#skq", el), go = $("#skgo", el);
     function answer(q) {
-      var ql = q.toLowerCase(), top = prods.slice().sort(function (x, y) { return y.sold - x.sold; });
+      var ql = ((window.I18N ? window.I18N.en(q) : q) + " " + q).toLowerCase(), top = prods.slice().sort(function (x, y) { return y.sold - x.sold; });
       var c30 = change(R.tot.s, R.ptot.s);
-      if (/today|sales|doing|revenue/.test(ql)) return "Today you\u2019ve made " + money(Rt.tot.s) + " from " + count(Rt.tot.o) + " order" + (Rt.tot.o === 1 ? "" : "s") + ". Over the last 30 days, total sales are " + money(R.tot.s) + (c30 !== null ? ", " + (c30 >= 0 ? "up " : "down ") + Math.abs(Math.round(c30)) + "% from the 30 days before." : ".");
-      if (/best|top|seller|product/.test(ql)) return "Your best seller over the last 30 days is " + top[0].title + " with " + count(top[0].sold) + " units sold" + (top[1] ? ", followed by " + top[1].title + " (" + count(top[1].sold) + ")." : ".");
-      if (/attention|order|fulfill/.test(ql)) { var u = unfulfilled(), c = toCapture().length; return "You have " + u.length + " order" + (u.length === 1 ? "" : "s") + " to fulfill" + (c ? " and " + c + " payment" + (c === 1 ? "" : "s") + " to capture" : "") + ". The oldest unfulfilled order is #" + (u.slice(-1)[0] || { n: S.lastN }).n + "."; }
-      if (/description|write/.test(ql)) return "Here\u2019s a draft for " + top[0].title + ":\n\nMade for everyday wear, the " + top[0].title + " pairs a clean silhouette with materials that hold up wash after wash. It\u2019s the piece you\u2019ll reach for first.";
+      if (/today|sales|doing|revenue|aujourd|ventes|chiffre|hoy|ventas|heute|umsatz|verk/.test(ql)) return "Today you\u2019ve made " + money(Rt.tot.s) + " from " + count(Rt.tot.o) + " order" + (Rt.tot.o === 1 ? "" : "s") + ". Over the last 30 days, total sales are " + money(R.tot.s) + (c30 !== null ? ", " + (c30 >= 0 ? "up " : "down ") + Math.abs(Math.round(c30)) + "% from the 30 days before." : ".");
+      if (/best|top|seller|product|meilleur|produit|mejor|producto|beste|produkt/.test(ql)) return "Your best seller over the last 30 days is " + top[0].title + " with " + count(top[0].sold) + " units sold" + (top[1] ? ", followed by " + top[1].title + " (" + count(top[1].sold) + ")." : ".");
+      if (/attention|order|fulfill|commande|traiter|pedido|preparar|bestell|erfüll/.test(ql)) { var u = unfulfilled(), c = toCapture().length; return "You have " + u.length + " order" + (u.length === 1 ? "" : "s") + " to fulfill" + (c ? " and " + c + " payment" + (c === 1 ? "" : "s") + " to capture" : "") + ". The oldest unfulfilled order is #" + (u.slice(-1)[0] || { n: S.lastN }).n + "."; }
+      if (/description|write|rédig|écri|escrib|schreib|beschreib/.test(ql)) return "Here\u2019s a draft for " + top[0].title + ":\n\nMade for everyday wear, the " + top[0].title + " pairs a clean silhouette with materials that hold up wash after wash. It\u2019s the piece you\u2019ll reach for first.";
       return "Your store has " + count(S.custTotal) + " customers and " + count(R.tot.o) + " orders in the last 30 days. I can dig into sales, products, orders or customers, or help you write and edit content.";
     }
     function ask(q) {
@@ -1728,7 +1729,7 @@
       var b = document.createElement("div"); b.className = "sk-a typing"; b.innerHTML = "<i></i><i></i><i></i>"; log.appendChild(b);
       var pb = $(".pg-b", el); pb.scrollTop = pb.scrollHeight;
       setTimeout(function () {
-        var txt = answer(q), k = 0; b.classList.remove("typing"); b.textContent = "";
+        var txt = answer(q), k = 0; if (window.I18N) txt = window.I18N.tr(txt); b.classList.remove("typing"); b.textContent = "";
         var timer = setInterval(function () {
           k += 2 + Math.floor(Math.random() * 3); b.textContent = txt.slice(0, k); pb.scrollTop = pb.scrollHeight;
           if (k >= txt.length) { clearInterval(timer); b.insertAdjacentHTML("afterend", '<div class="sk-fb"><button aria-label="Good response">' + ic("thumb-up") + '</button><button aria-label="Bad response">' + ic("thumb-down") + "</button></div>"); }
@@ -1883,7 +1884,7 @@
         o.n = base + 1 + i;
         o.ch = weighted([["Online Store", 74], ["Shop", 10], ["Instagram", 5], ["TikTok", 5], ["Facebook", 3], ["Google & YouTube", 3]]);
         specs.push({ at: Math.round(at), n: o.n, src: idx, lines: lines.map(function (l) { return [l[0].title, l[1]]; }), pay: o.pay, ch: o.ch });
-        items.push({ at: Math.round(at), title: "Order #" + o.n, body: pushBody(o) });
+        items.push({ at: Math.round(at), title: L10n("Order #" + o.n), body: L10n(pushBody(o)) });
         at += 1000 * Math.min(pc[2], Math.max(pc[1], -Math.log(1 - Math.random()) * pc[0]));
       }
       cfg.__bg = specs; writeSettings(cfg);
@@ -2152,7 +2153,8 @@
       '<button type="button" class="ac-more" aria-label="Plus" aria-haspopup="true">' + ic("more") + '</button></div>' +
       '<button type="button" class="ac-r ac-add">' + ic("plus-circle") + "<b>Ajouter un compte</b></button>" +
       '<div class="ac-menu" hidden><button type="button" class="ac-pref" data-go="profile">' + ic("person") + "<span>Modifier le profil</span></button>" +
-      '<button type="button" class="ac-pref" data-go="prefs">' + ic("settings") + "<span>Préférences</span></button></div></div>";
+      '<button type="button" class="ac-pref" data-go="prefs">' + ic("settings") + "<span>Préférences</span></button>" +
+      '<button type="button" class="ac-pref" data-go="lang">' + ic("globe") + "<span>Language</span></button></div></div>";
     app.appendChild(el);
     requestAnimationFrame(function () { requestAnimationFrame(function () { el.classList.add("on"); }); });
     function close() { el.classList.remove("on"); setTimeout(function () { el.remove(); }, 300); }
@@ -2163,6 +2165,7 @@
       if (it) {
         close();
         if (it.getAttribute("data-go") === "profile") setTimeout(openEditProfile, 120);
+        else if (it.getAttribute("data-go") === "lang") setTimeout(openLang, 120);
         else setTimeout(function () { closeSheets(); closeAll(); location.href = "./editor.html"; }, 180);
         return;
       }
@@ -2170,6 +2173,20 @@
       if (!menu.hidden && !e.target.closest(".ac-r")) { menu.hidden = true; return; }
       if (e.target.closest(".ac-add")) toast("Ajouter un compte");
       close();
+    });
+  }
+  // Language picker: the whole app is translated on the fly by i18n.js, so switching is instant.
+  function openLang() {
+    if (!window.I18N) return;
+    var cur = window.I18N.lang;
+    var el = sheet("Language", '<div class="opts">' + window.I18N.langs.map(function (l) {
+      return '<button class="opt" data-lang="' + l.code + '" data-no-i18n><span>' + esc(l.name) + "</span>" + (l.code === cur ? ic("check", "ck") : "") + "</button>";
+    }).join("") + "</div>");
+    $$(".opt", el).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var code = b.getAttribute("data-lang"); hap(6); pop(false);
+        setTimeout(function () { window.I18N.set(code); }, 180);
+      });
     });
   }
   function openEditProfile() {
