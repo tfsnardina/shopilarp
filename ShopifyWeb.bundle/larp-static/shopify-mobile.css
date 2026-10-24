@@ -570,6 +570,22 @@ em.flat{color:#8a8a8a}
 .tr-max:active{background:#e4e4e4}
 .tr-err{margin:12px 2px 0;font-size:14.5px;color:#c70a24}
 .tr-err[hidden]{display:none}
+.sh.tr-ok .sh-b{padding:4px 20px 10px;overflow:visible}
+.ok-w{display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:10px}
+.ok-ic{position:relative;width:88px;height:88px;margin:6px 0 14px;animation:okpop .5s var(--ease) both}
+.ok-ic svg{position:relative;display:block}
+.ok-c{stroke-dasharray:189;stroke-dashoffset:189;animation:okdraw .6s .1s cubic-bezier(.65,0,.35,1) forwards}
+.ok-k{stroke-dasharray:48;stroke-dashoffset:48;animation:okdraw .35s .62s cubic-bezier(.65,0,.35,1) forwards}
+.ok-pulse{position:absolute;inset:0;border-radius:50%;background:rgba(26,157,84,.22);opacity:0;animation:okpulse .9s .62s ease-out forwards}
+.ok-pulse.p2{animation-delay:.8s}
+.ok-t{margin:0;font-size:22px;font-weight:700;letter-spacing:-.4px;opacity:0;animation:okup .45s .7s ease-out forwards}
+.ok-a{display:block;margin-top:6px;font-size:34px;font-weight:750;letter-spacing:-.8px;opacity:0;animation:okup .45s .8s ease-out forwards}
+.ok-s{margin:6px 0 0;font-size:15px;color:var(--tx2);opacity:0;animation:okup .45s .9s ease-out forwards}
+.ok-b{margin-top:22px;opacity:0;animation:okup .45s 1s ease-out forwards}
+@keyframes okpop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+@keyframes okdraw{to{stroke-dashoffset:0}}
+@keyframes okpulse{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+@keyframes okup{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
 .tr-note{margin:12px 2px 0;font-size:13.5px;color:var(--tx2);text-align:center}
 html.ios-bold .tr-bal b{font-weight:850}
 .po-d{text-align:center;padding:12px 16px 20px}
