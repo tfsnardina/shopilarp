@@ -1553,10 +1553,10 @@
   /* ── Live View ───────────────────────────────────────────── */
   function openLiveView() {
     var R = rangeData("today");
-    var el = page('<div class="lvw"><div class="lv-top"><div class="lv-globe" id="lvglobe"></div><div class="lv-now"><span>Visitors right now</span><b id="lvN">' + count(live.visitors) + '</b></div></div>' +
+    var el = sheet("Live View", '<div class="lvw"><div class="lv-top"><div class="lv-globe" id="lvglobe"></div><div class="lv-now"><span>Visitors right now</span><b id="lvN">' + count(live.visitors) + '</b></div></div>' +
       '<div class="lv-grid"><div><span>Total sales</span><b>' + money(R.tot.s) + "</b></div><div><span>Sessions</span><b>" + count(R.tot.se) + "</b></div><div><span>Orders</span><b>" + count(R.tot.o) + "</b></div><div><span>Page views</span><b>" + count(Math.round(R.tot.se * 3.4)) + "</b></div></div>" +
       '<div class="an-c"><div class="an-t">Customer behavior</div><div class="beh"><div><span>Active carts</span><b>' + count(live.carts) + "</b></div><div><span>Checking out</span><b>" + count(live.checkingOut) + "</b></div><div><span>Purchased</span><b>" + count(live.purchased) + "</b></div></div></div>" +
-      '<div class="an-c"><div class="an-t">Sessions by location</div>' + locRows() + "</div></div>", { title: "Live View", cls: "liveview", notabs: true });
+      '<div class="an-c"><div class="an-t">Sessions by location</div>' + locRows() + "</div></div>", { navClose: true, cls: "notifs liveview" });
     globe($("#lvglobe", el));
   }
   function locRows() {
