@@ -3,6 +3,22 @@
   "use strict";
   var P = JSON.parse(document.getElementById("payload").textContent || "{}");
   var S = P.st, D = P.d;
+  /* Store clock: the base data is on New York time (UTC-4). For a store in another country the clock used for the
+     hourly chart ("Today" / "Yesterday") and the order times must be that country's, otherwise a store in France
+     starts its day at 6 am and the "Today" chart has a single point (= no line) until 7 am. */
+  (function storeClock() {
+    var TZ = { FR: "Europe/Paris", DE: "Europe/Berlin", ES: "Europe/Madrid", IT: "Europe/Rome", NL: "Europe/Amsterdam", BE: "Europe/Brussels", IE: "Europe/Dublin", GB: "Europe/London", CH: "Europe/Zurich", AU: "Australia/Sydney", JP: "Asia/Tokyo" };
+    var tz = S && TZ[S.country];
+    if (!tz || !window.Intl || !Intl.DateTimeFormat) return;
+    try {
+      var at = Number(S.now) || Date.now();
+      var f = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" });
+      var q = {}; f.formatToParts(new Date(at)).forEach(function (x) { q[x.type] = parseInt(x.value, 10); });
+      var wall = Date.UTC(q.year, q.month - 1, q.day, q.hour, q.minute, q.second);
+      var off = Math.round((wall - Math.floor(at / 1000) * 1000) / 60000) * 60000;
+      if (isFinite(off) && Math.abs(off) <= 14 * 3600000) S.off = off;
+    } catch (e) { }
+  })();
   /* Store in France: the base data is American (cities, states, ZIP codes, +1 phones). Swap it, once, for French
      cities / regions / postcodes / streets / phones. Every US city always maps to the same French city, so a
      customer and their orders stay in the same place, and new orders (built from these templates) are French too. */
@@ -418,6 +434,7 @@
   function lnPaths(cur, X, Y, R) {
     var pts = cur.map(function (v, i) { return [X(i), Y(v)]; });
     var open = !R.hourly && R.key !== "yday" && pts.length > 2;
+    if (pts.length === 1) return '<path class="ln" d="' + smooth(pts) + '"/><circle cx="' + pts[0][0].toFixed(1) + '" cy="' + pts[0][1].toFixed(1) + '" r="3.2" fill="#20a8e6"/>';
     if (!open) return '<path class="ln" d="' + smooth(pts) + '"/>';
     var full = smooth(pts), head = smooth(pts.slice(0, -1));
     var tail = full.slice(full.lastIndexOf("C"));
