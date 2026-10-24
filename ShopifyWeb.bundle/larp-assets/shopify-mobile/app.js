@@ -1280,7 +1280,7 @@
     var tl = '<div class="sec"><div class="sec-h"><h3>Timeline</h3></div><div class="tl">' + timeline(o).map(function (e) { return '<div class="tle"><i></i><div><span>' + esc(e[1]) + "</span><em>" + esc(e[0]) + "</em></div></div>"; }).join("") + "</div></div>";
     var body = '<div class="oh"><div class="oh-t"><h1>#' + o.n + "</h1>" + fulBadge(o) + payBadge(o) + '</div><p class="oh-s">' + esc(relAt(o.ts)) + " • " + esc(o.ch === "Online Store" ? "Online store" : o.ch) + "</p></div>" +
       fulSec + paySec + contact + cust + notes + conv + risk + tl;
-    var el = page(body, { cls: "order", actions: '<button class="nb-c" data-act="print" aria-label="Print">' + ic("print") + '</button><button class="nb-c" data-act="ordermore" aria-label="More">' + ic("more") + "</button>" });
+    var el = sheet("", body, { navClose: true, cls: "notifs order", actions: '<button class="nb-c" data-act="print" aria-label="Print">' + ic("print") + '</button><button class="nb-c" data-act="ordermore" aria-label="More">' + ic("more") + "</button>" });
     el.setAttribute("data-on", o.n);
   }
   function initials(n) { var w = String(n || "").split(/\s+/).filter(Boolean); return ((w[0] || "")[0] || "") + ((w[1] || "")[0] || ""); }
@@ -2048,7 +2048,7 @@
       if (k === "analytics") return openAnalytics();
       return toast("Sidekick is working on it");
     }
-    if (t.hasAttribute("data-copy")) { var pg = t.closest(".page"); var p = pg ? $(".addr p", pg) : null; return copyText(p ? p.innerText : ""); }
+    if (t.hasAttribute("data-copy")) { var pg = t.closest(".page, .sh-wrap"); var p = pg ? $(".addr p", pg) : null; return copyText(p ? p.innerText : ""); }
     var a = t.getAttribute("data-act");
     if (!a) return;
     hap(5);
@@ -2087,7 +2087,7 @@
       case "scan": return toast("Camera access is needed to scan barcodes");
       case "print": return toast("Preparing packing slip…");
       case "track": return toast("Opening tracking…");
-      case "email": case "phone": var pgc = t.closest(".page"); var on = pgc ? findOrder(+pgc.getAttribute("data-on")) : null; return toast(on && on.c ? (a === "email" ? on.c.email : on.c.phone || "No phone number") : "No contact details");
+      case "email": case "phone": var pgc = t.closest(".page, .sh-wrap"); var on = pgc ? findOrder(+pgc.getAttribute("data-on")) : null; return toast(on && on.c ? (a === "email" ? on.c.email : on.c.phone || "No phone number") : "No contact details");
       case "ordermore": case "prodmore": case "custmore": return optSheet("More actions", a === "prodmore" ? ["Duplicate", "Archive product", "View on Online Store"] : a === "custmore" ? ["Edit customer", "Send account invite"] : ["Edit order", "Refund", "Print packing slip", "Archive"], "", function (v) { toast(v); });
       case "notifsettings": return toast("Notification settings");
       case "quicksale": return quickSale();
