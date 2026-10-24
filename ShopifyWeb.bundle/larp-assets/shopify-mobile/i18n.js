@@ -136,6 +136,7 @@
     ["Payouts", "Versements", "Pagos", "Auszahlungen"],
     ["Payout balance", "Solde des versements", "Saldo de pagos", "Auszahlungsguthaben"],
     ["Transfer", "Transférer", "Transferir", "Überweisen"],
+    ["Transfer sent", "Virement envoyé", "Transferencia enviada", "Überweisung gesendet"],
     ["Available balance", "Solde disponible", "Saldo disponible", "Verfügbares Guthaben"],
     ["Amount", "Montant", "Importe", "Betrag"],
     ["Account holder", "Titulaire du compte", "Titular de la cuenta", "Kontoinhaber"],
