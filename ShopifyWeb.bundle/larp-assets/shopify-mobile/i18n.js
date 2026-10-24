@@ -619,11 +619,12 @@
         if (m.type === "childList") m.addedNodes.forEach(function (n) { queue.push(n); });
         else queue.push(m.target);
       });
-      if (!scheduled && queue.length) { scheduled = true; (window.requestAnimationFrame || setTimeout)(flush); }
+      if (queue.length) flush();                      // same microtask: translated before the browser paints or measures
     });
     walk(document.body);
     attach();
   }
+  function apply(root) { if (observer) observer.disconnect(); walk(root || document.body); attach(); }
   function refresh() { if (observer) observer.disconnect(); walk(document.body); attach(); }
 
   /* ── public API ── */
@@ -643,6 +644,6 @@
   }
   lang = detect();
   document.documentElement.lang = lang;
-  window.I18N = { en: function (t) { var k = TO_EN[norm(String(t).trim())]; return k || t; }, langs: LANGS, get lang() { return lang; }, set: setLang, tr: function (s) { var t = tr(String(s)); return t == null ? s : t; }, refresh: refresh };
+  window.I18N = { en: function (t) { var k = TO_EN[norm(String(t).trim())]; return k || t; }, langs: LANGS, get lang() { return lang; }, set: setLang, tr: function (s) { var t = tr(String(s)); return t == null ? s : t; }, refresh: refresh, apply: apply };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();
