@@ -1788,6 +1788,22 @@
       if (payEl && payEl.isConnected) { $(".sh-b", payEl).innerHTML = payoutsHtml(); bindPayouts(payEl); }
     } catch (e) { }
   }
+  // Bottom sheet shown once a transfer is sent: animated check + a little haptic choreography.
+  function paySuccess(amt, bank) {
+    var body = '<div class="ok-w"><div class="ok-ic"><i class="ok-pulse"></i><i class="ok-pulse p2"></i>' +
+      '<svg viewBox="0 0 72 72" width="88" height="88"><circle class="ok-c" cx="36" cy="36" r="30" fill="none" stroke="#1a9d54" stroke-width="4" stroke-linecap="round"/>' +
+      '<path class="ok-k" d="M23 37.5l9.5 9.5L50 27" fill="none" stroke="#1a9d54" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+      '<h2 class="ok-t">Transfer sent</h2><b class="ok-a">' + money(amt) + '</b>' +
+      '<p class="ok-s"><span>Bank transfer</span> <span>' + esc(bank) + '</span></p>' +
+      '<button class="btn-p ok-b" id="okDone"><span>Done</span></button></div>';
+    var el = sheet("", body, { cls: "tr-ok" });
+    $("#okDone", el).addEventListener("click", function () { hap("light"); pop(false); });
+    // heavy thud as it opens, light ticks while the ring draws, success burst when the check lands
+    hap("heavy");
+    [160, 280, 400].forEach(function (t) { setTimeout(function () { hap("light"); }, t); });
+    setTimeout(function () { hap("success"); }, 620);
+    setTimeout(function () { hap("selection"); }, 900);
+  }
   function openTransfer() {
     var bal = payBal();
     if (bal <= 0) return toast("Nothing to transfer");
@@ -1819,9 +1835,9 @@
         payBank = { holder: name, iban: iban };
         var row = { ts: nowMs(), amt: amt, st: "In transit", n: 0, fees: 0, gross: amt, bank: bankLabel(iban), holder: name };
         transfers.unshift(row); payouts.unshift(row);
-        hap("success"); pop(false);
+        pop(false);
         saveState(); syncPayCard();
-        setTimeout(function () { toast("Transfer initiated"); }, 240);
+        setTimeout(function () { paySuccess(amt, row.bank); }, 260);
       }, 900);
     });
   }
