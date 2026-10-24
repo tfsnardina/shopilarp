@@ -239,6 +239,7 @@
       prods.forEach(function (p) { inv[p.title] = [p.inv, p.baseInv, p.sold]; });
       var snap = {
         v: STATE_V, D: D, hrT: HR.t, purchased: live.purchased, custTotal: S.custTotal, custs: cl, inv: inv,
+        pay: { base: Number(CFG.payoutBalance) || 0, bal: S.payout || 0, tr: transfers, bank: payBank },
         orders: list.map(function (o) {
           var c = Object.assign({}, o);
           c.c = cl.indexOf(o.c);
@@ -283,6 +284,20 @@
         return o;
       });
       lastSnap = JSON.stringify(snap);
+    } catch (e) { }
+  })();
+  /* Payout balance, transfers and the saved bank account survive a relaunch.
+     If the balance typed in Preferences changed since, the Preferences win. */
+  var payBank = { holder: "", iban: "" }, transfers = [], payEl = null;
+  (function restorePay() {
+    if (!EMPTY) return;
+    var pay = (savedSettingsObj().__state || {}).pay;
+    if (!pay || pay.base !== (Number(CFG.payoutBalance) || 0)) return;
+    try {
+      if (typeof pay.bal === "number") S.payout = pay.bal;
+      transfers = Array.isArray(pay.tr) ? pay.tr : [];
+      transfers.slice().reverse().forEach(function (t) { payouts.unshift(t); });
+      if (pay.bank) payBank = { holder: String(pay.bank.holder || ""), iban: String(pay.bank.iban || "") };
     } catch (e) { }
   })();
   setInterval(saveState, 3000);
@@ -538,10 +553,11 @@
   function unfulfilled() { return orders.filter(function (o) { return o.ful !== "Fulfilled" && o.pay !== "Refunded" && o.pay !== "Voided" && !o.archived; }); }
   function toCapture() { return orders.filter(function (o) { return o.pay === "Authorized"; }); }
   function nextPayout() {
+    var bal = Math.max(0, S.payout || 0);
+    if (!bal) return null;
     var scheduled = payouts.filter(function (p) { return p.st === "Scheduled"; })[0];
-    if (scheduled) return scheduled;
-    if (S.payout) return { ts: nowMs() + 3 * DAY, amt: S.payout, st: "Scheduled", n: 0, fees: 0, gross: S.payout };
-    return null;
+    var ts = scheduled && scheduled.ts > nowMs() ? scheduled.ts : nowMs() + 3 * DAY;   // never an estimate in the past
+    return { ts: ts, amt: bal, st: "Scheduled", n: 0, fees: 0, gross: bal };
   }
   function sparkSvg(vals, up) {
     var n = vals.length, w = 28, h = 14;
@@ -1385,7 +1401,7 @@
     $("#doCap", el).addEventListener("click", function () {
       this.disabled = true; this.classList.add("busy");
       setTimeout(function () {
-        o.pay = "Paid"; hap(14); pop(false);
+        o.pay = "Paid"; creditOrder(o); hap(14); pop(false);
         setTimeout(function () { var pg = stack.length ? stack[stack.length - 1].el : null; if (pg && +pg.getAttribute("data-on") === o.n) { pop(false); setTimeout(function () { openOrder(o.n); }, 60); } toast("Payment captured"); refreshAll(); }, 240);
       }, 800);
     });
@@ -1707,28 +1723,106 @@
   }
 
   /* ── Payouts ─────────────────────────────────────────────── */
+  /* Every paid order lands in the balance (S.payout, in cents). "Transfer" sends it to a bank account. */
+  function payBal() { return Math.max(0, S.payout || 0); }
+  function creditOrder(o) {
+    if (!o || o.credited || o.pay !== "Paid") return;
+    o.credited = true;
+    S.payout = (S.payout || 0) + o.total;
+    syncPayCard();
+  }
+  function bankLabel(iban) { var t = String(iban || "").replace(/\s+/g, "").toUpperCase(); return t.slice(0, 4) + " •••• " + t.slice(-4); }
+  function payStatus(p) {
+    if (p.bank) return (nowMs() - p.ts) > 2 * DAY ? "Paid" : "In transit";
+    return p.st === "In transit" ? "In transit" : "Paid";
+  }
+  function payList() { return payouts.filter(function (p) { return p.st !== "Scheduled"; }).sort(function (a, b) { return b.ts - a.ts; }); }
+  function payRowHtml(p, k) {
+    var st = payStatus(p);
+    var sub = p.bank ? "<span>Bank transfer</span> <span>" + esc(p.bank) + "</span>" : "<span>" + count(p.n) + " order" + (p.n === 1 ? "" : "s") + "</span>";
+    return '<button class="po-r" data-po="' + k + '"><div><b>' + esc(mdLong(p.ts)) + "</b>" + sub + '</div><div class="po-a"><b>' + money(p.amt) + "</b>" + badge(st, st === "In transit" ? "info" : "ok") + "</div></button>";
+  }
+  function payCard(label, em) {
+    var bal = payBal();
+    return '<div class="po-next"><span>' + label + "</span><b>" + money(bal) + "</b>" + (em || "") +
+      '<button class="btn-p po-tr" data-act="transfer"' + (bal > 0 ? "" : " disabled") + "><span>Transfer</span></button></div>";
+  }
   function financeBody() {
     var np = nextPayout();
-    var paid = payouts.filter(function (p) { return p.st !== "Scheduled"; });
-    return (np ? '<div class="po-next"><span>Payout balance</span><b>' + money(np.amt) + "</b><em>Next payout " + md(np.ts) + " to the account ending in " + String(1000 + (S.lastN * 7) % 9000).slice(-4) + "</em></div>" : "") +
-      '<div class="sec po"><div class="sec-h"><h3>Recent payouts</h3></div>' + paid.slice(0, 20).map(function (p, k) {
-        return '<button class="po-r" data-po="' + k + '"><div><b>' + esc(mdLong(p.ts)) + "</b><span>" + count(p.n) + " order" + (p.n === 1 ? "" : "s") + '</span></div><div class="po-a"><b>' + money(p.amt) + "</b>" + badge(p.st === "In transit" ? "In transit" : "Paid", p.st === "In transit" ? "info" : "ok") + "</div></button>";
-      }).join("") + "</div>";
+    var em = np ? "<em>Next payout " + md(np.ts) + " to the account " + (payBank.iban ? esc(bankLabel(payBank.iban)) : "ending in " + String(1000 + (S.lastN * 7) % 9000).slice(-4)) + "</em>" : "";
+    return payCard("Payout balance", em) +
+      '<div class="sec po"><div class="sec-h"><h3>Recent payouts</h3></div>' + payList().slice(0, 20).map(payRowHtml).join("") + "</div>";
+  }
+  function payoutsHtml() {
+    var np = nextPayout();
+    return payCard("Next payout", np ? "<em>Estimated " + md(np.ts) + "</em>" : "") +
+      '<div class="sec"><div class="sec-h"><h3>Payouts</h3></div>' + payList().slice(0, 30).map(payRowHtml).join("") + "</div>";
+  }
+  function bindPayouts(el) {
+    $$("[data-po]", el).forEach(function (b) {
+      b.addEventListener("click", function () { var p = payList()[+b.getAttribute("data-po")]; if (p) payDetail(p); });
+    });
   }
   function openPayouts() {
-    var np = nextPayout();
-    var paid = payouts.filter(function (p) { return p.st !== "Scheduled"; });
-    var body = (np ? '<div class="po-next"><span>Next payout</span><b>' + money(np.amt) + "</b><em>Estimated " + md(np.ts) + "</em></div>" : "") +
-      '<div class="sec"><div class="sec-h"><h3>Payouts</h3></div>' + paid.slice(0, 30).map(function (p, k) {
-        return '<button class="po-r" data-po="' + k + '"><div><b>' + esc(mdLong(p.ts)) + "</b><span>" + count(p.n) + " order" + (p.n === 1 ? "" : "s") + "</span></div><div class=\"po-a\"><b>" + money(p.amt) + "</b>" + badge(p.st === "In transit" ? "In transit" : "Paid", p.st === "In transit" ? "info" : "ok") + "</div></button>";
-      }).join("") + "</div>";
-    var el = page(body, { title: "Payouts", cls: "payouts" });
-    $$("[data-po]", el).forEach(function (b) {
-      b.addEventListener("click", function () {
-        var p = paid[+b.getAttribute("data-po")];
-        page('<div class="po-d"><span>' + esc(mdLong(p.ts)) + "</span><h1>" + money(p.amt) + "</h1>" + badge(p.st === "In transit" ? "In transit" : "Paid", p.st === "In transit" ? "info" : "ok") + "</div>" +
-          '<div class="sec"><div class="kv"><div><span>Orders</span><span>' + count(p.n) + "</span><b>" + money(p.gross) + "</b></div><div><span>Fees</span><span></span><b>-" + money(p.fees) + '</b></div><div class="tot"><span>Total</span><span></span><b>' + money(p.amt) + "</b></div></div></div>", { title: "Payout", cls: "payout" });
-      });
+    payEl = sheet("Payouts", payoutsHtml(), { navClose: true, cls: "notifs payouts" });
+    bindPayouts(payEl);
+  }
+  function payDetail(p) {
+    var st = payStatus(p);
+    var kv = p.bank
+      ? '<div class="kv"><div><span>Destination</span><span></span><b>' + esc(p.bank) + "</b></div>" + (p.holder ? "<div><span>Account holder</span><span></span><b>" + esc(p.holder) + "</b></div>" : "") +
+        '<div class="tot"><span>Total</span><span></span><b>' + money(p.amt) + "</b></div></div>"
+      : '<div class="kv"><div><span>Orders</span><span>' + count(p.n) + "</span><b>" + money(p.gross) + "</b></div><div><span>Fees</span><span></span><b>-" + money(p.fees) + '</b></div><div class="tot"><span>Total</span><span></span><b>' + money(p.amt) + "</b></div></div>";
+    sheet("Payout", '<div class="po-d"><span>' + esc(mdLong(p.ts)) + "</span><h1>" + money(p.amt) + "</h1>" + badge(st, st === "In transit" ? "info" : "ok") + '</div><div class="sec">' + kv + "</div>", { navClose: true, cls: "notifs payout" });
+  }
+  // Keep every place that shows the balance in step (home card, Payouts sheet, Finance menu).
+  function syncPayCard() {
+    try {
+      var b = $('#s-home [data-act="payouts"] b'), want = payBal() > 0, home = $("#s-home");
+      if (b && want) b.textContent = money(payBal());
+      else if (home && home.innerHTML && !!b !== want) {
+        rendered.home = 0;
+        if (current === "home" && !stack.length) { RENDER.home(); rendered.home = 1; }
+      }
+      rendered.menu = 0;
+      if (payEl && payEl.isConnected) { $(".sh-b", payEl).innerHTML = payoutsHtml(); bindPayouts(payEl); }
+    } catch (e) { }
+  }
+  function openTransfer() {
+    var bal = payBal();
+    if (bal <= 0) return toast("Nothing to transfer");
+    var dec = S.dec == null ? 2 : S.dec, sep = (1.1).toLocaleString(S.loc || "en-US").charAt(1);
+    var toStr = function (c) { return (c / Math.pow(10, dec)).toFixed(dec).replace(".", sep); };
+    var toCents = function (v) { var n = parseFloat(String(v).replace(/[^\d.,]/g, "").replace(",", ".")); return isFinite(n) ? Math.round(n * Math.pow(10, dec)) : 0; };
+    var body = '<div class="tr-b"><div class="tr-bal"><span>Available balance</span><b>' + money(bal) + "</b></div>" +
+      '<div class="ff"><label class="fld"><span>Amount</span><div class="tr-amt"><input id="trAmt" inputmode="decimal" autocomplete="off" value="' + toStr(bal) + '"><button type="button" class="tr-max" id="trMax">Max</button></div></label>' +
+      '<label class="fld"><span>Account holder</span><input id="trName" autocomplete="name" value="' + esc(payBank.holder) + '"></label>' +
+      '<label class="fld"><span>IBAN</span><input id="trIban" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="FR76 0000 0000 0000 0000 0000 000" value="' + esc(payBank.iban) + '"></label></div>' +
+      '<p class="tr-err" id="trErr" hidden></p>' +
+      '<button class="btn-p" id="doTr"><span>Transfer</span><b id="trBtnAmt">' + money(bal) + "</b></button>" +
+      '<p class="tr-note">Transfers to a bank account usually arrive within 1 to 2 business days.</p></div>';
+    var el = sheet("Transfer", body, { navClose: true, cls: "notifs transfer" });
+    var amtI = $("#trAmt", el), btnAmt = $("#trBtnAmt", el), err = $("#trErr", el);
+    function showErr(m) { err.textContent = m; err.hidden = !m; }
+    amtI.addEventListener("input", function () { var c = toCents(amtI.value); btnAmt.textContent = money(c > 0 ? c : 0); showErr(""); });
+    $("#trMax", el).addEventListener("click", function () { amtI.value = toStr(payBal()); btnAmt.textContent = money(payBal()); showErr(""); });
+    $("#doTr", el).addEventListener("click", function () {
+      var c = toCents(amtI.value), name = $("#trName", el).value.trim(), iban = $("#trIban", el).value.replace(/\s+/g, "").toUpperCase();
+      if (c <= 0) return showErr("Enter a valid amount");
+      if (c > payBal()) return showErr("Amount is higher than your balance");
+      if (!name) return showErr("Enter the account holder's name");
+      if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) return showErr("Enter a valid IBAN");
+      var btn = this; btn.disabled = true; btn.classList.add("busy");
+      setTimeout(function () {
+        var amt = Math.min(c, payBal());
+        S.payout = payBal() - amt;
+        payBank = { holder: name, iban: iban };
+        var row = { ts: nowMs(), amt: amt, st: "In transit", n: 0, fees: 0, gross: amt, bank: bankLabel(iban), holder: name };
+        transfers.unshift(row); payouts.unshift(row);
+        hap("success"); pop(false);
+        saveState(); syncPayCard();
+        setTimeout(function () { toast("Transfer initiated"); }, 240);
+      }, 900);
     });
   }
 
@@ -1883,6 +1977,7 @@
     pend.sales += o.total / Math.pow(10, S.dec != null ? S.dec : 2); pend.orders += 1; pend.sess += addSe;
     HR.t[0][h] += o.total; HR.t[1][h] += 1; HR.t[2][h] += 1;
     live.purchased += 1;
+    creditOrder(o);
     if (live.visitors < 2) live.visitors = 2 + Math.floor(Math.random() * 4);   // someone is on the store when an order lands
     o.items.forEach(function (x) { if (x.p && x.p.i >= 0) { x.p.inv = Math.max(0, x.p.inv - x.q); x.p.sold += x.q; } });
     if (quiet) return;
@@ -2115,7 +2210,7 @@
     if (t.hasAttribute("data-cust")) { hap(5); return openCustomer(+t.getAttribute("data-cust")); }
     if (t.hasAttribute("data-fulfill")) { hap(8); return fulfillFlow(+t.getAttribute("data-fulfill")); }
     if (t.hasAttribute("data-capture")) { hap(8); return capture(+t.getAttribute("data-capture")); }
-    if (t.hasAttribute("data-markpaid")) { var mo = findOrder(+t.getAttribute("data-markpaid")); if (mo) { mo.pay = "Paid"; hap(10); pop(false); setTimeout(function () { openOrder(mo.n); toast("Order marked as paid"); }, 60); } return; }
+    if (t.hasAttribute("data-markpaid")) { var mo = findOrder(+t.getAttribute("data-markpaid")); if (mo) { mo.pay = "Paid"; creditOrder(mo); hap(10); pop(false); setTimeout(function () { openOrder(mo.n); toast("Order marked as paid"); }, 60); } return; }
     if (t.hasAttribute("data-pulse")) {
       var k = t.getAttribute("data-pulse");
       if (k === "inventory") { setTab("products", true); return; }
@@ -2133,6 +2228,7 @@
       case "notifs": return openNotifs();
       case "liveview": return openLiveView();
       case "payouts": return openPayouts();
+      case "transfer": return openTransfer();
       case "analytics": return openAnalytics();
       case "customers": return openCustomers();
       case "fulfill": closeAll(); oFilter = "Unfulfilled"; oShown = 40; setTab("orders"); return;
