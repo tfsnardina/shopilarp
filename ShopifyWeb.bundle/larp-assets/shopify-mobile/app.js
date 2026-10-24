@@ -66,6 +66,11 @@
       if (!(CFG.payoutBalance > 0)) { S.payout = 0; P.pay = []; }
       else P.pay = (P.pay || []).filter(function (r) { return r[2] === "Scheduled"; });   // keep only the scheduled payout, no fake history
       P.live = { visitors: 0, carts: 0, checkingOut: 0, purchased: 0 };
+    } else {
+      // The Preferences numbers only describe the last 30 days. Anything older is demo data from the base file: it
+      // used to show up (e.g. in 90d / 365d) as soon as the history was rebuilt, for instance after changing currency.
+      var cut = Math.max(0, (Number(S.n) || 0) - 30);
+      Object.keys(D).forEach(function (k) { if (Array.isArray(D[k])) for (var i = 0; i < cut && i < D[k].length; i++) D[k][i] = 0; });
     }
   }
   var A = "./larp-assets/shopify-mobile";
