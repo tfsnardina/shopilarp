@@ -306,6 +306,8 @@
   var unread = 0;
   var notifs = [];
   orders.slice(0, 30).forEach(function (o) { notifs.push({ kind: "order", o: o, ts: o.ts, read: (S.now - o.ts) > 10 * HOUR }); });
+  transfers.forEach(function (t) { notifs.push({ kind: "payout", t: t, ts: t.ts, read: (S.now - t.ts) > 10 * HOUR }); });
+  notifs.sort(function (a, b) { return b.ts - a.ts; });
   notifs.forEach(function (x) { if (!x.read) unread++; });
   unread = Math.min(unread, 12);
   var units = function (o) { return o.items.reduce(function (a, x) { return a + x.q; }, 0); };
@@ -314,7 +316,16 @@
   function L10n(t) { return window.I18N ? window.I18N.tr(t) : t; }
   function pushBody(o) { var n = units(o); return money(o.total) + ", " + n + " item" + (n === 1 ? "" : "s") + " from " + chName(o.ch) + " \u2022 " + S.name; }
   function nativeOrderPush(o) {
-    var payload = { type: "shopify_order", title: L10n("Order #" + o.n), body: L10n(pushBody(o)), orderNumber: o.n };
+    return postNative({ type: "shopify_order", title: L10n("Order #" + o.n), body: L10n(pushBody(o)), orderNumber: o.n });
+  }
+  function payoutBody(t) { return money(t.amt) + " \u2192 " + t.bank + " \u2022 " + S.name; }
+  // A transfer rings like an order: bell badge + row in Notifications + a real iOS notification.
+  function notifyPayout(t) {
+    notifs.unshift({ kind: "payout", t: t, ts: t.ts, read: false });
+    unread += 1; setBell();
+    if (S.pops !== false) postNative({ type: "shopify_payout", title: L10n("Transfer sent"), body: L10n(payoutBody(t)) });
+  }
+  function postNative(payload) {
     try {
       if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.shopifyOrder) {
         window.webkit.messageHandlers.shopifyOrder.postMessage(payload);
@@ -1837,7 +1848,7 @@
         transfers.unshift(row); payouts.unshift(row);
         pop(false);
         saveState(); syncPayCard();
-        setTimeout(function () { paySuccess(amt, row.bank); }, 260);
+        setTimeout(function () { paySuccess(amt, row.bank); notifyPayout(row); }, 260);
       }, 900);
     });
   }
@@ -1845,6 +1856,7 @@
   /* ── Notifications, search, Sidekick ─────────────────────── */
   function openNotifs() {
     var body = notifs.slice(0, 40).map(function (x) {
+      if (x.kind === "payout") return '<button class="nrow' + (x.read ? "" : " unr") + '" data-act="payouts"><span class="napp pay"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 12.5l4 4 8-9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><div class="nr1"><b>Transfer sent</b><em>' + esc(pushTime(x.ts)) + "</em></div><span>" + esc(payoutBody(x.t)) + "</span></div></button>";
       var o = x.o;
       return '<button class="nrow' + (x.read ? "" : " unr") + '" data-order="' + o.n + '"><span class="napp">' + ic("bag-color") + '</span><div><div class="nr1"><b>Order #' + o.n + "</b><em>" + esc(pushTime(x.ts)) + "</em></div><span>" + esc(pushBody(o)) + "</span></div></button>";
     }).join("");
