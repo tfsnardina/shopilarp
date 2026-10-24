@@ -646,7 +646,7 @@
     bindScrub(host, function (i, g) { showTip(i, g); });
     $$(".met[data-met]", el).forEach(function (b) {
       b.addEventListener("click", function () {
-        var k = b.getAttribute("data-met"); if (k === homeMet) { hap(5); $(".hm-top").classList.toggle("fold"); return; }
+        var k = b.getAttribute("data-met"); if (k === homeMet) { foldHome(); return; }
         hap(6); switchMetric(k, b);
       });
     });
@@ -810,10 +810,31 @@
     var sv = $("svg", host);
     if (sv) sv.animate([{ transform: "translate3d(" + dir * W + "px,0,0)" }, { transform: "translate3d(0,0,0)" }], { duration: MS, easing: EASE });
   }
+  // Tap the selected metric: the chart folds away (and unfolds again) with a slide + blur + line redraw.
+  function foldHome() {
+    var top = $(".hm-top"); if (!top) return;
+    var closing = !top.classList.contains("fold");
+    clearTimeout(top._ft); clearTimeout(top._fd);
+    top.classList.add("anim");
+    if (closing) {
+      hap("medium");
+      top.classList.add("fold");
+      top._fd = setTimeout(function () { hap("light"); }, 330);
+    } else {
+      hap("light");
+      top.classList.remove("fold");
+      top._fd = setTimeout(function () {
+        var host = $("#hchart");
+        if (host && host._g) drawChart(host, host._g.R, homeMet, { anim: true, h: CH });
+        hap("selection");
+      }, 220);
+    }
+    top._ft = setTimeout(function () { top.classList.remove("anim"); }, 900);
+  }
   function bindMetButtons() {
     $$(".met[data-met]", $("#s-home")).forEach(function (b) {
       b.addEventListener("click", function () {
-        var k = b.getAttribute("data-met"); if (k === homeMet) { hap(5); $(".hm-top").classList.toggle("fold"); return; }
+        var k = b.getAttribute("data-met"); if (k === homeMet) { foldHome(); return; }
         hap(6); switchMetric(k, b);
       });
     });
