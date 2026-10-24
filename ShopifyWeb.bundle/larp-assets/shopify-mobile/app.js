@@ -1216,7 +1216,7 @@
     opts = opts || {};
     var el = document.createElement("div");
     el.className = "sh-wrap";
-    el.innerHTML = '<div class="sh-scrim"></div><div class="sh' + (opts.cls ? " " + opts.cls : "") + '"><div class="sh-grab"></div>' + (title ? '<div class="sh-h"><h2>' + esc(title) + '</h2><button class="sh-x" aria-label="Close">' + ic("x") + "</button></div>" : "") + '<div class="sh-b">' + body + "</div></div>";
+    el.innerHTML = '<div class="sh-scrim"></div><div class="sh' + (opts.cls ? " " + opts.cls : "") + '">' + (opts.navClose ? "" : '<div class="sh-grab"></div>') + (opts.navClose ? '<div class="sh-h nav"><button class="sh-x" aria-label="Close">' + ic("x") + '</button><h2>' + esc(title) + "</h2>" + (opts.actions || '<span class="sh-sp"></span>') + "</div>" : title ? '<div class="sh-h"><h2>' + esc(title) + '</h2><button class="sh-x" aria-label="Close">' + ic("x") + "</button></div>" : "") + '<div class="sh-b">' + body + "</div></div>";
     $(".sh-scrim", el).addEventListener("click", function () { pop(false); });
     var x = $(".sh-x", el); if (x) x.addEventListener("click", function () { pop(false); });
     // Drag the sheet down to dismiss.
@@ -1662,7 +1662,7 @@
       var o = x.o;
       return '<button class="nrow' + (x.read ? "" : " unr") + '" data-order="' + o.n + '"><span class="napp">' + ic("bag-color") + '</span><div><div class="nr1"><b>Order #' + o.n + "</b><em>" + esc(pushTime(x.ts)) + "</em></div><span>" + esc(pushBody(o)) + "</span></div></button>";
     }).join("");
-    page(body || emptyState("No notifications", ""), { title: "Notifications", cls: "notifs", actions: '<button class="nb-c" data-act="notifsettings" aria-label="Settings">' + ic("settings") + "</button>" });
+    sheet("Notifications", body || emptyState("No notifications", ""), { navClose: true, cls: "notifs", actions: '<button class="nb-c" data-act="notifsettings" aria-label="Settings">' + ic("settings") + "</button>" });
     notifs.forEach(function (x) { x.read = true; });
     unread = 0; setBell();
   }
