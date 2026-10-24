@@ -787,3 +787,99 @@ html.checker-native #tabbar{bottom:calc(var(--bot,0px) + 8px)!important}
 .skel .act b{color:transparent!important;-webkit-text-fill-color:transparent;background:linear-gradient(105deg,rgba(0,0,0,.16) 38%,rgba(0,0,0,.55) 50%,rgba(0,0,0,.16) 62%) 200% 0/250% 100%;-webkit-background-clip:text;background-clip:text;animation:shim 1.05s linear infinite}
 .skel #hchart{opacity:.3}
 #hchart{transition:opacity .5s ease}
+
+/* iOS Bold Text: html.ios-bold is set by the native app */
+html.ios-bold body{font-weight:600}
+html.ios-bold body{font-weight:600}
+html.ios-bold b{font-weight:800}
+html.ios-bold .store b{font-weight:700}
+html.ios-bold .logo{font-weight:850}
+html.ios-bold .logo.ini{font-weight:800}
+html.ios-bold .nb{font-weight:850}
+html.ios-bold .met>b{font-weight:800}
+html.ios-bold .met em,html.ios-bold .an-v em{font-weight:700}
+html.ios-bold .hchart .yl,html.ios-bold .hchart .xl{font-weight:600}
+html.ios-bold .tip b{font-weight:750}
+html.ios-bold .hpill{font-weight:600}
+html.ios-bold .rng{font-weight:700}
+html.ios-bold .greet{font-weight:700}
+html.ios-bold .act b{font-weight:800}
+html.ios-bold .pl-h{font-weight:600}
+html.ios-bold .pl-card h3{font-weight:800}
+html.ios-bold .pl-btn{font-weight:700}
+html.ios-bold .card h3{font-weight:800}
+html.ios-bold .tp-r b{font-weight:700}
+html.ios-bold .tp-r em{font-weight:700}
+html.ios-bold .tt{font-weight:850}
+html.ios-bold .hb.txt{font-weight:700}
+html.ios-bold .chip{font-weight:650}
+html.ios-bold .dgrp{font-weight:650}
+html.ios-bold .or1 b:first-child{font-weight:800}
+html.ios-bold .or1 b:last-child{font-weight:600}
+html.ios-bold .bdg{font-weight:700}
+html.ios-bold .pr-t b{font-weight:700}
+html.ios-bold .qsale{font-weight:700}
+html.ios-bold .mh{font-weight:700}
+html.ios-bold .dr-row{font-weight:750}
+html.ios-bold .dr-srow{font-weight:600}
+html.ios-bold .dr-head{font-weight:650}
+html.ios-bold .dr-add{font-weight:650}
+html.ios-bold .dr-qs{font-weight:700}
+html.ios-bold .sp-r b{font-weight:700}
+html.ios-bold .pg-nav.titled .pg-t{font-weight:800}
+html.ios-bold .oh h1{font-weight:850}
+html.ios-bold .sec-h h3{font-weight:700}
+html.ios-bold .li-t b{font-weight:700}
+html.ios-bold .li-q{font-weight:700}
+html.ios-bold .btn-p{font-weight:700}
+html.ios-bold .btn-s{font-weight:700}
+html.ios-bold .btn-o{font-weight:700}
+html.ios-bold .kv>div>b{font-weight:600}
+html.ios-bold .kv .tot{font-weight:800}
+html.ios-bold .kv .tot b,html.ios-bold .kv .tot span{font-weight:800}
+html.ios-bold .crow b{font-weight:700}
+html.ios-bold .cav{font-weight:800}
+html.ios-bold .risk b{font-weight:700}
+html.ios-bold .trk b{font-weight:700}
+html.ios-bold .lnk{font-weight:700}
+html.ios-bold .pt{font-weight:850}
+html.ios-bold .vr b{font-weight:700}
+html.ios-bold .cust-h h1{font-weight:850}
+html.ios-bold .tags span{font-weight:700}
+html.ios-bold .anp{font-weight:650}
+html.ios-bold .an-t{font-weight:700}
+html.ios-bold .an-v b{font-weight:800}
+html.ios-bold .brk b{font-weight:600}
+html.ios-bold .brk>div.b .lk,html.ios-bold .brk>div.b b{font-weight:800}
+html.ios-bold .bar-r b{font-weight:700}
+html.ios-bold .donut .dn-v{font-weight:800}
+html.ios-bold .donut span b{font-weight:700}
+html.ios-bold .lv-now b{font-weight:800}
+html.ios-bold .lv-grid b,html.ios-bold .beh b{font-weight:800}
+html.ios-bold .po-next b{font-weight:850}
+html.ios-bold .po-r b{font-weight:700}
+html.ios-bold .po-d h1{font-weight:850}
+html.ios-bold .nr1 b{font-weight:800}
+html.ios-bold .bn .nr1 b{font-weight:750}
+html.ios-bold .sk-g{font-weight:650}
+html.ios-bold .sk-new{font-weight:650}
+html.ios-bold .sk-hi h1{font-weight:800}
+html.ios-bold .sk-s{font-weight:650}
+html.ios-bold .qs-amt{font-weight:800}
+html.ios-bold .qs-pad button{font-weight:650}
+html.ios-bold .sh-h h2{font-weight:800}
+html.ios-bold .sh.notifs .sh-h.nav h2{font-weight:800}
+html.ios-bold .st-r b{font-weight:700}
+html.ios-bold .st-add{font-weight:700}
+html.ios-bold #toast{font-weight:700}
+html.ios-bold .np-save{font-weight:800}
+html.ios-bold .np-l{font-weight:800}
+html.ios-bold .np-f>span{font-weight:650}
+html.ios-bold .np-seg button{font-weight:650}
+html.ios-bold .np-seg button.on{font-weight:800}
+html.ios-bold .np-ph{font-weight:650}
+html.ios-bold .np-rm{font-weight:700}
+html.ios-bold .np-err{font-weight:650}
+html.ios-bold .ac-t b{font-weight:800}
+html.ios-bold .ac-add b{font-weight:800}
+html.ios-bold .ac-pref{font-weight:700}
