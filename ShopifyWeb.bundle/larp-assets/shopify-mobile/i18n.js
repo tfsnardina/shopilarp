@@ -613,18 +613,29 @@
     if (!observer) return;
     observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
   }
+  function enqueue(list) {
+    list.forEach(function (m) {
+      if (m.type === "childList") m.addedNodes.forEach(function (n) { queue.push(n); });
+      else queue.push(m.target);
+    });
+  }
   function start() {
     observer = new MutationObserver(function (list) {
-      list.forEach(function (m) {
-        if (m.type === "childList") m.addedNodes.forEach(function (n) { queue.push(n); });
-        else queue.push(m.target);
-      });
+      enqueue(list);
       if (queue.length) flush();                      // same microtask: translated before the browser paints or measures
     });
     walk(document.body);
     attach();
   }
-  function apply(root) { if (observer) observer.disconnect(); walk(root || document.body); attach(); }
+  function apply(root) {
+    // disconnect() throws away mutations the observer has not delivered yet (e.g. a whole screen just rebuilt
+    // with innerHTML, like Home after pull-to-refresh), which left them untranslated: take them first.
+    if (observer) { enqueue(observer.takeRecords()); observer.disconnect(); }
+    walk(root || document.body);
+    var q = queue; queue = [];
+    q.forEach(walk);
+    attach();
+  }
   function refresh() { if (observer) observer.disconnect(); walk(document.body); attach(); }
 
   /* ── public API ── */
