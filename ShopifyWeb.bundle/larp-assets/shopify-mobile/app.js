@@ -2767,7 +2767,47 @@
       if (done) return; done = true;
       hap("medium"); markWelcome();
       w.classList.add("out");
-      setTimeout(function () { w.remove(); }, 650);
+      setTimeout(function () { w.remove(); showLogin(onContinue); }, 650);
+    });
+    requestAnimationFrame(function () { w.classList.add("in"); });
+  }
+  /* Login step: shown right after the welcome screen's Continue, before the first reveal. */
+  function showLogin(onContinue) {
+    var w = document.createElement("div");
+    w.id = "login";
+    w.innerHTML = '<div class="lg-card">' +
+      '<h1>Se connecter</h1>' +
+      '<p>Continuer vers ' + esc(S.name) + ' Mobile</p>' +
+      '<div id="lgStepEmail">' +
+      '<label class="np-f"><span>E-mail</span><input id="lgEmail" type="email" value="exemple@exemple.com" autocapitalize="off" autocorrect="off" spellcheck="false"></label>' +
+      '<button type="button" class="btn-p" id="lgNext"><span>Continuer avec l\u2019e-mail</span></button>' +
+      '</div>' +
+      '<div id="lgStepPass" hidden>' +
+      '<div class="lg-acct"><span id="lgEmailShown"></span><button type="button" id="lgChange">Changer d\u2019e-mail</button></div>' +
+      '<label class="np-f"><span>Mot de passe</span><input id="lgPass" type="password" value="101014" autocapitalize="off" autocorrect="off" spellcheck="false"></label>' +
+      '<button type="button" class="btn-p" id="lgGo"><span>Se connecter</span></button>' +
+      '</div>' +
+      '</div>';
+    app.appendChild(w);
+    statusBar("dark");
+    var done = false;
+    $("#lgNext", w).addEventListener("click", function () {
+      var email = $("#lgEmail", w).value.trim() || "exemple@exemple.com";
+      $("#lgEmailShown", w).textContent = email;
+      $("#lgStepEmail", w).hidden = true;
+      $("#lgStepPass", w).hidden = false;
+      hap("light");
+    });
+    $("#lgChange", w).addEventListener("click", function () {
+      $("#lgStepPass", w).hidden = true;
+      $("#lgStepEmail", w).hidden = false;
+      hap("light");
+    });
+    $("#lgGo", w).addEventListener("click", function () {
+      if (done) return; done = true;
+      hap("medium");
+      w.classList.add("out");
+      setTimeout(function () { w.remove(); }, 400);
       onContinue();
     });
     requestAnimationFrame(function () { w.classList.add("in"); });
