@@ -1284,10 +1284,10 @@ html.native-glass-hdr:not(.glass-cover) .gl-hd .gl-chev,
 html.native-glass-hdr:not(.glass-cover) .gl-scr .sfield,
 html.native-glass-hdr:not(.glass-cover) .gl-scr .cb,
 html.native-glass-hdr:not(.glass-cover) .gl-scr .chip{visibility:hidden}
-html.native-glass-hdr:not(.glass-cover) #layers .sh.notifs:is(.order,.payouts,.transfer) .sh-h.nav .sh-x,
-html.native-glass-hdr:not(.glass-cover) #layers .sh.notifs:is(.order,.payouts,.transfer) .sh-h.nav .nb-c,
-html.native-glass-hdr:not(.glass-cover) #layers .sh.notifs:is(.order,.payouts,.transfer) .pv-go,
-html.native-glass-hdr:not(.glass-cover) #layers .sh.notifs:is(.order,.payouts,.transfer) .btn-p{visibility:hidden}
+html.native-glass-hdr:not(.glass-cover) #layers .sh.notifs:is(.payouts,.transfer) .sh-h.nav .sh-x,
+html.native-glass-hdr:not(.glass-cover) #layers .sh.notifs:is(.payouts,.transfer) .sh-h.nav .nb-c,
+html.native-glass-hdr:not(.glass-cover) #layers .sh.notifs:is(.payouts,.transfer) .pv-go,
+html.native-glass-hdr:not(.glass-cover) #layers .sh.notifs:is(.payouts,.transfer) .btn-p{visibility:hidden}
 .i-check-circle{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill-rule='evenodd' d='M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm0-1.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11Z'/%3E%3Cpath transform='translate(3.8 3.9) scale(.62)' d='M15.78 5.97a.75.75 0 0 1 0 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3.25-3.25a.75.75 0 1 1 1.06-1.06l2.72 2.72 5.97-5.97a.75.75 0 0 1 1.06 0Z'/%3E%3C/svg%3E")}
 .i-x-circle{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill-rule='evenodd' d='M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm0-1.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11Z'/%3E%3Cpath transform='translate(4 4) scale(.6)' d='M13.97 15.03a.75.75 0 1 0 1.06-1.06l-3.97-3.97 3.97-3.97a.75.75 0 0 0-1.06-1.06l-3.97 3.97-3.97-3.97a.75.75 0 0 0-1.06 1.06l3.97 3.97-3.97 3.97a.75.75 0 1 0 1.06 1.06l3.97-3.97 3.97 3.97Z'/%3E%3C/svg%3E")}
 
@@ -1339,3 +1339,28 @@ html.native-glass-hdr:not(.glass-cover) #layers .sh.notifs:is(.order,.payouts,.t
 .al-b button{display:flex;align-items:center;justify-content:center;text-align:center}
 .opt.act .ic{order:-1}
 html.native-glass-drawer .gl-selbar{visibility:hidden}
+
+/* ── Fiche commande v2 : tout est dans la feuille (aucun élément natif en surcouche), donc rien ne se désynchronise ──
+   Boutons en verre CSS flottant, fondu en haut, bouton principal en verre sombre, sections propres. */
+.sh.notifs.order{background:#fff;overflow:hidden}
+.sh.notifs.order .sh-h.nav{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;align-items:center;gap:10px;padding:12px 14px 22px;pointer-events:none;background:linear-gradient(180deg,#fff 0,rgba(255,255,255,.92) 55%,rgba(255,255,255,0))}
+.sh.notifs.order .sh-h.nav h2{display:none}
+.sh.notifs.order .sh-h.nav::after{content:"";order:1;flex:1}
+.sh.notifs.order .sh-h.nav .sh-x{order:0}
+.sh.notifs.order .sh-h.nav .nb-c{order:2}
+.sh.notifs.order .sh-x,.sh.notifs.order .nb-c{pointer-events:auto;display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none;border-radius:50%;color:#111;background:rgba(255,255,255,.62);-webkit-backdrop-filter:blur(20px) saturate(190%);backdrop-filter:blur(20px) saturate(190%);box-shadow:inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(0,0,0,.04),inset 0 0 0 .5px rgba(0,0,0,.1),0 6px 18px rgba(0,0,0,.12);transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
+.sh.notifs.order .sh-x:active,.sh.notifs.order .nb-c:active{transform:scale(.9)}
+.sh.notifs.order .sh-x .ic,.sh.notifs.order .nb-c .ic{width:20px;height:20px}
+.sh.notifs.order .sh-b{padding-top:66px;padding-bottom:calc(var(--bot) + 24px);-webkit-overflow-scrolling:touch}
+.sh.notifs.order .oh{padding:4px 16px 16px}
+.sh.notifs.order .oh h1{font-size:32px;letter-spacing:-.8px;line-height:1.1}
+.sh.notifs.order .oh-s{margin-top:8px}
+.sh.notifs.order .sec{border-top-width:8px}
+.sh.notifs.order .btn-p{height:50px;margin-top:14px;border-radius:25px;font-size:17px;font-weight:600;color:#fff;background:linear-gradient(180deg,rgba(66,66,68,.96),rgba(26,26,28,.98));-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);box-shadow:inset 0 1px 0 rgba(255,255,255,.24),inset 0 0 0 .5px rgba(255,255,255,.1),0 8px 20px rgba(0,0,0,.2);transition:transform .25s cubic-bezier(.34,1.56,.64,1),opacity .2s}
+.sh.notifs.order .btn-p:active{transform:scale(.97);background:linear-gradient(180deg,rgba(54,54,56,.96),rgba(18,18,20,.98))}
+.sh.notifs.order .btn-o{height:48px;border-radius:24px;border:0;background:rgba(244,244,246,.9);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 .5px rgba(0,0,0,.1)}
+.sh.notifs.order .btn-s{height:50px;border-radius:25px;border:0;background:rgba(244,244,246,.9);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 .5px rgba(0,0,0,.1)}
+/* feuille « Traiter les articles » : hauteur du contenu, bouton en verre sombre */
+.sh.fulfill{min-height:0}
+.sh.fulfill .ff{padding:0 16px calc(var(--bot) + 8px)}
+.sh.fulfill .btn-p{height:50px;border-radius:25px;font-weight:600;background:linear-gradient(180deg,rgba(66,66,68,.96),rgba(26,26,28,.98));box-shadow:inset 0 1px 0 rgba(255,255,255,.24),inset 0 0 0 .5px rgba(255,255,255,.1),0 8px 20px rgba(0,0,0,.2)}
