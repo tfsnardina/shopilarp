@@ -1112,7 +1112,7 @@
     return '<button class="orow" data-order="' + o.n + '"><div class="or1"><b>#' + o.n + "</b><b>" + money(o.total) + "</b></div>" +
       '<div class="or2">' + esc(o.c ? o.c.name : "No customer") + " • " + n + " item" + (n === 1 ? "" : "s") + " • " + hmPad(o.ts) + "</div>" +
       '<div class="or3">' + fulBadge(o) + payBadge(o) + (o.note ? ic("note", "on") : "") + "</div>" +
-      '<div class="or4">' + esc(o.ch === "Point of Sale" ? "Point of Sale" : o.ful === "Fulfilled" || o.pay === "Refunded" ? o.shipM : "Fulfill by: " + mdy(o.ts + (o.shipM === "Express Shipping" ? 1 : 3) * DAY) + " \u2022 " + shipShort(o.shipM)) + "</div></button>";
+      '<div class="or4">' + esc(o.ch === "Point of Sale" ? "Point of Sale" : o.ful === "Fulfilled" || o.pay === "Refunded" ? o.shipM : L10n("Fulfill by:") + " " + mdyL(o.ts + (o.shipM === "Express Shipping" ? 1 : 3) * DAY) + " \u2022 " + L10n(shipShort(o.shipM))) + "</div></button>";
   }
   function orderList(list, limit) {
     var out = "", last = "";
@@ -1150,6 +1150,12 @@
     $$(".chip", el).forEach(function (b) { b.addEventListener("click", function () { oFilter = b.getAttribute("data-of"); oShown = 40; hap(5); renderOrders(); }); });
     var q = $("#oq");
     q.addEventListener("input", function () { oQuery = q.value; var l = orders.filter(orderMatches); $("#olist").innerHTML = l.length ? orderList(l, oShown) : emptyState("No orders found", "Try changing the filters or search term"); });
+  }
+  // Date courte dans la langue de l'app (19 oct. / Oct 19), au lieu du 10/19/26 américain.
+  function mdyL(t) {
+    var d = L(t), loc = "en-US";
+    try { if (window.I18N) window.I18N.langs.forEach(function (l) { if (l.code === window.I18N.lang) loc = l.loc; }); } catch (e) { }
+    try { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toLocaleDateString(loc, { day: "numeric", month: "short", timeZone: "UTC" }); } catch (e2) { return mdy(t); }
   }
   function mdy(t) { var d = L(t); return d.getUTCMonth() + 1 + "/" + d.getUTCDate() + "/" + String(d.getUTCFullYear()).slice(2); }
   function shipShort(m) { return m === "Express Shipping" ? "Express" : m === "Free Shipping" ? "Economy" : "Standard"; }
