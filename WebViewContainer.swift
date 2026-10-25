@@ -70,6 +70,7 @@ enum WebViewContainer {
         let payload = UserDefaults.standard.string(forKey: payloadDefaultsKey) ?? ""
         return """
         window.__CHECKER_NATIVE__=true;
+        window.__LARP_NATIVE_PRODUCT__=\(NativeGlass.isAvailable ? "true" : "false");
         document.documentElement.classList.add('checker-native');
         document.documentElement.classList.toggle('ios-bold', \(UIAccessibility.isBoldTextEnabled ? "true" : "false"));
         document.documentElement.classList.toggle('native-glass-tabbar', \(NativeGlass.isAvailable ? "true" : "false"));
@@ -175,6 +176,16 @@ enum WebViewContainer {
                 let open = (dict["open"] as? NSNumber)?.boolValue ?? false
                 DispatchQueue.main.async { [weak self] in
                     self?.host?.updateGlassDrawerBar(open: open)
+                }
+                return
+            }
+            if message.name == "larpProduct" {
+                let dict = (message.body as? [String: Any]) ?? [:]
+                DispatchQueue.main.async { [weak self] in
+                    self?.host?.presentProductCreator(
+                        currency: (dict["sym"] as? String) ?? "€",
+                        vendor: (dict["vendor"] as? String) ?? ""
+                    )
                 }
                 return
             }
@@ -398,6 +409,7 @@ final class WebHostViewController: UIViewController {
         config.userContentController.add(coordinator, name: "larpHaptic")
         config.userContentController.add(coordinator, name: "larpTabbar")
         config.userContentController.add(coordinator, name: "larpDrawer")
+        config.userContentController.add(coordinator, name: "larpProduct")
         config.userContentController.add(coordinator, name: "larpPtr")
         config.userContentController.addUserScript(
             WKUserScript(
@@ -436,6 +448,23 @@ final class WebHostViewController: UIViewController {
         if let glass = glassTabBar { view.bringSubviewToFront(glass) }
         if let host = pullHost { view.bringSubviewToFront(host) }
         if let drawerGlass = glassDrawerBar { view.bringSubviewToFront(drawerGlass) }
+    }
+
+    // MARK: - Création de produit native (Liquid Glass, iOS 26)
+
+    /// Ouvre l'écran natif « Ajouter un produit » ; à l'enregistrement, la page web crée le produit.
+    func presentProductCreator(currency: String, vendor: String) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), presentedViewController == nil else { return }
+        let creator = ProductCreatorViewController(currencySymbol: currency, vendor: vendor)
+        creator.onSave = { [weak self] payload in
+            guard let data = try? JSONSerialization.data(withJSONObject: payload),
+                  let json = String(data: data, encoding: .utf8) else { return }
+            let literal = WebViewContainer.jsStringLiteral(json)
+            self?.runJS("window.__larpNativeProductSave && window.__larpNativeProductSave(JSON.parse(\(literal)))")
+        }
+        present(creator, animated: true)
+        #endif
     }
 
     // MARK: - Barre d'onglets Liquid Glass native (iOS 26)
