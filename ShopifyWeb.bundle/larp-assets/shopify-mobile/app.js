@@ -2734,7 +2734,51 @@
   // Launch: white screen with the Shopify bag (1 s) -> spinner on a white sheet -> numbers shimmer for a moment.
   function statusBar(mode) { try { window.webkit.messageHandlers.larpStatusBar.postMessage(mode); } catch (e) { } }
   function shimmer(ms) { app.classList.add("skel"); setTimeout(function () { app.classList.remove("skel"); }, ms); }
-  if (seen) { sp.remove(); shimmer(1100); }
+  /* Welcome page: shown once, the first time the app is opened (after the launch screens). */
+  function welcomeSeen() {
+    try { if (localStorage.getItem("sh-welcome") === "1") return true; } catch (e) { }
+    try { return !!(readCfgFresh() || {}).__welcome; } catch (e2) { return false; }
+  }
+  function markWelcome() {
+    try { localStorage.setItem("sh-welcome", "1"); } catch (e) { }
+    try { var cfg = savedSettingsObj(); cfg.__welcome = 1; writeSettings(cfg); } catch (e2) { }
+  }
+  var WL_ART = '<svg viewBox="0 0 240 240" aria-hidden="true"><defs><clipPath id="wlc"><rect x="0" y="0" width="240" height="214"/></clipPath></defs>' +
+    '<circle cx="120" cy="130" r="100" fill="#f0f1f2"/><g clip-path="url(#wlc)">' +
+    '<rect x="72" y="34" width="96" height="200" rx="16" fill="#454a4f"/><rect x="79" y="46" width="82" height="190" rx="8" fill="#eceef0"/>' +
+    '<rect x="86" y="54" width="68" height="76" rx="2" fill="#f4f5f6"/>' +
+    '<path d="M96 124l7-42h36l7 42z" fill="#008060"/><path d="M96 124l7-42h10l-5 42z" fill="#00543f"/>' +
+    '<path d="M113 82v-7a8 8 0 0116 0v7" fill="none" stroke="#006e52" stroke-width="4" stroke-linecap="round"/><path d="M121 82v-7a8 8 0 0116 0v7" fill="none" stroke="#00543f" stroke-width="4" stroke-linecap="round" opacity=".55"/>' +
+    '<rect x="128" y="92" width="13" height="17" rx="3.5" fill="#fff"/><rect x="86" y="124" width="68" height="8" fill="#e8b05a"/>' +
+    '<rect x="88" y="145" width="30" height="8" rx="4" fill="#1a8a68"/><rect x="88" y="160" width="56" height="6" rx="3" fill="#e2e4e6"/><rect x="88" y="172" width="42" height="6" rx="3" fill="#e2e4e6"/></g></svg>';
+  function showWelcome(onContinue) {
+    var w = document.createElement("div");
+    w.id = "welcome";
+    w.innerHTML = '<div class="wl-logo wl-x" style="--d:.05s">' + ic("bag-color") + "</div>" +
+      '<div class="wl-art wl-x" style="--d:.15s">' + WL_ART + "</div>" +
+      '<div class="wl-txt"><h1 class="wl-x" style="--d:.3s">Set up fast. Sell faster.</h1>' +
+      '<p class="wl-x" style="--d:.4s">Create your store in minutes and make your first sale today</p>' +
+      '<ul><li class="wl-x" style="--d:.55s">Create your online store</li><li class="wl-x" style="--d:.65s">Grow your audience</li><li class="wl-x" style="--d:.75s">Accept payments in person</li></ul></div>' +
+      '<button class="wl-go wl-x" style="--d:.9s" id="wlGo"><span>Continue</span></button>';
+    app.appendChild(w);
+    statusBar("dark");
+    var done = false;
+    $("#wlGo", w).addEventListener("click", function () {
+      if (done) return; done = true;
+      hap("medium"); markWelcome();
+      w.classList.add("out");
+      setTimeout(function () { w.remove(); }, 650);
+      onContinue();
+    });
+    requestAnimationFrame(function () { w.classList.add("in"); });
+  }
+  var wSeen = welcomeSeen();
+  try { if (/[?&]welcome=1/.test(location.search)) wSeen = false; } catch (e) { }
+  if (seen) {
+    sp.remove();
+    if (wSeen) shimmer(1100);
+    else { app.classList.add("skel"); showWelcome(function () { statusBar("light"); setTimeout(function () { app.classList.remove("skel"); }, 1200); }); }
+  }
   else {
     var spokes = "";
     var BARS = 8;   // number of bars of the spinner
@@ -2749,6 +2793,12 @@
       statusBar("light");
       sp.classList.add("out"); setTimeout(function () { sp.remove(); }, 420);   // reveals the spinner screen
       setTimeout(function () {
+        if (!wSeen) {
+          // New here: the welcome page takes over from the spinner; the home is revealed on "Continue".
+          showWelcome(function () { statusBar("light"); setTimeout(function () { app.classList.remove("skel"); }, 1200); });
+          setTimeout(function () { ld.remove(); }, 450);
+          return;
+        }
         ld.classList.add("out"); setTimeout(function () { ld.remove(); }, 380);  // reveals the home with shimmering numbers
         setTimeout(function () { app.classList.remove("skel"); }, 1200);
       }, 900);
