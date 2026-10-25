@@ -398,6 +398,13 @@
 
     /* search + sidekick */
     ["Recent searches", "Recherches récentes", "Búsquedas recientes", "Letzte Suchen"],
+    ["Filters are not available yet", "Les filtres ne sont pas encore disponibles", "Los filtros aún no están disponibles", "Filter sind noch nicht verfügbar"],
+    ["Everything", "Tout", "Todo", "Alles"],
+    ["No recent searches", "Aucune recherche récente", "Sin búsquedas recientes", "Keine letzten Suchen"],
+    ["Chat history", "Historique du chat", "Historial del chat", "Chatverlauf"],
+    ["Work with Sidekick", "Travailler avec Sidekick", "Trabajar con Sidekick", "Mit Sidekick arbeiten"],
+    ["No previous chats", "Aucune discussion précédente", "Sin chats anteriores", "Keine früheren Chats"],
+    ["Attachments are not available yet", "Les pièces jointes ne sont pas encore disponibles", "Los adjuntos aún no están disponibles", "Anhänge sind noch nicht verfügbar"],
     ["Ask anything...", "Pose une question...", "Pregunta lo que quieras...", "Frag etwas..."],
     ["Ask anything…", "Pose une question…", "Pregunta lo que quieras…", "Frag etwas…"],
     ["How can I help?", "Comment puis-je aider ?", "¿Cómo puedo ayudarte?", "Wie kann ich helfen?"],
