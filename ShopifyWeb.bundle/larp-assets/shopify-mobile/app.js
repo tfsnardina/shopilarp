@@ -2784,7 +2784,8 @@
       '</div>' +
       '<div id="lgStepPass" hidden>' +
       '<div class="lg-acct"><span id="lgEmailShown"></span><button type="button" id="lgChange">Changer d\u2019e-mail</button></div>' +
-      '<label class="np-f"><span>Mot de passe</span><input id="lgPass" type="password" value="101014" autocapitalize="off" autocorrect="off" spellcheck="false"></label>' +
+      '<label class="np-f"><span>Mot de passe</span><span class="lg-pw"><input id="lgPass" type="password" value="101014" autocapitalize="off" autocorrect="off" spellcheck="false"><button type="button" class="lg-eye" id="lgEye" aria-label="Afficher le mot de passe">' + ic("eye") + '</button></span></label>' +
+      '<a href="javascript:void(0)" class="lg-forgot" id="lgForgot">Mot de passe oubli\u00e9\u00a0?</a>' +
       '<button type="button" class="btn-p" id="lgGo"><span>Se connecter</span></button>' +
       '</div>' +
       '</div>';
@@ -2803,6 +2804,13 @@
       $("#lgStepEmail", w).hidden = false;
       hap("light");
     });
+    $("#lgEye", w).addEventListener("click", function () {
+      var inp = $("#lgPass", w), shown = inp.type === "text";
+      inp.type = shown ? "password" : "text";
+      this.classList.toggle("on", !shown);
+      hap("light");
+    });
+    $("#lgForgot", w).addEventListener("click", function () { hap("light"); });
     $("#lgGo", w).addEventListener("click", function () {
       if (done) return; done = true;
       hap("medium");
