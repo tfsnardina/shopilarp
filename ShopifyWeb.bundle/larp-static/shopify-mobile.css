@@ -1148,3 +1148,54 @@ html.ios-bold .lg-card h1{font-weight:900}
 .tb.on{color:#111}
 /* Liquid Glass natif actif (iOS 26) : la barre web reste dans le DOM mais invisible et non cliquable */
 html.native-glass-tabbar #tabbar,html.native-glass-tabbar #tabbar *{opacity:0!important;pointer-events:none!important}
+
+/* ══ Commandes / Produits : pages claires Liquid Glass ══════════════════ */
+.scr.gl-scr{background:#fff;color:var(--tx)}
+.gl-page{min-height:100%;display:flex;flex-direction:column;background:#fff}
+.gl-hd{position:sticky;top:0;z-index:6;flex:none;display:flex;align-items:center;gap:10px;box-sizing:border-box;height:calc(var(--top) + 56px);padding:var(--top) 22px 0 16px;background:linear-gradient(180deg,rgba(255,255,255,.96) 62%,rgba(255,255,255,.72));-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%)}
+.gl-hd .fl{flex:1}
+.gl-tt{display:flex;align-items:center;gap:7px;min-width:0;color:#111;font-size:31px;font-weight:700;letter-spacing:-.9px;line-height:1}
+.gl-tt span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gl-chev{flex:none;width:24px;height:24px;margin-top:3px;border-radius:50%;background:#f1f1f1;display:flex;align-items:center;justify-content:center;color:#111;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.04)}
+.gl-chev .ic{width:14px;height:14px}
+.gl-btn{position:relative;flex:none;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#111;background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,.55));-webkit-backdrop-filter:blur(18px) saturate(180%);backdrop-filter:blur(18px) saturate(180%);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 .5px rgba(0,0,0,.1),0 8px 22px rgba(0,0,0,.09),0 1px 3px rgba(0,0,0,.05);transition:transform .3s cubic-bezier(.34,1.56,.64,1),background .2s}
+.gl-btn .ic{width:26px;height:26px}
+.gl-btn:active{transform:scale(.9)}
+.gl-btn.txt{width:auto;padding:0 18px;border-radius:22px;font-size:16px;font-weight:600}
+.gl-body{flex:1;padding:6px 0 calc(150px + var(--bot))}
+
+/* état vide */
+.gl-empty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:26px 34px 0}
+.gl-hero{display:block;width:220px;height:auto;mix-blend-mode:multiply;pointer-events:none;-webkit-user-select:none;user-select:none}
+.gl-empty h2{margin:26px 0 8px;font-size:20px;font-weight:700;letter-spacing:-.4px;line-height:26px;color:#111}
+.gl-empty p{margin:0 0 24px;max-width:340px;font-size:15.5px;line-height:20px;color:#616161}
+.gl-cta{display:flex;align-items:center;justify-content:center;width:100%;height:48px;border-radius:24px;color:#fff;font-size:17px;font-weight:650;letter-spacing:-.2px;background:linear-gradient(180deg,#2e2e30,#151515);box-shadow:inset 0 1px 0 rgba(255,255,255,.24),inset 0 0 0 .5px rgba(255,255,255,.1),0 12px 26px rgba(0,0,0,.2);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.gl-cta:active{transform:scale(.97)}
+.gl-empty-p{padding:14px 42px 0}
+.gl-empty-p .gl-hero{width:143px;margin-bottom:-8px}
+.gl-empty-p h2{margin-top:16px}
+.gl-empty-p p{margin-bottom:30px}
+.gl-sub{align-self:flex-start;margin:40px 0 12px;font-size:16px;font-weight:500;color:#616161}
+.gl-cards{display:flex;gap:15px;width:100%}
+.gl-card{position:relative;flex:1;min-width:0;height:89px;padding:9px 12px;border-radius:24px;overflow:hidden;text-align:left;background:linear-gradient(180deg,#f7f7f7,#f3f3f3);box-shadow:inset 0 1px 0 rgba(255,255,255,.95),inset 0 0 0 .5px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.04);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.gl-card:active{transform:scale(.97)}
+.gl-card b{position:relative;z-index:1;display:block;max-width:74%;font-size:17px;line-height:19.7px;font-weight:650;letter-spacing:-.3px;color:#111}
+.gl-card img{position:absolute;display:block;pointer-events:none}
+.gl-card .gl-c1{right:0;bottom:0;width:64.7px}
+.gl-card .gl-c2{right:2.7px;bottom:.7px;width:51.7px}
+
+/* bannière d'essai (verre sombre) au-dessus de la barre d'onglets */
+.gl-dock{position:sticky;bottom:calc(var(--bot) + 88px);z-index:5;height:0;margin-top:auto;pointer-events:none}
+.gl-trial{pointer-events:auto;position:absolute;left:37px;right:37px;bottom:0;display:flex;align-items:center;gap:12px;height:50px;padding:0 6px 0 18px;border-radius:25px;color:#fff;text-align:left;background:rgba(12,12,12,.9);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 0 0 .5px rgba(255,255,255,.08),0 14px 34px rgba(0,0,0,.28);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.gl-trial:active{transform:scale(.98)}
+.gl-trial b{flex:1;min-width:0;font-size:18px;font-weight:600;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gl-trial span{flex:none;display:flex;align-items:center;gap:8px;height:40px;padding:0 14px 0 11px;border-radius:20px;background:rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.1);font-size:17px;font-weight:500;white-space:nowrap}
+.gl-trial i{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#e3f5b8,#a9d06c);box-shadow:0 0 0 3.5px rgba(169,208,108,.28)}
+
+/* listes : champs, pastilles et filtres en verre */
+.gl-scr .sbar{padding:6px var(--g) 0}
+.gl-scr .sfield{height:46px;border-radius:23px;background:rgba(244,244,246,.8);-webkit-backdrop-filter:blur(16px) saturate(170%);backdrop-filter:blur(16px) saturate(170%);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 .5px rgba(0,0,0,.08),0 4px 14px rgba(0,0,0,.05)}
+.gl-scr .cb{width:46px;height:46px;background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(246,246,248,.7));-webkit-backdrop-filter:blur(16px) saturate(170%);backdrop-filter:blur(16px) saturate(170%);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 .5px rgba(0,0,0,.1),0 6px 16px rgba(0,0,0,.07)}
+.gl-scr .chip{transition:background .2s,box-shadow .2s,transform .25s cubic-bezier(.34,1.56,.64,1)}
+.gl-scr .chip.on{background:linear-gradient(180deg,#fff,#f0f0f2);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 .5px rgba(0,0,0,.1),0 4px 12px rgba(0,0,0,.08)}
+.gl-scr .chip:active{transform:scale(.95)}
