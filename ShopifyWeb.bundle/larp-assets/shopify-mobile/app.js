@@ -1605,7 +1605,7 @@
       '<label class="fld"><span>Tracking number</span><input id="trk" inputmode="numeric" placeholder="Add tracking number" autocomplete="off"></label>' +
       '<label class="fld"><span>Shipping carrier</span><div class="sel">' + esc(carrier) + ic("chev-down") + "</div></label>" +
       '<label class="tg"><input type="checkbox" checked><span></span>Send shipment details to your customer now</label>' +
-      '<button class="btn-p" id="doFul">Fulfill items</button></div>', { cls: "tall" });
+      '<button class="btn-p" id="doFul">Fulfill items</button></div>', { cls: "fulfill" });
     $("#doFul", el).addEventListener("click", function () {
       var b = this; b.disabled = true; b.classList.add("busy");
       setTimeout(function () {
@@ -3302,7 +3302,7 @@
       if (app.querySelector(".sk-ov") || document.querySelector(".dr-bot")) return true;
       return false;
     }
-    var ORD_SEL = ".sh.notifs.order, .sh.notifs.payouts, .sh.notifs.transfer";
+    var ORD_SEL = ".sh.notifs.payouts, .sh.notifs.transfer";
     // Verre « épinglé » : pendant un défilement / un rebond, la page web bouge mais le verre natif garde
     // la position qu'il avait au repos (sinon il suit la page avec un temps de retard et tremble).
     var pin = {}, touching = false, lastMove = 0;
