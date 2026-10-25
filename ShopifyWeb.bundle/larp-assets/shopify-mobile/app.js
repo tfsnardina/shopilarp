@@ -1819,6 +1819,7 @@
     var st = payStatus(p);
     var kv = p.bank
       ? '<div class="kv"><div><span>Destination</span><span></span><b>' + esc(p.bank) + "</b></div>" + (p.holder ? "<div><span>Account holder</span><span></span><b>" + esc(p.holder) + "</b></div>" : "") +
+        (p.fees > 0 ? "<div><span>Amount</span><span></span><b>" + money(p.gross) + "</b></div><div><span>Withdrawal fee</span><span></span><b>-" + money(p.fees) + "</b></div>" : "") +
         '<div class="tot"><span>Total</span><span></span><b>' + money(p.amt) + "</b></div></div>"
       : '<div class="kv"><div><span>Orders</span><span>' + count(p.n) + "</span><b>" + money(p.gross) + "</b></div><div><span>Fees</span><span></span><b>-" + money(p.fees) + '</b></div><div class="tot"><span>Total</span><span></span><b>' + money(p.amt) + "</b></div></div>";
     sheet("Payout", '<div class="po-d"><span>' + esc(mdLong(p.ts)) + "</span><h1>" + money(p.amt) + "</h1>" + badge(st, st === "In transit" ? "info" : "ok") + '</div><div class="sec">' + kv + "</div>", { navClose: true, cls: "notifs payout" });
@@ -1856,6 +1857,8 @@
   var PLUS = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
   var WAL = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 012-2h11v4M4 7v10a2 2 0 002 2h13a1 1 0 001-1V9a1 1 0 00-1-1H6a2 2 0 01-2-1zM16 14h2"/></svg>';
   var BKS = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>';
+  var SWA = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+  var SWC = '<svg class="sl-ck" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   var DEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11a1 1 0 011 1v10a1 1 0 01-1 1H9l-6-6 6-6zM12 10l5 4M17 10l-5 4"/></svg>';
   // Transfer flow in 3 steps: 1/3 method (bank / PayPal), 2/3 amount (keypad), 3/3 account (saved banks or PayPal email).
   function openTransfer() {
@@ -1873,6 +1876,7 @@
     function showErr(m) { var e = $("#trErr", el); if (e) { e.textContent = m; e.hidden = !m; } if (m) hap("warning"); }
     function foot(btn) { return '<div class="tr-foot">' + btn + "</div>"; }
     function stepHtml() {
+      if (T.step === 4) return recapHtml();
       if (T.step === 1) {
         return '<h3 class="tr-h">Withdrawal method</h3><p class="tr-p">Choose how you want to receive your money.</p>' +
           '<button class="tr-opt' + (T.method === "bank" ? " sel" : "") + '" data-m="bank"><span class="pv-ic">' + BKS + '</span><div><b>Bank account</b><span>1 to 2 business days</span></div><span class="rd"></span></button>' +
@@ -1972,24 +1976,91 @@
             dest = { kind: "bank", label: bankLabel(a2.iban), holder: a2.holder };
           }
           var c = toCents(T.amt); if (c <= 0 || c > payBal()) return showErr("Amount is higher than your balance");
-          go.disabled = true; go.classList.add("busy");
-          setTimeout(function () {
-            var amt = Math.min(c, payBal());
-            S.payout = payBal() - amt;
-            if (dest.kind === "paypal") payPal = T.email; else paySel = T.sel;
-            var row = { ts: nowMs(), amt: amt, st: "In transit", n: 0, fees: 0, gross: amt, bank: dest.label, holder: dest.holder, kind: dest.kind };
-            transfers.unshift(row); payouts.unshift(row);
-            pop(false);
-            saveState(); syncPayCard();
-            setTimeout(function () { paySuccess(amt, row.bank, row.kind); notifyPayout(row); }, 260);
-          }, 900);
+          var fee = feeFor(c, T.method);
+          if (c <= fee) return showErr("Amount too low to cover the fees");
+          T.dest = dest; T.fee = fee; hap("light"); T.step = 4; render(1);
         });
       }
+      if (T.step === 4) bindSwipe();
+    }
+    function feeFor(c, method) {
+      var u = Math.pow(10, dec - 2);
+      return method === "paypal" ? Math.max(Math.round(10 * u), Math.round(c * 0.01)) : Math.round(25 * u);
+    }
+    function recapHtml() {
+      var c = toCents(T.amt), fee = T.fee || 0, d = T.dest || {};
+      return '<h3 class="tr-h">Review transfer</h3><p class="tr-p">Check the details before sending.</p>' +
+        '<div class="tr-rc">' +
+        '<div><span>Amount</span><b>' + money(c) + "</b></div>" +
+        '<div><span>Withdrawal fee</span><b>' + (fee > 0 ? "-" + money(fee) : "Free") + "</b></div>" +
+        '<div><span>To</span><b>' + esc(d.label || "") + "</b></div>" +
+        (d.holder ? '<div><span>Account holder</span><b>' + esc(d.holder) + "</b></div>" : "") +
+        '<div><span>Arrival</span><b>' + (T.method === "paypal" ? "Usually within minutes" : "1 to 2 business days") + "</b></div>" +
+        '<div class="tot"><span>You receive</span><b>' + money(c - fee) + "</b></div></div>" +
+        '<p class="tr-err" id="trErr" hidden></p>' +
+        foot('<div class="sl" id="slr"><div class="sl-fill"></div><span class="sl-t">Swipe to send</span><div class="sl-k" id="slK">' + SWA + "</div></div>");
+    }
+    // A burst of haptics (native iOS generators in quick succession, or a vibration pattern in a browser).
+    function burst() {
+      var native = false;
+      try { native = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpHaptic); } catch (e) { }
+      if (!native) { try { if (navigator.vibrate) navigator.vibrate([30, 20, 30, 20, 30, 20, 30, 20, 30, 20, 60, 20, 60, 20, 90]); } catch (e2) { } return; }
+      var seq = ["heavy", "medium", "heavy", "light", "heavy", "medium", "heavy", "heavy", "medium", "heavy", "light", "heavy", "medium", "heavy", "heavy", "heavy", "medium", "heavy"];
+      seq.forEach(function (k, i) { setTimeout(function () { hap(k); }, i * 45); });
+      setTimeout(function () { hap("success"); }, seq.length * 45 + 40);
+    }
+    function send() {
+      var c = toCents(T.amt), dest = T.dest, fee = T.fee || 0;
+      if (c > payBal()) c = payBal();
+      S.payout = payBal() - c;
+      if (dest.kind === "paypal") payPal = T.email; else paySel = T.sel;
+      var row = { ts: nowMs(), amt: Math.max(0, c - fee), st: "In transit", n: 0, fees: fee, gross: c, bank: dest.label, holder: dest.holder, kind: dest.kind };
+      transfers.unshift(row); payouts.unshift(row);
+      pop(false);
+      saveState(); syncPayCard();
+      setTimeout(function () { paySuccess(row.amt, row.bank, row.kind); notifyPayout(row); }, 260);
+    }
+    function bindSwipe() {
+      var sw = $("#slr", el), k = $("#slK", el), fill = $(".sl-fill", el), txt = $(".sl-t", el);
+      var x0 = null, cur = 0, max = 0, lastTick = 0, done = false;
+      // keep the sheet's drag-to-dismiss out of the way
+      ["touchstart", "touchmove"].forEach(function (ev) { sw.addEventListener(ev, function (e) { e.stopPropagation(); }, { passive: true }); });
+      function set(px) {
+        cur = px; k.style.transform = "translateX(" + px + "px)";
+        fill.style.width = (px + k.offsetWidth + 4) + "px";
+        txt.style.opacity = Math.max(0, 1 - px / (max * 0.55));
+      }
+      k.addEventListener("pointerdown", function (e) {
+        if (done) return;
+        max = sw.clientWidth - k.offsetWidth - 8; x0 = e.clientX - cur; lastTick = 0;
+        try { k.setPointerCapture(e.pointerId); } catch (e1) { }
+        k.style.transition = "none"; fill.style.transition = "none"; sw.classList.add("drag"); hap("light");
+      });
+      k.addEventListener("pointermove", function (e) {
+        if (x0 === null || done) return;
+        var px = Math.max(0, Math.min(max, e.clientX - x0)); set(px);
+        var p = px / max, tick = Math.floor(p * 14);
+        if (tick !== lastTick) { lastTick = tick; hap(p > 0.85 ? "medium" : p > 0.5 ? "light" : "selection"); }
+      });
+      function end() {
+        if (x0 === null) return;
+        x0 = null; sw.classList.remove("drag");
+        if (cur / max >= 0.88) {
+          done = true; k.style.transition = "transform .2s var(--ease)"; fill.style.transition = "width .2s var(--ease)"; set(max);
+          sw.classList.add("done"); txt.textContent = "Sending…"; txt.style.opacity = 1; k.innerHTML = '<span class="sl-spin"></span>';
+          burst();
+          setTimeout(function () { k.innerHTML = SWC; sw.classList.add("ok"); }, 650);
+          setTimeout(send, 1000);
+        } else {
+          k.style.transition = "transform .45s var(--ease)"; fill.style.transition = "width .45s var(--ease)"; set(0); hap("light");
+        }
+      }
+      k.addEventListener("pointerup", end); k.addEventListener("pointercancel", end);
     }
     function render(dir) {
       W.innerHTML = '<div class="tr-pane' + (dir ? " in" + (dir < 0 ? " back" : "") : "") + '">' + stepHtml() + "</div>";
-      $$(".tr-prog i", el).forEach(function (b, i) { b.classList.toggle("on", i < T.step); });
-      $("#trStep", el).textContent = T.step + "/3";
+      $$(".tr-prog i", el).forEach(function (b, i) { b.classList.toggle("on", i < Math.min(T.step, 3)); });
+      $("#trStep", el).textContent = Math.min(T.step, 3) + "/3";
       nx.innerHTML = T.step > 1 ? ic("chev-left") : ic("x");
       nx.setAttribute("aria-label", T.step > 1 ? "Back" : "Close");
       bind();
