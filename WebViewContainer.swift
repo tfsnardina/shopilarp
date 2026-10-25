@@ -191,6 +191,21 @@ enum WebViewContainer {
                 }
                 return
             }
+            if message.name == "larpSelect", let dict = message.body as? [String: Any] {
+                let shown = (dict["shown"] as? NSNumber)?.boolValue ?? false
+                let count = (dict["count"] as? NSNumber)?.intValue ?? 0
+                let busy = (dict["busy"] as? NSNumber)?.boolValue ?? false
+                DispatchQueue.main.async { [weak self] in
+                    self?.host?.updateGlassSelectionBar(shown: shown, count: count, busy: busy)
+                }
+                return
+            }
+            if message.name == "larpConfirm", let dict = message.body as? [String: Any] {
+                DispatchQueue.main.async { [weak self] in
+                    self?.host?.presentNativeConfirm(dict)
+                }
+                return
+            }
             if message.name == "larpProduct" {
                 let dict = (message.body as? [String: Any]) ?? [:]
                 DispatchQueue.main.async { [weak self] in
@@ -316,6 +331,8 @@ final class WebHostViewController: UIViewController {
     private var glassChrome: UIView?
     private var pullHost: PullRefreshHost?
     private var glassDrawerBarBottom: NSLayoutConstraint?
+    private var glassSelectionBar: UIView?
+    private var glassSelectionBarBottom: NSLayoutConstraint?
 
     init(coordinator: WebViewContainer.Coordinator) {
         self.coordinator = coordinator
@@ -343,6 +360,7 @@ final class WebHostViewController: UIViewController {
         installGlassChrome()
         installGlassTabBar()
         installGlassDrawerBar()
+        installGlassSelectionBar()
         installPullHost()
 
         guard let entry = WebViewContainer.resolveWebEntry() else {
@@ -415,6 +433,8 @@ final class WebHostViewController: UIViewController {
         old?.removeScriptMessageHandler(forName: "larpDrawer")
         old?.removeScriptMessageHandler(forName: "larpGlass")
         old?.removeScriptMessageHandler(forName: "larpPtr")
+        old?.removeScriptMessageHandler(forName: "larpSelect")
+        old?.removeScriptMessageHandler(forName: "larpConfirm")
         let web = makeWebView()
         showWebView(web)
         lastLayoutInsets = .zero
@@ -434,6 +454,8 @@ final class WebHostViewController: UIViewController {
         config.userContentController.add(coordinator, name: "larpGlass")
         config.userContentController.add(coordinator, name: "larpProduct")
         config.userContentController.add(coordinator, name: "larpPtr")
+        config.userContentController.add(coordinator, name: "larpSelect")
+        config.userContentController.add(coordinator, name: "larpConfirm")
         config.userContentController.addUserScript(
             WKUserScript(
                 source: WebViewContainer.nativeChromeScript(),
@@ -471,6 +493,7 @@ final class WebHostViewController: UIViewController {
         if let chrome = glassChrome { view.bringSubviewToFront(chrome) }
         if let glass = glassTabBar { view.bringSubviewToFront(glass) }
         if let host = pullHost { view.bringSubviewToFront(host) }
+        if let selectionGlass = glassSelectionBar { view.bringSubviewToFront(selectionGlass) }
         if let drawerGlass = glassDrawerBar { view.bringSubviewToFront(drawerGlass) }
     }
 
@@ -667,6 +690,62 @@ final class WebHostViewController: UIViewController {
         #endif
     }
 
+    // MARK: - Sélection multiple des produits : barre Liquid Glass + alerte système
+
+    private func installGlassSelectionBar() {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), glassSelectionBar == nil else { return }
+        let bar = GlassSelectionBarView()
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        bar.onAction = { [weak self] name in
+            self?.runJS("window.__larpNativeSelect && window.__larpNativeSelect(\(WebViewContainer.jsStringLiteral(name)))")
+        }
+        view.addSubview(bar)
+        // Posée juste au-dessus de la barre d'onglets (8 pt de marge + 56 pt de barre + 12 pt d'écart).
+        let bottom = bar.bottomAnchor.constraint(
+            equalTo: view.bottomAnchor,
+            constant: -(deviceSafeAreaInsets().bottom + 76)
+        )
+        NSLayoutConstraint.activate([
+            bar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            bar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            bar.heightAnchor.constraint(equalToConstant: GlassSelectionBarView.barHeight),
+            bottom,
+        ])
+        glassSelectionBar = bar
+        glassSelectionBarBottom = bottom
+        #endif
+    }
+
+    /// Appelé par la page web : mode sélection actif, nombre de produits cochés, suppression en cours.
+    func updateGlassSelectionBar(shown: Bool, count: Int, busy: Bool) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), let bar = glassSelectionBar as? GlassSelectionBarView else { return }
+        bar.update(shown: shown, count: count, busy: busy)
+        #endif
+    }
+
+    /// Vraie alerte Apple (UIAlertController) pour confirmer une action destructive demandée par la page.
+    /// Le résultat revient à la page via window.__larpConfirmResult(id, ok).
+    func presentNativeConfirm(_ info: [String: Any]) {
+        let id = (info["id"] as? String) ?? ""
+        let fr = (Locale.preferredLanguages.first ?? "en").hasPrefix("fr")
+        let title = (info["title"] as? String) ?? (fr ? "Supprimer ?" : "Delete?")
+        let message = info["message"] as? String
+        let cancel = (info["cancel"] as? String) ?? (fr ? "Annuler" : "Cancel")
+        let confirm = (info["confirm"] as? String) ?? (fr ? "Supprimer" : "Delete")
+        let reply: (Bool) -> Void = { [weak self] ok in
+            self?.runJS("window.__larpConfirmResult && window.__larpConfirmResult(\(WebViewContainer.jsStringLiteral(id)), \(ok ? "true" : "false"))")
+        }
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: cancel, style: .cancel) { _ in reply(false) })
+        alert.addAction(UIAlertAction(title: confirm, style: .destructive) { _ in reply(true) })
+        // Si une fiche est déjà présentée, l'alerte se pose au-dessus ; sinon sur ce contrôleur.
+        var presenter: UIViewController = self
+        while let next = presenter.presentedViewController { presenter = next }
+        presenter.present(alert, animated: true)
+    }
+
     /// Insets of this view only. Do not invent 47/34 — that double-pads when the system already inset the window.
     func deviceSafeAreaInsets() -> UIEdgeInsets {
         let raw = view.safeAreaInsets
@@ -689,6 +768,7 @@ final class WebHostViewController: UIViewController {
             lastLayoutInsets = insets
             glassTabBarBottom?.constant = -(insets.bottom + 8)
             glassDrawerBarBottom?.constant = -max(20, insets.bottom + 2)
+            glassSelectionBarBottom?.constant = -(insets.bottom + 76)
             coordinator.pushSafeArea(to: webView, insets: insets)
         }
     }
