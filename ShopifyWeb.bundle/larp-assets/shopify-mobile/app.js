@@ -923,6 +923,9 @@
       nb.textContent = "html,body,[id^='s-']{overscroll-behavior-y:none}";
       document.head.appendChild(nb);
     }
+    /* Spinner natif Apple (UIRefreshControl) : l'app iOS le dessine, la page ne fait que lui envoyer la distance tirée. */
+    var nativePtr = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpPtr);
+    function ptrPost(o) { try { window.webkit.messageHandlers.larpPtr.postMessage(o); } catch (e) { } }
     function ptrEl() { return $("#ptr", sc); }
     function bodyEls() {
       var out = [], top = $(".hm-top", sc), sheet = $(".hm-sheet", sc);
@@ -937,6 +940,7 @@
     function ensureSpinner(ptr) {
       if (!ptr || ptr._ios) return;
       ptr._ios = true;
+      if (nativePtr) { ptr.style.display = "none"; return; }
       if (!document.getElementById("ptr-ios-css")) {
         var st = document.createElement("style"); st.id = "ptr-ios-css";
         st.textContent = "@keyframes ptrFade{0%{opacity:1}100%{opacity:.14}}" +
@@ -970,12 +974,13 @@
     var cur = 0, vel = 0, tgt = 0, raf = 0, last = 0, onDone = null, loading = false;
     function apply(s) {
       var els = bodyEls(), ptr = ptrEl(), t = s > 0.05 ? "translate3d(0," + s.toFixed(2) + "px,0)" : "";
+      if (nativePtr) ptrPost({ s: "pull", y: Math.max(0, s) });
       els.forEach(function (el) {
         el.style.transition = "none";
         el.style.willChange = t ? "transform" : "";
         el.style.transform = t;
       });
-      if (ptr) {
+      if (ptr && !nativePtr) {
         ptr.style.transition = "none";
         ptr.style.opacity = Math.min(1, s / 30).toFixed(2);
         ptr.style.transform = t ? "translate3d(0," + (s / 2 - spH / 2).toFixed(2) + "px,0)" : "";
@@ -1012,6 +1017,7 @@
       x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; pull = shift = 0; axis = null;
       cur = vel = 0; loading = false; lastT = 0;
       placePtr(ptrEl());
+      if (nativePtr) { var hdr = $(".hm-hd", sc); ptrPost({ s: "start", top: hdr ? hdr.getBoundingClientRect().bottom : 0 }); }
     }, { passive: true });
     sc.addEventListener("touchmove", function (e) {
       if (y0 === null) return;
@@ -1040,8 +1046,10 @@
       reset();
       if (!go) { home(); return; }
       busy = true; loading = true; hap(10);
+      if (nativePtr) ptrPost({ s: "load" });
       springTo(HOLD);
       setTimeout(function () {
+        if (nativePtr) ptrPost({ s: "end" });
         home(function () { loading = false; busy = false; renderHome(); });
       }, 800);
     }
