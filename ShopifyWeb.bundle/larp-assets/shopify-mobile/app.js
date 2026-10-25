@@ -2227,6 +2227,7 @@
     var x = $(".sh-x", el), nx = x.cloneNode(true); x.parentNode.replaceChild(nx, x);
     nx.addEventListener("click", function () { if (T.step > 1) { hap("selection"); T.step -= 1; render(-1); } else pop(false); });
     var W = $("#trW", el);
+    W.innerHTML = '<div class="tr-panes"></div><div class="tr-footw"></div>';
     function acc() { return payAccts.filter(function (a) { return a.id === T.sel; })[0]; }
     function showErr(m) { var e = $("#trErr", el); if (e) { e.textContent = m; e.hidden = !m; } if (m) hap("warning"); }
     function foot(btn) { return '<div class="tr-foot">' + btn + "</div>"; }
@@ -2413,8 +2414,20 @@
       }
       k.addEventListener("pointerup", end); k.addEventListener("pointercancel", end);
     }
+    // Le bas de page (Continuer / Transférer / curseur) est FIXE, hors du volet qui glisse : le bouton de verre natif
+    // ne bouge donc pas (et n'est jamais recréé, ce qui le faisait remonter depuis le bas). Seul le contenu glisse :
+    // étape suivante = de droite vers la gauche, retour = de gauche vers la droite.
     function render(dir) {
-      W.innerHTML = '<div class="tr-pane' + (dir ? " in" + (dir < 0 ? " back" : "") : "") + '">' + stepHtml() + "</div>";
+      var html = stepHtml(), fi = html.lastIndexOf('<div class="tr-foot">');
+      var body = fi < 0 ? html : html.slice(0, fi), ft = fi < 0 ? "" : html.slice(fi);
+      var P = $(".tr-panes", W), F = $(".tr-footw", W), old = P.lastElementChild, np;
+      if (dir && old) {
+        old.classList.remove("in", "back"); old.classList.add("out"); if (dir < 0) old.classList.add("back");
+        setTimeout(function () { if (old.parentNode) old.parentNode.removeChild(old); }, 460);
+        np = document.createElement("div"); np.className = "tr-pane in" + (dir < 0 ? " back" : ""); np.innerHTML = body; P.appendChild(np);
+      } else if (old) { old.innerHTML = body; }
+      else { np = document.createElement("div"); np.className = "tr-pane"; np.innerHTML = body; P.appendChild(np); }
+      F.innerHTML = ft;
       $$(".tr-prog i", el).forEach(function (b, i) { b.classList.toggle("on", i < Math.min(T.step, 3)); });
       $("#trStep", el).textContent = Math.min(T.step, 3) + "/3";
       nx.innerHTML = T.step > 1 ? ic("chev-left") : ic("x");
@@ -3468,7 +3481,7 @@
         $$(".sh-h.nav .nb-c", ord).forEach(function (b, n) { addO("o:" + (b.getAttribute("data-act") || n), b, iconOf(b)); });
         // Gros boutons sombres (Transférer, Continuer…) : verre teinté.
         $$(".pv-go, .btn-p", ord).forEach(function (b, n) {
-          if (!b.getBoundingClientRect().width) return;
+          if (!b.getBoundingClientRect().width || b.closest(".tr-pane.out")) return;
           var o = mk("o:cta" + n, "cta", b, { title: b.textContent.replace(/\s+/g, " ").trim(), icon: b.classList.contains("pv-go") ? "arrow-ur" : "", disabled: !!b.disabled, target: Math.round(target), drag: dragging });
           o.y = Math.round(o.y - tr);
           items.push(o);
