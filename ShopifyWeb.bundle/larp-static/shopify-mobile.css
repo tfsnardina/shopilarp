@@ -1033,3 +1033,25 @@ html.ios-bold .np-err{font-weight:650}
 html.ios-bold .ac-t b{font-weight:800}
 html.ios-bold .ac-add b{font-weight:800}
 html.ios-bold .ac-pref{font-weight:700}
+
+/* Welcome page (first launch) */
+#welcome{position:absolute;inset:0;z-index:92;background:#fff;display:flex;flex-direction:column;align-items:center;padding:calc(var(--top) + 18px) 24px calc(var(--bot) + 18px);text-align:center;color:var(--tx);opacity:0;transition:opacity .35s ease,transform .6s var(--ease)}
+#welcome.in{opacity:1}
+#welcome.out{opacity:0;transform:translateY(-4%);pointer-events:none;transition:opacity .5s ease,transform .6s var(--ease)}
+#welcome .wl-x{opacity:0;transform:translateY(16px)}
+#welcome.in .wl-x{animation:wlup .7s var(--d,0s) var(--ease) forwards}
+@keyframes wlup{to{opacity:1;transform:none}}
+.wl-logo .ic{width:50px;height:50px}
+.wl-art{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;width:100%}
+.wl-art svg{width:min(66vw,280px);height:auto;max-height:100%;animation:wlfloat 5s ease-in-out infinite}
+@keyframes wlfloat{50%{transform:translateY(-6px)}}
+.wl-txt{width:100%;flex:none}
+.wl-txt h1{margin:0;font-size:28px;line-height:1.15;font-weight:750;letter-spacing:-.7px}
+.wl-txt p{margin:10px 6px 0;font-size:17px;line-height:1.35;color:var(--tx2)}
+.wl-txt ul{list-style:none;margin:26px 0 0;padding:0}
+.wl-txt li{margin:0 0 14px;font-size:17px;font-weight:650}
+.wl-go{flex:none;width:100%;height:56px;margin-top:20px;border-radius:28px;background:#1a1a1a;color:#fff;font-size:18px;font-weight:600;transition:transform .15s,background .15s;box-shadow:0 10px 24px -12px rgba(0,0,0,.6)}
+.wl-go span{color:#fff}
+.wl-go:active{transform:scale(.97);background:#000}
+@media (max-height:700px){.wl-txt h1{font-size:24px}.wl-txt ul{margin-top:16px}.wl-txt li{margin-bottom:8px}.wl-art svg{width:min(52vw,220px)}}
+html.ios-bold .wl-txt h1{font-weight:850}
