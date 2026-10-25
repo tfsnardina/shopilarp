@@ -29,6 +29,7 @@ final class GlassChromeView: UIView {
 
     func apply(_ items: [[String: Any]]) {
         var seen = Set<String>()
+        var moves: [(GlassChromeItem, CGFloat, Bool)] = []
         UIView.performWithoutAnimation {
             for d in items {
                 guard let id = d["id"] as? String, let kind = d["kind"] as? String else { continue }
@@ -60,7 +61,7 @@ final class GlassChromeView: UIView {
                     let target = CGFloat((d["target"] as? NSNumber)?.doubleValue ?? 0)
                     let drag = (d["drag"] as? Bool) == true
                     if isNew { item.transform = CGAffineTransform(translationX: 0, y: max(target, bounds.height)); item.sheetTarget = .infinity }
-                    sheetMove(item, to: target, drag: drag)
+                    moves.append((item, target, drag))
                 }
             }
             for (id, v) in views where !seen.contains(id) {
@@ -68,6 +69,8 @@ final class GlassChromeView: UIView {
                 views[id] = nil
             }
         }
+        // Hors du bloc « sans animation » : sinon la montée de la feuille serait sautée.
+        for (item, target, drag) in moves { sheetMove(item, to: target, drag: drag) }
     }
 
     func reset() { apply([]) }
@@ -127,9 +130,10 @@ class GlassChromeItem: UIView {
         }
     }
 
-    static func glass(interactive: Bool = true) -> UIVisualEffectView {
+    static func glass(interactive: Bool = true, tint: UIColor? = nil) -> UIVisualEffectView {
         let effect = UIGlassEffect()
         effect.isInteractive = interactive
+        if let tint { effect.tintColor = tint }
         let v = UIVisualEffectView(effect: effect)
         v.cornerConfiguration = .capsule()
         return v
@@ -170,22 +174,27 @@ private let glassSymbols: [String: String] = [
     "print": "printer",
     "search": "magnifyingglass",
     "chev-down": "chevron.down",
+    "chev-left": "chevron.left",
+    "arrow-ur": "arrow.up.right",
 ]
 
 /// Bouton rond (ou capsule avec texte) en verre.
 @available(iOS 26.0, *)
 final class GlassButtonItem: GlassChromeItem {
-    private let glass = GlassChromeItem.glass()
+    private let glass: UIVisualEffectView
     private let button = UIButton(type: .system)
     private let dot = UIView()
     private var iconKey = ""
     private var titleKey = ""
 
     override init(kind: String, id: String) {
+        glass = kind == "cta"
+            ? GlassChromeItem.glass(tint: UIColor(white: 0.14, alpha: 0.92))
+            : GlassChromeItem.glass()
         super.init(kind: kind, id: id)
         addSubview(glass)
         glass.contentView.addSubview(button)
-        button.tintColor = GlassChromeItem.ink
+        button.tintColor = kind == "cta" ? .white : GlassChromeItem.ink
         button.addAction(UIAction { [weak self] _ in
             guard let self else { return }
             Haptics.play("light")
@@ -210,12 +219,19 @@ final class GlassButtonItem: GlassChromeItem {
             iconKey = icon
             titleKey = title
             var config = UIButton.Configuration.plain()
-            config.baseForegroundColor = GlassChromeItem.ink
+            config.baseForegroundColor = kind == "cta" ? .white : GlassChromeItem.ink
             config.contentInsets = .zero
-            if kind == "txt" {
+            if kind == "txt" || kind == "cta" {
                 var t = AttributedString(title)
-                t.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+                t.font = UIFont.systemFont(ofSize: kind == "cta" ? 17 : 16, weight: .semibold)
                 config.attributedTitle = t
+                if kind == "cta", let name = glassSymbols[icon] {
+                    config.image = UIImage(
+                        systemName: name,
+                        withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+                    )
+                    config.imagePadding = 8
+                }
             } else if let name = glassSymbols[icon] {
                 let size: CGFloat = kind == "mini" ? 12 : 19
                 let weight: UIImage.SymbolWeight = kind == "mini" ? .bold : .medium
@@ -227,6 +243,9 @@ final class GlassButtonItem: GlassChromeItem {
             button.configuration = config
         }
         dot.isHidden = (d["dot"] as? Bool) != true
+        let disabled = (d["disabled"] as? Bool) == true
+        button.isEnabled = !disabled
+        glass.contentView.alpha = disabled ? 0.45 : 1
     }
 
     override func layoutSubviews() {
