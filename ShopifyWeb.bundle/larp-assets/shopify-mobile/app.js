@@ -1085,14 +1085,30 @@
     });
     return out;
   }
+  /* ── Pages claires Liquid Glass (Commandes / Produits) ── */
+  var IMG = "larp-assets/shopify-mobile/img/";
+  var glStatus = false;
+  function glHead(title, act, btns) {
+    return '<header class="gl-hd"><button class="gl-tt" data-act="' + act + '"><span>' + title + '</span><i class="gl-chev">' + ic("chev-down") + '</i></button><span class="fl"></span>' + btns + "</header>";
+  }
+  function glBtn(act, label, icon) { return '<button class="gl-btn" data-act="' + act + '" aria-label="' + label + '">' + ic(icon) + "</button>"; }
   function renderOrders() {
     var el = $("#s-orders");
+    el.classList.add("gl-scr");
     var list = orders.filter(orderMatches);
-    el.innerHTML = '<div class="tab-top"><header class="th-hd"><button class="tt" data-act="locations">Orders' + ic("chev-down") + '</button><span class="fl"></span><button class="hb" data-act="neworder" aria-label="Create order">' + ic("plus-circle") + '</button><button class="hb" data-act="ordermore" aria-label="More">' + ic("more") + "</button></header></div>" +
-      '<div class="sheet-body">' +
+    var none = !orders.length && !oQuery && oFilter === "All";
+    var head = glHead("Orders", "locations", glBtn("neworder", "Create order", "plus-circle") + (none ? "" : glBtn("ordermore", "More", "more")));
+    if (none) {
+      el.innerHTML = '<div class="gl-page">' + head + '<div class="gl-body"><div class="gl-empty olist" id="olist">' +
+        '<img class="gl-hero" src="' + IMG + 'orders-hero.webp" alt="" width="220" height="200">' +
+        "<h2>Get your first order</h2><p>Use Quick Sale to sell anywhere, to anyone, right from your phone</p>" +
+        '<button class="gl-cta" data-act="quicksale">Set up Quick Sale</button></div></div></div>';
+      return;
+    }
+    el.innerHTML = '<div class="gl-page">' + head + '<div class="gl-body">' +
       '<div class="sbar"><label class="sfield">' + ic("search") + '<input id="oq" type="search" placeholder="All locations" value="' + esc(oQuery) + '" autocomplete="off"></label><button class="cb" data-act="locations" aria-label="Locations">' + ic("location") + '</button><button class="cb dot" data-act="sort" aria-label="Sort">' + ic("sort") + '</button><button class="cb" data-act="ofilter" aria-label="Filter">' + ic("filter") + "</button></div>" +
       '<div class="chips">' + ["All", "Unfulfilled", "Unpaid", "Open", "Archived"].map(function (c) { return '<button class="chip' + (c === oFilter ? " on" : "") + '" data-of="' + c + '">' + c + "</button>"; }).join("") + "</div>" +
-      '<div class="olist" id="olist">' + (list.length ? orderList(list, oShown) : emptyState("No orders found", "Try changing the filters or search term")) + "</div></div>";
+      '<div class="olist" id="olist">' + (list.length ? orderList(list, oShown) : emptyState("No orders found", "Try changing the filters or search term")) + "</div></div></div>";
     $$(".chip", el).forEach(function (b) { b.addEventListener("click", function () { oFilter = b.getAttribute("data-of"); oShown = 40; hap(5); renderOrders(); }); });
     var q = $("#oq");
     q.addEventListener("input", function () { oQuery = q.value; var l = orders.filter(orderMatches); $("#olist").innerHTML = l.length ? orderList(l, oShown) : emptyState("No orders found", "Try changing the filters or search term"); });
@@ -1111,12 +1127,26 @@
   function prodsSorted(l) { return EMPTY ? l.slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0) || a.i - b.i; }) : l; }
   function renderProducts() {
     var el = $("#s-products");
+    el.classList.add("gl-scr");
     var list = prodsSorted(prods.filter(function (p) { return (pFilter === "All" || p.status === pFilter) && (!pQuery || p.title.toLowerCase().indexOf(pQuery.toLowerCase()) >= 0); }));
-    el.innerHTML = '<div class="tab-top"><header class="th-hd"><button class="tt" data-act="prodviews">Products' + ic("chev-down") + '</button><span class="fl"></span><button class="hb" data-act="newproduct" aria-label="Add product">' + ic("plus-circle") + '</button><button class="hb txt" data-act="select">Select</button></header></div>' +
-      '<div class="sheet-body">' +
+    var none = !prods.length && !pQuery && pFilter === "All";
+    var head = glHead("Products", "prodviews", glBtn("newproduct", "Add product", "plus-circle") + (none ? "" : '<button class="gl-btn txt" data-act="select">Select</button>'));
+    var trial = '<div class="gl-dock"><button class="gl-trial" data-act="trial"><b>Subscribe to keep selling</b><span><i></i>3 days left</span></button></div>';
+    if (none) {
+      el.innerHTML = '<div class="gl-page">' + head + '<div class="gl-body"><div class="gl-empty gl-empty-p">' +
+        '<img class="gl-hero" src="' + IMG + 'products-hero.webp" alt="" width="143" height="143">' +
+        "<h2>Add your first product</h2><p>Start by adding products to your store that your customers will love</p>" +
+        '<button class="gl-cta" data-act="newproduct">Add your products</button>' +
+        '<h3 class="gl-sub">Other ways to add products</h3><div class="gl-cards">' +
+        '<button class="gl-card" data-act="discover"><b>Discover products to sell</b><img class="gl-c1" src="' + IMG + 'card-discover.webp" alt=""></button>' +
+        '<button class="gl-card" data-act="sampleproduct"><b>Add a sample product</b><img class="gl-c2" src="' + IMG + 'card-sample.webp" alt=""></button>' +
+        "</div></div></div>" + trial + "</div>";
+      return;
+    }
+    el.innerHTML = '<div class="gl-page">' + head + '<div class="gl-body">' +
       '<div class="sbar"><label class="sfield">' + ic("search") + '<input id="pq" type="search" placeholder="Filter products" value="' + esc(pQuery) + '" autocomplete="off"></label><button class="cb" data-act="sort" aria-label="Sort">' + ic("sort") + '</button><button class="cb" data-act="pfilter" aria-label="Filter">' + ic("filter") + "</button></div>" +
       '<div class="chips">' + ["All", "Active", "Draft", "Archived"].map(function (c) { return '<button class="chip' + (c === pFilter ? " on" : "") + '" data-pf="' + c + '">' + c + "</button>"; }).join("") + "</div>" +
-      '<div class="plist" id="plist">' + (list.length ? list.map(prodRow).join("") : emptyState("No products found", "Try changing the filters or search term")) + "</div></div>";
+      '<div class="plist" id="plist">' + (list.length ? list.map(prodRow).join("") : emptyState("No products found", "Try changing the filters or search term")) + "</div></div>" + trial + "</div>";
     $$(".chip", el).forEach(function (b) { b.addEventListener("click", function () { pFilter = b.getAttribute("data-pf"); hap(5); renderProducts(); }); });
     var q = $("#pq");
     q.addEventListener("input", function () { pQuery = q.value; var l = prodsSorted(prods.filter(function (p) { return (pFilter === "All" || p.status === pFilter) && p.title.toLowerCase().indexOf(pQuery.toLowerCase()) >= 0; })); $("#plist").innerHTML = l.length ? l.map(prodRow).join("") : emptyState("No products found", "Try changing the filters or search term"); });
@@ -1174,6 +1204,7 @@
     app.appendChild(el);
     drawerEl = el;
     postDrawer(true);
+    statusBar("light");
     $("#tabbar").classList.add("hide");
     try { history.pushState({ dr: 1 }, ""); } catch (e) { }
     $$(".dr-item, .dr-head, .dr-add", el).forEach(function (r, k) { r.style.setProperty("--d", Math.min(k, 16) * 14 + "ms"); });
@@ -1199,6 +1230,7 @@
     if (!drawerEl) return;
     var el = drawerEl; drawerEl = null;
     postDrawer(false);
+    statusBar(glStatus ? "dark" : "light");
     el.classList.remove("on");
     $("#tabbar").classList.toggle("hide", !!(stack.length && stack[stack.length - 1].el.hasAttribute("data-notabs")));
     if (!fromHistory) { ignorePop++; try { history.back(); } catch (e) { ignorePop--; } }
@@ -1242,6 +1274,11 @@
     $$("#tabbar .tb").forEach(function (t) { t.classList.toggle("on", t.getAttribute("data-tab") === name); });
     moveInd();
     app.classList.toggle("dark-top", true);
+    var gl = name === "orders" || name === "products";
+    if (gl !== glStatus) {
+      glStatus = gl;
+      if (!document.getElementById("splash") && !document.getElementById("loading") && !document.getElementById("welcome") && !document.getElementById("login")) statusBar(gl ? "dark" : "light");
+    }
   }
   function moveInd() {
     var on = $("#tabbar .tb.on"), ind = $(".tb-ind");
@@ -2513,6 +2550,13 @@
       case "prodviews": return optSheet("Products", ["Products", "Collections", "Inventory", "Purchase orders", "Transfers", "Gift cards"], "Products", function (v) { if (v !== "Products") toast(v + " opens on the full admin"); });
       case "neworder": return optSheet("Create", ["Create order", "Create draft order"], "", function (v) { toast(v + " started"); });
       case "newproduct": return openNewProduct();
+      case "discover": return toast("Product sourcing opens on the full admin");
+      case "trial": return toast("Choose a plan on the full admin");
+      case "sampleproduct":
+        hap(8);
+        createProduct({ title: "Sample product", price: 29, compare: 0, inv: 25, vars: "", type: "General", status: "Active", img: "" });
+        pFilter = "All"; pQuery = ""; rendered.products = 0; renderProducts();
+        return toast("Sample product added");
       case "scan": return toast("Camera access is needed to scan barcodes");
       case "print": return toast("Preparing packing slip…");
       case "track": return toast("Opening tracking…");
