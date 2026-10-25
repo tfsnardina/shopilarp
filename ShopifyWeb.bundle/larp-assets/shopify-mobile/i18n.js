@@ -399,6 +399,8 @@
     /* search + sidekick */
     ["Recent searches", "Recherches récentes", "Búsquedas recientes", "Letzte Suchen"],
     ["Filters are not available yet", "Les filtres ne sont pas encore disponibles", "Los filtros aún no están disponibles", "Filter sind noch nicht verfügbar"],
+    ["Thinking", "Réflexion en cours", "Pensando", "Denke nach"],
+    ["Hi! Good to see you again \ud83d\ude0a Want to make progress on your store today?", "Salut ! Ravi de te retrouver \ud83d\ude0a Tu veux qu’on avance sur ta boutique aujourd’hui ?", "¡Hola! Qué bueno verte de nuevo \ud83d\ude0a ¿Avanzamos con tu tienda hoy?", "Hallo! Schön, dich wiederzusehen \ud83d\ude0a Sollen wir heute mit deinem Shop weiterkommen?"],
     ["Everything", "Tout", "Todo", "Alles"],
     ["No recent searches", "Aucune recherche récente", "Sin búsquedas recientes", "Keine letzten Suchen"],
     ["Chat history", "Historique du chat", "Historial del chat", "Chatverlauf"],
