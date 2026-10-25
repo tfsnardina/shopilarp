@@ -1109,10 +1109,11 @@
   }
   function orderRow(o) {
     var n = units(o);
+    var fulBy = o.ful === "Fulfilled" || o.pay === "Refunded" ? L10n(o.shipM) : L10n("Fulfill by:") + " " + mdyL(o.ts + (o.shipM === "Express Shipping" ? 1 : 3) * DAY) + " \u2022 " + L10n(shipShort(o.shipM));
     return '<button class="orow" data-order="' + o.n + '"><div class="or1"><b>#' + o.n + "</b><b>" + money(o.total) + "</b></div>" +
-      '<div class="or2">' + esc(o.c ? o.c.name : "No customer") + " • " + n + " item" + (n === 1 ? "" : "s") + " • " + hmPad(o.ts) + "</div>" +
+      '<div class="or2"><span>' + esc(o.c ? o.c.name : "No customer") + "</span><span>" + n + " item" + (n === 1 ? "" : "s") + "</span><span>" + hmPad(o.ts) + "</span></div>" +
       '<div class="or3">' + fulBadge(o) + payBadge(o) + (o.note ? ic("note", "on") : "") + "</div>" +
-      '<div class="or4">' + esc(o.ch === "Point of Sale" ? "Point of Sale" : o.ful === "Fulfilled" || o.pay === "Refunded" ? o.shipM : L10n("Fulfill by:") + " " + mdyL(o.ts + (o.shipM === "Express Shipping" ? 1 : 3) * DAY) + " \u2022 " + L10n(shipShort(o.shipM))) + "</div></button>";
+      '<div class="or4">' + esc(o.ch === "Point of Sale" ? L10n("Point of Sale") : fulBy) + "</div></button>";
   }
   function orderList(list, limit) {
     var out = "", last = "";
@@ -1589,7 +1590,7 @@
     ["Items", "Payment", "Fulfillment", "Contact information", "Customer", "Notes", "Conversion summary", "Order risk", "Timeline", "Total",
       "Fulfill items", "Capture payment", "Mark as paid", "Track", "Email details", "Phone details", "Address", "Copy address", "Copied", "Print", "More actions",
       "Edit order", "Refund", "Print packing slip", "Archive", "Tracking number", "Add tracking number", "Shipping carrier",
-      "Send shipment details to your customer now", "Cancel", "Order status", "No phone number", "No contact details"].forEach(function (key) { lb[key] = T(key); });
+      "Send shipment details to your customer now", "Cancel", "Order status", "No phone number", "No contact details", "No customer", "Shipping and billing address", "Products"].forEach(function (key) { lb[key] = T(key); });
     return {
       mode: "order", n: o.n, title: "#" + o.n,
       sub: T(relAt(o.ts)) + " \u2022 " + T(o.ch === "Online Store" ? "Online store" : o.ch),
