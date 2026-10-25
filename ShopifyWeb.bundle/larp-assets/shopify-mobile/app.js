@@ -1140,6 +1140,19 @@
   ];
   var CHANNELS = [["onlinestore", "Online Store", "d-store", ["Themes", "Pages", "Navigation", "Preferences"]], ["inbox", "Inbox", "d-inbox"], ["pos", "Point of Sale", "d-pos"], ["shop", "Shop", "d-shop"], ["social", "Facebook & Instagram", "d-social"]];
   var drawerEl = null;
+  /* Barre du bas du menu en Liquid Glass natif (iOS 26) : la barre web reste dans le DOM (invisible) et sert de relais. */
+  function postDrawer(open) {
+    try {
+      var mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpDrawer;
+      if (mh) mh.postMessage({ open: !!open });
+    } catch (e) { }
+  }
+  window.__larpNativeDrawer = function (name) {
+    if (!drawerEl) return;
+    var sel = name === "close" ? "[data-dclose]" : '[data-go="' + name + '"]';
+    var b = drawerEl.querySelector(".dr-bot " + sel);
+    if (b) b.click();
+  };
   function drawerRow(r, activeKey) {
     var kids = r[3];
     return '<div class="dr-item' + (r[0] === activeKey ? " cur" : "") + '"><div class="dr-row" data-go="' + r[0] + '">' + ic(r[2]) + "<span>" + esc(r[1]) + "</span>" +
@@ -1160,6 +1173,7 @@
       '<div class="dr-bot"><button class="dr-c" data-go="settings" aria-label="Settings">' + ic("settings") + '</button><button class="dr-qs" data-go="quicksale">' + ic("tap") + '<span>Quick sale</span></button><button class="dr-c" data-dclose aria-label="Close">' + ic("x") + "</button></div>";
     app.appendChild(el);
     drawerEl = el;
+    postDrawer(true);
     $("#tabbar").classList.add("hide");
     try { history.pushState({ dr: 1 }, ""); } catch (e) { }
     $$(".dr-item, .dr-head, .dr-add", el).forEach(function (r, k) { r.style.setProperty("--d", Math.min(k, 16) * 14 + "ms"); });
@@ -1184,6 +1198,7 @@
   function closeDrawer(fromHistory) {
     if (!drawerEl) return;
     var el = drawerEl; drawerEl = null;
+    postDrawer(false);
     el.classList.remove("on");
     $("#tabbar").classList.toggle("hide", !!(stack.length && stack[stack.length - 1].el.hasAttribute("data-notabs")));
     if (!fromHistory) { ignorePop++; try { history.back(); } catch (e) { ignorePop--; } }
