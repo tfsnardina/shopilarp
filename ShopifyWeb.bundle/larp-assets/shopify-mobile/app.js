@@ -2181,7 +2181,19 @@
     idle();
     setTimeout(function () { try { inp.focus({ preventScroll: true }); } catch (e) { } }, 320);
   }
-  function openSidekickChat(first) {
+  var skThread = [];
+  function skAnswer(q) {
+  var R = rangeData("30d"), Rt = rangeData("today");
+  if (/^\s*(salut|bonjour|bonsoir|coucou|hello|hi|hey|hola|hallo|yo)\b/i.test(q)) return "Hi! Good to see you again \ud83d\ude0a Want to make progress on your store today?";
+    var ql = ((window.I18N ? window.I18N.en(q) : q) + " " + q).toLowerCase(), top = prods.slice().sort(function (x, y) { return y.sold - x.sold; });
+    var c30 = change(R.tot.s, R.ptot.s);
+    if (/today|sales|doing|revenue|aujourd|ventes|chiffre|hoy|ventas|heute|umsatz|verk/.test(ql)) return "Today you\u2019ve made " + money(Rt.tot.s) + " from " + count(Rt.tot.o) + " order" + (Rt.tot.o === 1 ? "" : "s") + ". Over the last 30 days, total sales are " + money(R.tot.s) + (c30 !== null ? ", " + (c30 >= 0 ? "up " : "down ") + Math.abs(Math.round(c30)) + "% from the 30 days before." : ".");
+    if (/best|top|seller|product|meilleur|produit|mejor|producto|beste|produkt/.test(ql)) return "Your best seller over the last 30 days is " + top[0].title + " with " + count(top[0].sold) + " units sold" + (top[1] ? ", followed by " + top[1].title + " (" + count(top[1].sold) + ")." : ".");
+    if (/attention|order|fulfill|commande|traiter|pedido|preparar|bestell|erfüll/.test(ql)) { var u = unfulfilled(), c = toCapture().length; return "You have " + u.length + " order" + (u.length === 1 ? "" : "s") + " to fulfill" + (c ? " and " + c + " payment" + (c === 1 ? "" : "s") + " to capture" : "") + ". The oldest unfulfilled order is #" + (u.slice(-1)[0] || { n: S.lastN }).n + "."; }
+    if (/description|write|rédig|écri|escrib|schreib|beschreib/.test(ql)) return "Here\u2019s a draft for " + top[0].title + ":\n\nMade for everyday wear, the " + top[0].title + " pairs a clean silhouette with materials that hold up wash after wash. It\u2019s the piece you\u2019ll reach for first.";
+    return "Your store has " + count(S.custTotal) + " customers and " + count(R.tot.o) + " orders in the last 30 days. I can dig into sales, products, orders or customers, or help you write and edit content.";
+  }
+  function openSidekickChat(first, replay) {
     var R = rangeData("30d"), Rt = rangeData("today");
     var sugg = ["How are sales today?", "What are my best sellers?", "Which orders need attention?", "Write a product description"];
     var g = greeting().replace("!", "");
@@ -2191,15 +2203,6 @@
       '<div class="sk-bar"><input id="skq" placeholder="Ask anything..." autocomplete="off" enterkeyhint="send"><button class="sk-plus" aria-label="Attach">' + ic("plus") + '</button><button class="sk-go" id="skgo" aria-label="Voice"><span class="wave"><i></i><i></i><i></i><i></i></span></button></div></div>';
     var el = page(body, { cls: "sidekick", title: "New conversation", titleChev: true, notabs: true, actions: '<button class="nb-c" data-act="sknew" aria-label="Private chat">' + ic("view") + "</button>" });
     var log = $("#sklog", el), qi = $("#skq", el), go = $("#skgo", el);
-    function answer(q) {
-      var ql = ((window.I18N ? window.I18N.en(q) : q) + " " + q).toLowerCase(), top = prods.slice().sort(function (x, y) { return y.sold - x.sold; });
-      var c30 = change(R.tot.s, R.ptot.s);
-      if (/today|sales|doing|revenue|aujourd|ventes|chiffre|hoy|ventas|heute|umsatz|verk/.test(ql)) return "Today you\u2019ve made " + money(Rt.tot.s) + " from " + count(Rt.tot.o) + " order" + (Rt.tot.o === 1 ? "" : "s") + ". Over the last 30 days, total sales are " + money(R.tot.s) + (c30 !== null ? ", " + (c30 >= 0 ? "up " : "down ") + Math.abs(Math.round(c30)) + "% from the 30 days before." : ".");
-      if (/best|top|seller|product|meilleur|produit|mejor|producto|beste|produkt/.test(ql)) return "Your best seller over the last 30 days is " + top[0].title + " with " + count(top[0].sold) + " units sold" + (top[1] ? ", followed by " + top[1].title + " (" + count(top[1].sold) + ")." : ".");
-      if (/attention|order|fulfill|commande|traiter|pedido|preparar|bestell|erfüll/.test(ql)) { var u = unfulfilled(), c = toCapture().length; return "You have " + u.length + " order" + (u.length === 1 ? "" : "s") + " to fulfill" + (c ? " and " + c + " payment" + (c === 1 ? "" : "s") + " to capture" : "") + ". The oldest unfulfilled order is #" + (u.slice(-1)[0] || { n: S.lastN }).n + "."; }
-      if (/description|write|rédig|écri|escrib|schreib|beschreib/.test(ql)) return "Here\u2019s a draft for " + top[0].title + ":\n\nMade for everyday wear, the " + top[0].title + " pairs a clean silhouette with materials that hold up wash after wash. It\u2019s the piece you\u2019ll reach for first.";
-      return "Your store has " + count(S.custTotal) + " customers and " + count(R.tot.o) + " orders in the last 30 days. I can dig into sales, products, orders or customers, or help you write and edit content.";
-    }
     function ask(q) {
       if (!q) return;
       $("#sksug", el).classList.add("gone"); $("#skhi", el).classList.add("gone");
@@ -2207,7 +2210,7 @@
       var b = document.createElement("div"); b.className = "sk-a typing"; b.innerHTML = "<i></i><i></i><i></i>"; log.appendChild(b);
       var pb = $(".pg-b", el); pb.scrollTop = pb.scrollHeight;
       setTimeout(function () {
-        var txt = answer(q), k = 0; if (window.I18N) txt = window.I18N.tr(txt); b.classList.remove("typing"); b.textContent = "";
+        var txt = skAnswer(q), k = 0; if (window.I18N) txt = window.I18N.tr(txt); skThread.push({ q: q, a: txt }); b.classList.remove("typing"); b.textContent = "";
         var timer = setInterval(function () {
           k += 2 + Math.floor(Math.random() * 3); b.textContent = txt.slice(0, k); pb.scrollTop = pb.scrollHeight;
           if (k >= txt.length) { clearInterval(timer); b.insertAdjacentHTML("afterend", '<div class="sk-fb"><button aria-label="Good response">' + ic("thumb-up") + '</button><button aria-label="Bad response">' + ic("thumb-down") + "</button></div>"); }
@@ -2219,6 +2222,10 @@
     qi.addEventListener("input", sync);
     qi.addEventListener("keydown", function (e) { if (e.key === "Enter") { ask(qi.value.trim()); qi.value = ""; sync(); } });
     go.addEventListener("click", function () { if (qi.value.trim()) { ask(qi.value.trim()); qi.value = ""; sync(); } else toast("Listening\u2026"); });
+    if (replay && replay.length) {
+      $("#sksug", el).classList.add("gone"); $("#skhi", el).classList.add("gone");
+      replay.forEach(function (m) { log.insertAdjacentHTML("beforeend", '<div class="sk-u">' + esc(m.q) + '</div><div class="sk-a">' + esc(m.a) + "</div>"); });
+    }
     if (first) setTimeout(function () { ask(first); }, 480);
   }
   /* Sidekick : barre flottante au-dessus du clavier (bouton droit de la barre d'onglets) */
@@ -2226,32 +2233,45 @@
   function openSidekick() {
     if (skEl) return;
     var el = document.createElement("div");
-    el.className = "sk-ov";
+    el.className = "sk-ov" + (skThread.length ? " has-thread" : "");
     el.innerHTML = '<div class="sk-ov-scrim" data-skclose></div><div class="sk-ov-dock">' +
+      '<span class="sk-grab"></span><div class="sk-ans" id="skov-ans"></div>' +
       '<div class="sk-ov-top"><button class="sk-glass sk-hist" data-skhist>' + ic("recent") + "<span>Chat history</span></button>" +
       '<button class="sk-glass sk-circ sk-opts" data-skopts aria-label="Options">' + ic("filter") + "</button></div>" +
+      '<button class="sk-glass sk-chev" data-skexpand aria-label="Expand">' + ic("chev-down") + "</button>" +
       '<div class="sk-ov-row"><div class="sk-glass sk-card"><input id="skov-q" placeholder="Work with Sidekick" autocomplete="off" enterkeyhint="send">' +
       '<div class="sk-card-bar"><span class="sk-face">' + mascot() + '</span><span class="sk-fill"></span>' +
-      '<button class="sk-ib" data-skplus aria-label="Attach">' + ic("plus") + '</button><button class="sk-ib" id="skov-go" aria-label="Voice">' + ic("mic") + "</button></div></div>" +
+      '<button class="sk-ib" data-skplus aria-label="Attach">' + ic("plus") + '</button><button class="sk-ib" id="skov-go" aria-label="Voice">' + ic("mic") + "</button></div>" +
+      '<div class="sk-think"><span class="sk-face">' + mascot() + '</span><span class="sk-thinking">Thinking</span><span class="sk-fill"></span>' +
+      '<button class="sk-ib" data-skplus aria-label="Attach">' + ic("plus") + '</button><button class="sk-ib sk-stop" data-skstop aria-label="Stop"><i></i></button></div></div>' +
       '<button class="sk-glass sk-circ sk-x" data-skclose aria-label="Close">' + ic("x") + "</button></div></div>";
     app.appendChild(el);
     skEl = el;
     $("#tabbar").classList.add("hide");
     try { history.pushState({ sk: 1 }, ""); } catch (e) { }
-    var qi = $("#skov-q", el), go = $("#skov-go", el);
+    var qi = $("#skov-q", el), go = $("#skov-go", el), ans = $("#skov-ans", el), timer = null, typer = null;
     function sync() { var has = !!qi.value.trim(); go.classList.toggle("send", has); go.innerHTML = has ? ic("arrow-up") : ic("mic"); }
+    function reset() { clearTimeout(timer); clearInterval(typer); el.classList.remove("thinking", "answered"); }
     function send() {
       var q = qi.value.trim(); if (!q) return;
-      hap(5); closeSidekick();
-      setTimeout(function () { openSidekickChat(q); }, 360);
+      hap(5); reset(); qi.value = ""; sync(); qi.blur();
+      el.classList.add("thinking");
+      timer = setTimeout(function () {
+        var txt = skAnswer(q), k = 0; if (window.I18N) txt = window.I18N.tr(txt);
+        skThread.push({ q: q, a: txt });
+        el.classList.remove("thinking"); el.classList.add("answered", "has-thread"); ans.textContent = "";
+        typer = setInterval(function () { k += 2 + Math.floor(Math.random() * 3); ans.textContent = txt.slice(0, k); if (k >= txt.length) clearInterval(typer); }, 22);
+      }, 1700);
     }
     qi.addEventListener("input", sync);
     qi.addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
     go.addEventListener("click", function () { if (qi.value.trim()) send(); else toast("Listening\u2026"); });
     el.addEventListener("click", function (e) {
-      var t = e.target.closest("[data-skclose],[data-skhist],[data-skopts],[data-skplus]");
+      var t = e.target.closest("[data-skclose],[data-skhist],[data-skopts],[data-skplus],[data-skstop],[data-skexpand]");
       if (!t) return;
       if (t.hasAttribute("data-skclose")) { hap(4); return closeSidekick(); }
+      if (t.hasAttribute("data-skstop")) { hap(4); reset(); return setTimeout(function () { try { qi.focus({ preventScroll: true }); } catch (er) { } }, 80); }
+      if (t.hasAttribute("data-skexpand")) { hap(5); closeSidekick(); return setTimeout(function () { openSidekickChat(null, skThread); }, 360); }
       if (t.hasAttribute("data-skhist")) { hap(4); return toast("No previous chats"); }
       if (t.hasAttribute("data-skopts")) { hap(4); return toast("Private chat"); }
       if (t.hasAttribute("data-skplus")) { hap(4); return toast("Attachments are not available yet"); }
