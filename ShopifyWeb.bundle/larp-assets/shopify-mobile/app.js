@@ -239,7 +239,7 @@
       prods.forEach(function (p) { inv[p.title] = [p.inv, p.baseInv, p.sold]; });
       var snap = {
         v: STATE_V, D: D, hrT: HR.t, purchased: live.purchased, custTotal: S.custTotal, custs: cl, inv: inv,
-        pay: { base: Number(CFG.payoutBalance) || 0, bal: S.payout || 0, tr: transfers, bank: payBank },
+        pay: { base: Number(CFG.payoutBalance) || 0, bal: S.payout || 0, tr: transfers, accts: payAccts, pp: payPal, sel: paySel },
         orders: list.map(function (o) {
           var c = Object.assign({}, o);
           c.c = cl.indexOf(o.c);
@@ -288,16 +288,20 @@
   })();
   /* Payout balance, transfers and the saved bank account survive a relaunch.
      If the balance typed in Preferences changed since, the Preferences win. */
-  var payBank = { holder: "", iban: "" }, transfers = [], payEl = null;
+  var payAccts = [], payPal = "", paySel = "", transfers = [], payEl = null;
   (function restorePay() {
     if (!EMPTY) return;
     var pay = (savedSettingsObj().__state || {}).pay;
-    if (!pay || pay.base !== (Number(CFG.payoutBalance) || 0)) return;
+    if (!pay) return;
     try {
+      // Saved accounts always come back; balance and history only if the Preferences balance did not change.
+      if (Array.isArray(pay.accts)) payAccts = pay.accts.filter(function (x) { return x && x.iban; });
+      else if (pay.bank && pay.bank.iban) payAccts = [{ id: "a0", holder: String(pay.bank.holder || ""), iban: String(pay.bank.iban) }];
+      payPal = String(pay.pp || ""); paySel = String(pay.sel || (payAccts[0] ? payAccts[0].id : ""));
+      if (pay.base !== (Number(CFG.payoutBalance) || 0)) return;
       if (typeof pay.bal === "number") S.payout = pay.bal;
       transfers = Array.isArray(pay.tr) ? pay.tr : [];
       transfers.slice().reverse().forEach(function (t) { payouts.unshift(t); });
-      if (pay.bank) payBank = { holder: String(pay.bank.holder || ""), iban: String(pay.bank.iban || "") };
     } catch (e) { }
   })();
   setInterval(saveState, 3000);
@@ -1763,6 +1767,13 @@
     S.payout = (S.payout || 0) + o.total;
     syncPayCard();
   }
+  function maskMail(e) { var m = String(e || "").split("@"); return m[0].slice(0, 1) + "***@" + (m[1] || ""); }
+  function payChip() {
+    var a = payAccts.filter(function (x) { return x.id === paySel; })[0] || payAccts[0];
+    if (a) return bankLabel(a.iban);
+    if (payPal) return "PayPal " + maskMail(payPal);
+    return "No bank account yet";
+  }
   function bankLabel(iban) { var t = String(iban || "").replace(/\s+/g, "").toUpperCase(); return t.slice(0, 4) + " •••• " + t.slice(-4); }
   function payStatus(p) {
     if (p.bank) return (nowMs() - p.ts) > 2 * DAY ? "Paid" : "In transit";
@@ -1775,7 +1786,7 @@
   function payRowHtml(p, k) {
     var st = payStatus(p), tr = st === "In transit";
     var sub = p.bank ? "<span>" + esc(mdLong(p.ts)) + " • " + esc(p.bank) + "</span>" : "<span>" + esc(mdLong(p.ts)) + " • " + count(p.n) + " order" + (p.n === 1 ? "" : "s") + "</span>";
-    return '<button class="pv-r pv-x" style="--d:' + (0.32 + Math.min(k, 8) * 0.06) + 's" data-po="' + k + '"><span class="pv-ic' + (p.bank ? "" : " o") + (tr ? " tr" : "") + '">' + (p.bank ? ARW : BAG) + '</span><div><b>' + (p.bank ? "Bank transfer" : "Payout") + "</b>" + sub + '</div><div class="po-a"><b>' + money(p.amt) + "</b>" + badge(st, tr ? "info" : "ok") + "</div></button>";
+    return '<button class="pv-r pv-x" style="--d:' + (0.32 + Math.min(k, 8) * 0.06) + 's" data-po="' + k + '"><span class="pv-ic' + (p.bank ? "" : " o") + (tr ? " tr" : "") + '">' + (p.bank ? ARW : BAG) + '</span><div><b>' + (p.bank ? (p.kind === "paypal" ? "PayPal" : "Bank transfer") : "Payout") + "</b>" + sub + '</div><div class="po-a"><b>' + money(p.amt) + "</b>" + badge(st, tr ? "info" : "ok") + "</div></button>";
   }
   function payoutsHtml() {
     var np = nextPayout(), bal = payBal(), list = payList();
@@ -1783,7 +1794,7 @@
     var moving = transfers.filter(function (t) { return payStatus(t) === "In transit"; }).reduce(function (a, t) { return a + t.amt; }, 0);
     var hero = '<div class="pv-hero pv-x"><div class="pv-top"><span class="pv-lb"><i></i>Available balance</span>' + (np ? '<span class="pv-chip">Estimated ' + md(np.ts) + "</span>" : "") + "</div>" +
       '<b class="pv-bal" id="pvBal">' + money(bal) + "</b>" +
-      '<div class="pv-acc">' + BANK + "<span>" + (payBank.iban ? esc(bankLabel(payBank.iban)) : "No bank account yet") + "</span></div>" +
+      '<div class="pv-acc">' + BANK + "<span>" + esc(payChip()) + "</span></div>" +
       '<button class="pv-go" data-act="transfer"' + (bal > 0 ? "" : " disabled") + ">" + ARW + "<span>Transfer</span></button></div>";
     var stats = transfers.length ? '<div class="pv-stats pv-x" style="--d:.2s"><div><span>In transit</span><b>' + money(moving) + "</b></div><div><span>Transferred</span><b>" + money(sent) + "</b></div></div>" : "";
     var rows = list.length ? list.slice(0, 30).map(payRowHtml).join("") :
@@ -1826,12 +1837,12 @@
     } catch (e) { }
   }
   // Bottom sheet shown once a transfer is sent: animated check + a little haptic choreography.
-  function paySuccess(amt, bank) {
+  function paySuccess(amt, bank, kind) {
     var body = '<div class="ok-w"><div class="ok-ic"><i class="ok-pulse"></i><i class="ok-pulse p2"></i>' +
       '<svg viewBox="0 0 72 72" width="88" height="88"><circle class="ok-c" cx="36" cy="36" r="30" fill="none" stroke="#1a9d54" stroke-width="4" stroke-linecap="round"/>' +
       '<path class="ok-k" d="M23 37.5l9.5 9.5L50 27" fill="none" stroke="#1a9d54" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
       '<h2 class="ok-t">Transfer sent</h2><b class="ok-a">' + money(amt) + '</b>' +
-      '<p class="ok-s"><span>Bank transfer</span> <span>' + esc(bank) + '</span></p>' +
+      '<p class="ok-s"><span>' + (kind === "paypal" ? "PayPal" : "Bank transfer") + '</span> <span>' + esc(bank) + '</span></p>' +
       '<button class="btn-p ok-b" id="okDone"><span>Done</span></button></div>';
     var el = sheet("", body, { cls: "tr-ok" });
     $("#okDone", el).addEventListener("click", function () { hap("light"); pop(false); });
@@ -1841,42 +1852,149 @@
     setTimeout(function () { hap("success"); }, 620);
     setTimeout(function () { hap("selection"); }, 900);
   }
+  var TRASH = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V5h6v2"/></svg>';
+  var PLUS = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+  var WAL = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 012-2h11v4M4 7v10a2 2 0 002 2h13a1 1 0 001-1V9a1 1 0 00-1-1H6a2 2 0 01-2-1zM16 14h2"/></svg>';
+  var BKS = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>';
+  var DEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11a1 1 0 011 1v10a1 1 0 01-1 1H9l-6-6 6-6zM12 10l5 4M17 10l-5 4"/></svg>';
+  // Transfer flow in 3 steps: 1/3 method (bank / PayPal), 2/3 amount (keypad), 3/3 account (saved banks or PayPal email).
   function openTransfer() {
     var bal = payBal();
     if (bal <= 0) return toast("Nothing to transfer");
     var dec = S.dec == null ? 2 : S.dec, sep = (1.1).toLocaleString(S.loc || "en-US").charAt(1);
     var toStr = function (c) { return (c / Math.pow(10, dec)).toFixed(dec).replace(".", sep); };
-    var toCents = function (v) { var n = parseFloat(String(v).replace(/[^\d.,]/g, "").replace(",", ".")); return isFinite(n) ? Math.round(n * Math.pow(10, dec)) : 0; };
-    var body = '<div class="tr-b"><div class="tr-bal"><span>Available balance</span><b>' + money(bal) + "</b></div>" +
-      '<div class="ff"><label class="fld"><span>Amount</span><div class="tr-amt"><input id="trAmt" inputmode="decimal" autocomplete="off" value="' + toStr(bal) + '"><button type="button" class="tr-max" id="trMax">Max</button></div></label>' +
-      '<label class="fld"><span>Account holder</span><input id="trName" autocomplete="name" value="' + esc(payBank.holder) + '"></label>' +
-      '<label class="fld"><span>IBAN</span><input id="trIban" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="FR76 0000 0000 0000 0000 0000 000" value="' + esc(payBank.iban) + '"></label></div>' +
-      '<p class="tr-err" id="trErr" hidden></p>' +
-      '<button class="btn-p" id="doTr"><span>Transfer</span><b id="trBtnAmt">' + money(bal) + "</b></button>" +
-      '<p class="tr-note">Transfers to a bank account usually arrive within 1 to 2 business days.</p></div>';
-    var el = sheet("Transfer", body, { navClose: true, cls: "notifs transfer" });
-    var amtI = $("#trAmt", el), btnAmt = $("#trBtnAmt", el), err = $("#trErr", el);
-    function showErr(m) { err.textContent = m; err.hidden = !m; }
-    amtI.addEventListener("input", function () { var c = toCents(amtI.value); btnAmt.textContent = money(c > 0 ? c : 0); showErr(""); });
-    $("#trMax", el).addEventListener("click", function () { amtI.value = toStr(payBal()); btnAmt.textContent = money(payBal()); showErr(""); });
-    $("#doTr", el).addEventListener("click", function () {
-      var c = toCents(amtI.value), name = $("#trName", el).value.trim(), iban = $("#trIban", el).value.replace(/\s+/g, "").toUpperCase();
-      if (c <= 0) return showErr("Enter a valid amount");
-      if (c > payBal()) return showErr("Amount is higher than your balance");
-      if (!name) return showErr("Enter the account holder's name");
-      if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) return showErr("Enter a valid IBAN");
-      var btn = this; btn.disabled = true; btn.classList.add("busy");
-      setTimeout(function () {
-        var amt = Math.min(c, payBal());
-        S.payout = payBal() - amt;
-        payBank = { holder: name, iban: iban };
-        var row = { ts: nowMs(), amt: amt, st: "In transit", n: 0, fees: 0, gross: amt, bank: bankLabel(iban), holder: name };
-        transfers.unshift(row); payouts.unshift(row);
-        pop(false);
-        saveState(); syncPayCard();
-        setTimeout(function () { paySuccess(amt, row.bank); notifyPayout(row); }, 260);
-      }, 900);
-    });
+    var toCents = function (v) { var n = parseFloat(String(v).replace(sep, ".")); return isFinite(n) ? Math.round(n * Math.pow(10, dec)) : 0; };
+    var T = { step: 1, method: payAccts.length || !payPal ? "bank" : "paypal", amt: "", sel: paySel || (payAccts[0] ? payAccts[0].id : ""), adding: !payAccts.length, email: payPal };
+    var el = sheet("Transfer", '<div class="tr-prog"><i></i><i></i><i></i></div><div class="tr-wrap" id="trW"></div>', { navClose: true, cls: "notifs transfer", actions: '<span class="tr-step" id="trStep">1/3</span>' });
+    var x = $(".sh-x", el), nx = x.cloneNode(true); x.parentNode.replaceChild(nx, x);
+    nx.addEventListener("click", function () { if (T.step > 1) { hap("selection"); T.step -= 1; render(-1); } else pop(false); });
+    var W = $("#trW", el);
+    function acc() { return payAccts.filter(function (a) { return a.id === T.sel; })[0]; }
+    function showErr(m) { var e = $("#trErr", el); if (e) { e.textContent = m; e.hidden = !m; } if (m) hap("warning"); }
+    function foot(btn) { return '<div class="tr-foot">' + btn + "</div>"; }
+    function stepHtml() {
+      if (T.step === 1) {
+        return '<h3 class="tr-h">Withdrawal method</h3><p class="tr-p">Choose how you want to receive your money.</p>' +
+          '<button class="tr-opt' + (T.method === "bank" ? " sel" : "") + '" data-m="bank"><span class="pv-ic">' + BKS + '</span><div><b>Bank account</b><span>1 to 2 business days</span></div><span class="rd"></span></button>' +
+          '<button class="tr-opt' + (T.method === "paypal" ? " sel" : "") + '" data-m="paypal"><span class="pv-ic">' + WAL + '</span><div><b>PayPal</b><span>Usually within minutes</span></div><span class="rd"></span></button>' +
+          foot('<button class="btn-p" id="trNext"><span>Continue</span></button>');
+      }
+      if (T.step === 2) {
+        var keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", dec > 0 ? sep : "", "0", "del"].map(function (k) {
+          return k === "" ? "<span></span>" : '<button class="tr-k" data-k="' + k + '"' + (k === "del" ? ' aria-label="Delete">' + DEL : ">" + k) + "</button>";
+        }).join("");
+        return '<div class="tr-amt2" id="trBox"><span class="cur">' + esc(S.sym) + '</span><b id="trAmtV">0</b></div>' +
+          '<div class="tr-chips"><span class="tr-chip">' + (T.method === "bank" ? BKS : WAL) + "<span>" + (T.method === "bank" ? "Bank account" : "PayPal") + '</span></span><button class="tr-chip" id="trMax"><b>' + money(bal) + "</b><span>Available</span></button></div>" +
+          '<div class="tr-pad">' + keys + "</div>" +
+          foot('<button class="btn-p" id="trNext" disabled><span>Continue</span><b id="trNextA"></b></button>');
+      }
+      var amtB = "<b>" + money(toCents(T.amt)) + "</b>";
+      if (T.method === "paypal") {
+        return '<h3 class="tr-h">PayPal email</h3><p class="tr-p">Enter the email linked to your PayPal account.</p>' +
+          '<div class="ff"><label class="fld"><span>PayPal email</span><input id="trMail" type="email" inputmode="email" autocapitalize="off" autocomplete="email" spellcheck="false" placeholder="name@example.com" value="' + esc(T.email) + '"></label></div><p class="tr-err" id="trErr" hidden></p>' +
+          foot('<button class="btn-p" id="trGo"><span>Transfer</span>' + amtB + "</button>");
+      }
+      var list = payAccts.map(function (a) {
+        return '<div class="tr-acc' + (a.id === T.sel && !T.adding ? " sel" : "") + '" data-id="' + esc(a.id) + '"><span class="rd"></span><span class="pv-ic">' + BKS + "</span><div><b>" + esc(a.holder) + "</b><span>" + esc(bankLabel(a.iban)) + '</span></div><button class="tr-del" data-del="' + esc(a.id) + '" aria-label="Remove">' + TRASH + "</button></div>";
+      }).join("");
+      var form = T.adding ? '<div class="tr-form ff"><label class="fld"><span>Account holder</span><input id="trName" autocomplete="name"></label>' +
+        '<label class="fld"><span>IBAN</span><input id="trIban" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="FR76 0000 0000 0000 0000 0000 000"></label>' +
+        '<p class="tr-err" id="trErr" hidden></p><button class="btn-p" id="trSave"><span>Save account</span></button>' + (payAccts.length ? '<button class="tr-lk" id="trCancel">Cancel</button>' : "") + "</div>"
+        : '<button class="tr-addrow" id="trAdd">' + PLUS + "<span>Add a bank account</span></button><p class=\"tr-err\" id=\"trErr\" hidden></p>";
+      return '<h3 class="tr-h">Choose an account</h3><p class="tr-p">Select where to send ' + money(toCents(T.amt)) + ".</p>" + list + form +
+        foot('<button class="btn-p" id="trGo"' + (T.adding ? " disabled" : "") + "><span>Transfer</span>" + amtB + "</button>");
+    }
+    function updAmt() {
+      var c = toCents(T.amt), over = c > bal, box = $("#trBox", el), nx2 = $("#trNext", el);
+      $("#trAmtV", el).textContent = T.amt || "0";
+      $("#trAmtV", el).style.fontSize = (T.amt.length > 9 ? 40 : T.amt.length > 7 ? 48 : "") + (T.amt.length > 7 ? "px" : "");
+      box.classList.toggle("over", over);
+      nx2.disabled = !(c > 0 && !over);
+      $("#trNextA", el).textContent = c > 0 ? money(c) : "";
+    }
+    function bind() {
+      $$(".tr-opt", el).forEach(function (b) { b.addEventListener("click", function () { T.method = b.getAttribute("data-m"); hap("selection"); $$(".tr-opt", el).forEach(function (o) { o.classList.toggle("sel", o === b); }); }); });
+      var next = $("#trNext", el);
+      if (next) next.addEventListener("click", function () { hap("light"); T.step += 1; render(1); });
+      if (T.step === 2) {
+        updAmt();
+        $$(".tr-k", el).forEach(function (k) {
+          k.addEventListener("click", function () {
+            var v = k.getAttribute("data-k"), before = T.amt;
+            if (v === "del") T.amt = T.amt.slice(0, -1);
+            else if (v === sep) { if (T.amt.indexOf(sep) < 0) T.amt += (T.amt ? "" : "0") + sep; }
+            else {
+              var dp = T.amt.split(sep)[1];
+              if (dp !== undefined && dp.length >= dec) return hap("warning");
+              if (T.amt.replace(sep, "").length >= 9) return hap("warning");
+              T.amt = T.amt === "0" ? v : T.amt + v;
+            }
+            if (T.amt === before) return;
+            hap("selection"); updAmt();
+            if (toCents(T.amt) > bal) { var bx = $("#trBox", el); bx.classList.remove("shake"); void bx.offsetWidth; bx.classList.add("shake"); hap("warning"); }
+          });
+        });
+        $("#trMax", el).addEventListener("click", function () { T.amt = toStr(bal); hap("light"); updAmt(); });
+      }
+      if (T.step === 3) {
+        $$(".tr-acc", el).forEach(function (r) { r.addEventListener("click", function () { T.sel = r.getAttribute("data-id"); T.adding = false; hap("selection"); render(0); }); });
+        $$(".tr-del", el).forEach(function (d) {
+          d.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var id = d.getAttribute("data-del");
+            payAccts = payAccts.filter(function (a) { return a.id !== id; });
+            if (T.sel === id) T.sel = payAccts[0] ? payAccts[0].id : "";
+            if (paySel === id) paySel = T.sel;
+            if (!payAccts.length) T.adding = true;
+            hap("medium"); saveState(); syncPayCard(); render(0); toast("Account removed");
+          });
+        });
+        var add = $("#trAdd", el); if (add) add.addEventListener("click", function () { T.adding = true; hap("light"); render(0); var n = $("#trName", el); if (n) n.focus(); });
+        var cn = $("#trCancel", el); if (cn) cn.addEventListener("click", function () { T.adding = false; render(0); });
+        var sv = $("#trSave", el);
+        if (sv) sv.addEventListener("click", function () {
+          var name = $("#trName", el).value.trim(), iban = $("#trIban", el).value.replace(/\s+/g, "").toUpperCase();
+          if (!name) return showErr("Enter the account holder's name");
+          if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) return showErr("Enter a valid IBAN");
+          var a = { id: "a" + Date.now(), holder: name, iban: iban };
+          payAccts.push(a); T.sel = a.id; paySel = a.id; T.adding = false;
+          hap("success"); saveState(); syncPayCard(); render(0); toast("Account added");
+        });
+        var go = $("#trGo", el);
+        if (go) go.addEventListener("click", function () {
+          var dest;
+          if (T.method === "paypal") {
+            var em = $("#trMail", el).value.trim();
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) return showErr("Enter a valid email address");
+            T.email = em; dest = { kind: "paypal", label: "PayPal " + maskMail(em), holder: "" };
+          } else {
+            var a2 = acc(); if (!a2) return showErr("Select an account");
+            dest = { kind: "bank", label: bankLabel(a2.iban), holder: a2.holder };
+          }
+          var c = toCents(T.amt); if (c <= 0 || c > payBal()) return showErr("Amount is higher than your balance");
+          go.disabled = true; go.classList.add("busy");
+          setTimeout(function () {
+            var amt = Math.min(c, payBal());
+            S.payout = payBal() - amt;
+            if (dest.kind === "paypal") payPal = T.email; else paySel = T.sel;
+            var row = { ts: nowMs(), amt: amt, st: "In transit", n: 0, fees: 0, gross: amt, bank: dest.label, holder: dest.holder, kind: dest.kind };
+            transfers.unshift(row); payouts.unshift(row);
+            pop(false);
+            saveState(); syncPayCard();
+            setTimeout(function () { paySuccess(amt, row.bank, row.kind); notifyPayout(row); }, 260);
+          }, 900);
+        });
+      }
+    }
+    function render(dir) {
+      W.innerHTML = '<div class="tr-pane' + (dir ? " in" + (dir < 0 ? " back" : "") : "") + '">' + stepHtml() + "</div>";
+      $$(".tr-prog i", el).forEach(function (b, i) { b.classList.toggle("on", i < T.step); });
+      $("#trStep", el).textContent = T.step + "/3";
+      nx.innerHTML = T.step > 1 ? ic("chev-left") : ic("x");
+      nx.setAttribute("aria-label", T.step > 1 ? "Back" : "Close");
+      bind();
+    }
+    render(0);
   }
 
   /* ── Notifications, search, Sidekick ─────────────────────── */
