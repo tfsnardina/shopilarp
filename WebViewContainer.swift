@@ -556,7 +556,7 @@ final class WebHostViewController: UIViewController {
             if (payload["act"] as? String) == "customer" {
                 // La fiche client est une page web : on ferme d'abord la page native qui la masquerait.
                 detail?.closeAnimated()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { [weak self] in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.42) { [weak self] in
                     self?.sendProductEvent("__larpNativeOrderAct", payload)
                 }
             } else {
@@ -589,6 +589,7 @@ final class WebHostViewController: UIViewController {
     /// Retire la fiche produit (sans animation) : changement d'onglet, rechargement…
     func removeProductDetail() {
         guard let detail = productDetail else { return }
+        (detail as? DetailPushHosting)?.push.reset()
         detail.willMove(toParent: nil)
         detail.view.removeFromSuperview()
         detail.removeFromParent()
