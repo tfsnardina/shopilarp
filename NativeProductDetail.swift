@@ -113,9 +113,7 @@ final class PCDRow: UIControl {
 
         var trailing = row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16)
         if chevron {
-            let c = UIImageView(image: PCTheme.symbol("chevron.right", 13))
-            c.tintColor = UIColor(white: 0.55, alpha: 1)
-            c.translatesAutoresizingMaskIntoConstraints = false
+            let c = PCDRow.makeChevron()
             addSubview(c)
             NSLayoutConstraint.activate([
                 c.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
@@ -130,6 +128,19 @@ final class PCDRow: UIControl {
             row.topAnchor.constraint(equalTo: topAnchor, constant: 11),
             row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -11),
         ])
+    }
+
+    /// Chevron de taille fixe : sans largeur ni priorité de « hugging », il s'étirait sur toute la ligne.
+    static func makeChevron() -> UIImageView {
+        let c = UIImageView(image: PCTheme.symbol("chevron.right", 13))
+        c.tintColor = UIColor(white: 0.55, alpha: 1)
+        c.contentMode = .scaleAspectFit
+        c.translatesAutoresizingMaskIntoConstraints = false
+        c.setContentHuggingPriority(.required, for: .horizontal)
+        c.setContentCompressionResistancePriority(.required, for: .horizontal)
+        c.widthAnchor.constraint(equalToConstant: 10).isActive = true
+        c.heightAnchor.constraint(equalToConstant: 16).isActive = true
+        return c
     }
 
     @available(*, unavailable)
@@ -648,9 +659,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         priceField.keyboardType = .decimalPad
         priceField.addAction(UIAction { [weak self] _ in self?.priceEdited(); self?.refresh() }, for: .editingChanged)
         priceField.addAction(UIAction { [weak self] _ in self?.priceFormatted(); self?.refresh() }, for: .editingDidEnd)
-        let priceChevron = UIImageView(image: PCTheme.symbol("chevron.right", 13))
-        priceChevron.tintColor = UIColor(white: 0.55, alpha: 1)
-        priceChevron.translatesAutoresizingMaskIntoConstraints = false
+        let priceChevron = PCDRow.makeChevron()
         priceField.translatesAutoresizingMaskIntoConstraints = false
         let priceWrap = UIView()
         priceWrap.addSubview(priceField)
