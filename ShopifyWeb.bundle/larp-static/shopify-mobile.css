@@ -1247,3 +1247,31 @@ html.native-glass-tabbar #tabbar,html.native-glass-tabbar #tabbar *{opacity:0!im
 .sk-x{width:58px;height:58px;margin-bottom:6px}
 .sk-x .ic{width:22px;height:22px}
 html.ios-bold .sk-hist{font-weight:650}
+
+/* ── Sidekick : états chevron / réflexion / réponse (vidéo 2) ── */
+.sk-chev,.sk-grab,.sk-ans,.sk-think{display:none}
+.sk-ov.has-thread .sk-ov-top{display:none}
+.sk-ov.has-thread .sk-chev{display:flex}
+.sk-chev{align-self:center;align-items:center;justify-content:center;width:44px;height:30px;border-radius:15px;margin-bottom:-2px;transition:transform .2s}
+.sk-chev:active{transform:scale(.92)}
+.sk-chev .ic{width:18px;height:18px;transform:rotate(180deg)}
+/* réflexion en cours : carte compacte */
+.sk-ov.thinking .sk-card{padding:9px 10px 9px 12px}
+.sk-ov.thinking .sk-card input,.sk-ov.thinking .sk-card-bar{display:none}
+.sk-ov.thinking .sk-think{display:flex;align-items:center;gap:8px;min-height:40px}
+.sk-ov.thinking .sk-card{border-radius:30px}
+.sk-ov.thinking .sk-ov-row{align-items:center}
+.sk-ov.thinking .sk-x{margin-bottom:0;width:50px;height:50px}
+.sk-thinking{font-size:17px;font-weight:500;letter-spacing:-.2px;background:linear-gradient(100deg,#6e3ff3 20%,#b9a3ff 45%,#6e3ff3 70%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:skshim 1.6s linear infinite}
+@keyframes skshim{from{background-position:120% 0}to{background-position:-100% 0}}
+.sk-stop{background:#e3e3e6}
+.sk-stop i{width:12px;height:12px;border-radius:3px;background:#555;display:block}
+/* réponse : feuille blanche arrondie + fond grisé */
+.sk-ov.answered .sk-ov-scrim{background:rgba(0,0,0,.26)}
+.sk-ov.answered .sk-ov-dock{bottom:var(--kb,0px);padding:9px 16px calc(max(var(--bot,0px),12px) + 8px);background:#fff;border-radius:40px 40px 0 0;box-shadow:0 -12px 44px rgba(0,0,0,.14);gap:6px}
+.sk-ov.answered .sk-grab{display:block;align-self:center;width:40px;height:5px;border-radius:3px;background:#d4d4d8}
+.sk-ov.answered .sk-ans{display:block;padding:20px 6px 26px;font-size:18.5px;line-height:1.38;letter-spacing:-.15px;color:#111;min-height:24px}
+.sk-ov.answered .sk-chev{display:none}
+.sk-ov.answered .sk-card{background:#fff;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08),0 6px 22px rgba(0,0,0,.1)}
+.sk-ov.thinking .sk-ov-top,.sk-ov.answered .sk-ov-top{display:none}
+.sk-ov.thinking .sk-chev{display:flex}
