@@ -38,8 +38,8 @@ final class GlassChromeView: UIView {
                 let h = (d["h"] as? NSNumber)?.doubleValue ?? 0
                 guard w > 1, h > 1 else { continue }
                 seen.insert(id)
-                let frame = CGRect(x: x, y: y, width: w, height: h)
                 let item: GlassChromeItem
+                var isNew = false
                 if let existing = views[id], existing.kind == kind {
                     item = existing
                 } else {
@@ -49,10 +49,19 @@ final class GlassChromeView: UIView {
                     item.onText = { [weak self] id, text in self?.onText?(id, text) }
                     addSubview(item)
                     views[id] = item
+                    isNew = true
                 }
-                item.frame = frame
+                // bounds + center (et non frame) : la transformation de la feuille peut être active.
+                item.bounds = CGRect(x: 0, y: 0, width: w, height: h)
+                item.center = CGPoint(x: x + w / 2, y: y + h / 2)
                 item.update(d)
                 item.applyDim(CGFloat((d["dim"] as? NSNumber)?.doubleValue ?? 0))
+                if id.hasPrefix("o:") {
+                    let target = CGFloat((d["target"] as? NSNumber)?.doubleValue ?? 0)
+                    let drag = (d["drag"] as? Bool) == true
+                    if isNew { item.transform = CGAffineTransform(translationX: 0, y: max(target, bounds.height)); item.sheetTarget = .infinity }
+                    sheetMove(item, to: target, drag: drag)
+                }
             }
             for (id, v) in views where !seen.contains(id) {
                 v.removeFromSuperview()
@@ -62,6 +71,31 @@ final class GlassChromeView: UIView {
     }
 
     func reset() { apply([]) }
+
+    /// Suit la feuille commande : même courbe que la CSS (.5 s, cubic-bezier(.32,.72,0,1)).
+    private func sheetMove(_ item: GlassChromeItem, to target: CGFloat, drag: Bool) {
+        if drag {
+            item.layer.removeAllAnimations()
+            item.transform = CGAffineTransform(translationX: 0, y: target)
+            item.sheetTarget = target
+            return
+        }
+        guard item.sheetTarget != target else { return }
+        item.sheetTarget = target
+        let timing = UICubicTimingParameters(controlPoint1: CGPoint(x: 0.32, y: 0.72), controlPoint2: CGPoint(x: 0, y: 1))
+        let animator = UIViewPropertyAnimator(duration: 0.5, timingParameters: timing)
+        animator.addAnimations { item.transform = CGAffineTransform(translationX: 0, y: target) }
+        animator.startAnimation()
+    }
+
+    /// Position du doigt pendant le glissement (message léger, sans passer par le rendu complet).
+    func dragSheet(_ dy: CGFloat) {
+        for (id, v) in views where id.hasPrefix("o:") {
+            v.layer.removeAllAnimations()
+            v.transform = CGAffineTransform(translationX: 0, y: dy)
+            v.sheetTarget = dy
+        }
+    }
 }
 
 // MARK: - Éléments
@@ -74,6 +108,7 @@ class GlassChromeItem: UIView {
     var onText: ((String, String) -> Void)?
 
     static let ink = UIColor(white: 0.07, alpha: 1)
+    var sheetTarget: CGFloat = 0
 
     init(kind: String, id: String) {
         self.kind = kind
@@ -277,6 +312,7 @@ final class GlassSearchField: GlassChromeItem, UITextFieldDelegate {
 final class GlassChips: GlassChromeItem {
     private let scroll = UIScrollView()
     private let pill = GlassChromeItem.glass()
+    private let pillDim = UIView()
     private var buttons: [UIButton] = []
     private var labels: [String] = []
     private var selected = -1
@@ -363,7 +399,17 @@ final class GlassChips: GlassChromeItem {
 
     /// Seule la pastille de verre s'assombrit (le texte et le fond sont déjà sous le voile de la page).
     override func applyDim(_ amount: CGFloat) {
-        pill.contentView.backgroundColor = UIColor.black.withAlphaComponent(amount)
+        if pillDim.superview == nil {
+            pillDim.backgroundColor = .black
+            pillDim.isUserInteractionEnabled = false
+            pillDim.layer.cornerRadius = 17.5
+            pillDim.layer.cornerCurve = .continuous
+            pillDim.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            pill.contentView.addSubview(pillDim)
+        }
+        pillDim.frame = pill.contentView.bounds
+        pillDim.alpha = amount
+        pillDim.isHidden = amount < 0.005
         isUserInteractionEnabled = amount < 0.01
     }
 
