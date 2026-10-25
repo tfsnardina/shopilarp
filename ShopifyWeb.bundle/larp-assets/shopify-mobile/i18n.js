@@ -517,7 +517,16 @@
     ["3 days left", "3 jours restants", "Quedan 3 días", "Noch 3 Tage"],
     ["Product sourcing opens on the full admin", "La recherche de produits s’ouvre dans l’admin complet", "La búsqueda de productos se abre en el admin completo", "Die Produktsuche öffnet sich im vollständigen Admin"],
     ["Choose a plan on the full admin", "Choisissez un abonnement dans l’admin complet", "Elige un plan en el admin completo", "Wähle einen Tarif im vollständigen Admin"],
-    ["Sample product added", "Exemple de produit ajouté", "Producto de ejemplo añadido", "Beispielprodukt hinzugefügt"]
+    ["Sample product added", "Exemple de produit ajouté", "Producto de ejemplo añadido", "Beispielprodukt hinzugefügt"],
+    /* native order page */
+    ["Fulfillment", "Exécution", "Preparación", "Erfüllung"],
+    ["Payment", "Paiement", "Pago", "Zahlung"],
+    ["Items", "Articles", "Artículos", "Artikel"],
+    ["Net payment", "Paiement net", "Pago neto", "Nettozahlung"],
+    ["Refund", "Remboursement", "Reembolso", "Rückerstattung"],
+    ["Order status", "Statut de la commande", "Estado del pedido", "Bestellstatus"],
+    ["Copy address", "Copier l'adresse", "Copiar dirección", "Adresse kopieren"],
+    ["Fulfill", "Traiter", "Preparar", "Erfüllen"]
   ];
 
   var DICT = { fr: {}, es: {}, de: {} }, TO_EN = {};
