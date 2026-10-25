@@ -182,10 +182,14 @@ enum WebViewContainer {
             if message.name == "larpProduct" {
                 let dict = (message.body as? [String: Any]) ?? [:]
                 DispatchQueue.main.async { [weak self] in
-                    self?.host?.presentProductCreator(
-                        currency: (dict["sym"] as? String) ?? "€",
-                        vendor: (dict["vendor"] as? String) ?? ""
-                    )
+                    if (dict["mode"] as? String) == "edit" {
+                        self?.host?.presentProductDetail(info: dict)
+                    } else {
+                        self?.host?.presentProductCreator(
+                            currency: (dict["sym"] as? String) ?? "€",
+                            vendor: (dict["vendor"] as? String) ?? ""
+                        )
+                    }
                 }
                 return
             }
@@ -294,6 +298,7 @@ final class WebHostViewController: UIViewController {
     private var lastLayoutInsets: UIEdgeInsets = .zero
     private var homeIndicatorBottom: CGFloat = 34
     private var glassTabBar: UIView?
+    private var productDetail: UIViewController?
     private var glassTabBarBottom: NSLayoutConstraint?
     private var glassDrawerBar: UIView?
     private var pullHost: PullRefreshHost?
@@ -384,6 +389,7 @@ final class WebHostViewController: UIViewController {
 
     func reloadShopHome() {
         guard let root = coordinator.wwwRoot else { return }
+        removeProductDetail()
         let old = webView?.configuration.userContentController
         old?.removeScriptMessageHandler(forName: "shopifyOrder")
         old?.removeScriptMessageHandler(forName: "larpStore")
@@ -467,6 +473,47 @@ final class WebHostViewController: UIViewController {
         #endif
     }
 
+    // MARK: - Fiche produit native (clic sur un produit)
+
+    /// Ouvre la fiche produit native au-dessus de la page web, sous la barre d'onglets (comme dans l'app Shopify).
+    func presentProductDetail(info: [String: Any]) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), productDetail == nil, presentedViewController == nil else { return }
+        let detail = ProductDetailViewController(info: info)
+        detail.onSave = { [weak self] payload in self?.sendProductEvent("__larpNativeProductUpdate", payload) }
+        detail.onDuplicate = { [weak self] payload in self?.sendProductEvent("__larpNativeProductDuplicate", payload) }
+        detail.onDelete = { [weak self] index in self?.sendProductEvent("__larpNativeProductDelete", ["idx": index]) }
+        detail.onClose = { [weak self] in self?.removeProductDetail() }
+        addChild(detail)
+        detail.view.frame = view.bounds
+        detail.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        if let web = webView {
+            view.insertSubview(detail.view, aboveSubview: web)
+        } else {
+            view.addSubview(detail.view)
+        }
+        detail.didMove(toParent: self)
+        productDetail = detail
+        detail.slideIn()
+        #endif
+    }
+
+    /// Retire la fiche produit (sans animation) : changement d'onglet, rechargement…
+    func removeProductDetail() {
+        guard let detail = productDetail else { return }
+        detail.willMove(toParent: nil)
+        detail.view.removeFromSuperview()
+        detail.removeFromParent()
+        productDetail = nil
+    }
+
+    private func sendProductEvent(_ function: String, _ payload: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let json = String(data: data, encoding: .utf8) else { return }
+        let literal = WebViewContainer.jsStringLiteral(json)
+        runJS("window.\(function) && window.\(function)(JSON.parse(\(literal)))")
+    }
+
     // MARK: - Barre d'onglets Liquid Glass native (iOS 26)
 
     private func runJS(_ source: String) {
@@ -479,9 +526,11 @@ final class WebHostViewController: UIViewController {
         let bar = GlassTabBarView()
         bar.translatesAutoresizingMaskIntoConstraints = false
         bar.onTab = { [weak self] name in
+            self?.removeProductDetail()
             self?.runJS("window.__larpNativeTab && window.__larpNativeTab(\(WebViewContainer.jsStringLiteral(name)))")
         }
         bar.onAction = { [weak self] name in
+            self?.removeProductDetail()
             self?.runJS("window.__larpNativeAct && window.__larpNativeAct(\(WebViewContainer.jsStringLiteral(name)))")
         }
         view.addSubview(bar)
