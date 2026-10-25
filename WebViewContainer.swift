@@ -95,6 +95,8 @@ enum WebViewContainer {
         var wwwRoot: URL?
         weak var host: WebHostViewController?
         private var keyboardObservers: [NSObjectProtocol] = []
+        private var offsetObservation: NSKeyValueObservation?
+        private var lockOffset = false
 
         deinit {
             keyboardObservers.forEach { NotificationCenter.default.removeObserver($0) }
@@ -104,6 +106,12 @@ enum WebViewContainer {
             keyboardObservers.forEach { NotificationCenter.default.removeObserver($0) }
             keyboardObservers.removeAll()
             let scroll = webView.scrollView
+            // Quand la barre Sidekick est ouverte, la page ne doit JAMAIS défiler : sinon tout l'écran
+            // (en-tête compris) remonte quand le clavier apparaît.
+            offsetObservation = scroll.observe(\.contentOffset, options: [.new]) { [weak self] sv, _ in
+                guard let self, self.lockOffset, sv.contentOffset != .zero else { return }
+                sv.contentOffset = .zero
+            }
             let show = NotificationCenter.default.addObserver(
                 forName: UIResponder.keyboardWillShowNotification,
                 object: nil,
@@ -111,16 +119,27 @@ enum WebViewContainer {
             ) { [weak self] note in
                 guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
                 let overlap = webView.convert(frame, from: nil).intersection(webView.bounds).height
-                scroll.contentInset.bottom = overlap
-                scroll.verticalScrollIndicatorInsets.bottom = overlap
-                // Relais vers la page : la barre Sidekick flotte au-dessus du clavier.
-                webView.evaluateJavaScript("document.documentElement.setAttribute('data-native-kb','1');document.documentElement.style.setProperty('--kb','\(Int(overlap))px');", completionHandler: nil)
+                let js = "document.documentElement.setAttribute('data-native-kb','1');document.documentElement.style.setProperty('--kb','\(Int(overlap))px');(document.querySelector('.sk-ov')?1:0)"
+                // On sait tout de suite si la barre Sidekick est ouverte : pas de décalage avant le clavier.
+                webView.evaluateJavaScript(js) { result, _ in
+                    let sidekick = (result as? Int) == 1
+                    self?.lockOffset = sidekick
+                    if sidekick {
+                        scroll.contentInset.bottom = 0
+                        scroll.verticalScrollIndicatorInsets.bottom = 0
+                        scroll.contentOffset = .zero
+                    } else {
+                        scroll.contentInset.bottom = overlap
+                        scroll.verticalScrollIndicatorInsets.bottom = overlap
+                    }
+                }
             }
             let hide = NotificationCenter.default.addObserver(
                 forName: UIResponder.keyboardWillHideNotification,
                 object: nil,
                 queue: .main
-            ) { _ in
+            ) { [weak self] _ in
+                self?.lockOffset = false
                 scroll.contentInset.bottom = 0
                 scroll.verticalScrollIndicatorInsets.bottom = 0
                 webView.evaluateJavaScript("document.documentElement.style.setProperty('--kb','0px');", completionHandler: nil)
@@ -378,7 +397,7 @@ final class WebHostViewController: UIViewController {
                 forMainFrameOnly: true
             )
         )
-        let web = WKWebView(frame: .zero, configuration: config)
+        let web = LarpWebView(frame: .zero, configuration: config)
         web.isOpaque = true
         web.backgroundColor = .black
         web.scrollView.backgroundColor = .black
@@ -569,4 +588,10 @@ enum Haptics {
         default: break
         }
     }
+}
+
+
+/// WKWebView sans la barre d'accessoires du clavier (˄ ˅ ✓), comme dans l'app Shopify.
+final class LarpWebView: WKWebView {
+    override var inputAccessoryView: UIView? { nil }
 }
