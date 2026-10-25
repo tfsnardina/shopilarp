@@ -526,6 +526,7 @@
     ["Refund", "Remboursement", "Reembolso", "Rückerstattung"],
     ["Order status", "Statut de la commande", "Estado del pedido", "Bestellstatus"],
     ["Copy address", "Copier l'adresse", "Copiar dirección", "Adresse kopieren"],
+    ["Shipping and billing address", "Adresse d'expédition et de facturation", "Dirección de envío y facturación", "Liefer- und Rechnungsadresse"],
     ["Fulfill", "Traiter", "Preparar", "Erfüllen"]
   ];
 
