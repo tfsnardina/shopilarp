@@ -617,7 +617,9 @@ final class ODFulfillSheet: PCSheetBase {
 // MARK: - Page commande
 
 @available(iOS 26.0, *)
-final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, UIGestureRecognizerDelegate {
+final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, UIGestureRecognizerDelegate, DetailPushHosting {
+    let push = DetailPushTransition()
+
     /// Action vers la page web : { n, act: fulfill | capture | markpaid | customer, trk?, carrier?, idx? }.
     var onAct: (([String: Any]) -> Void)?
     var onClose: (() -> Void)?
@@ -686,19 +688,15 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
     }
 
     func slideIn() {
-        view.transform = CGAffineTransform(translationX: view.bounds.width, y: 0)
-        UIView.animate(withDuration: 0.34, delay: 0, options: [.curveEaseOut]) {
-            self.view.transform = .identity
-        }
+        push.attach(to: view)
+        push.slideIn()
     }
 
-    func closeAnimated() {
+    func closeAnimated(velocity: CGFloat = 0) {
         view.endEditing(true)
-        UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseOut], animations: {
-            self.view.transform = CGAffineTransform(translationX: self.view.bounds.width, y: 0)
-        }, completion: { _ in
-            self.onClose?()
-        })
+        push.close(velocity: velocity) { [weak self] in
+            self?.onClose?()
+        }
     }
 
     /// Nouvelles données après une action (traitée, payée…) : on reconstruit la page et on affiche le toast.
@@ -1105,16 +1103,17 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
     // MARK: Retour par glissement depuis le bord gauche
 
     @objc private func edgePan(_ g: UIScreenEdgePanGestureRecognizer) {
-        let x = max(0, g.translation(in: view).x)
+        let w = max(view.bounds.width, 1)
+        let x = max(0, g.translation(in: view.superview).x)
         switch g.state {
-        case .changed:
-            view.transform = CGAffineTransform(translationX: x, y: 0)
+        case .began, .changed:
+            push.setProgress(1 - x / w)
         case .ended, .cancelled:
-            let fast = g.velocity(in: view).x > 600
-            if g.state == .ended && (x > view.bounds.width * 0.33 || fast) {
-                closeAnimated()
+            let vx = g.velocity(in: view.superview).x
+            if g.state == .ended && (x > w * 0.33 || vx > 600) {
+                closeAnimated(velocity: vx)
             } else {
-                UIView.animate(withDuration: 0.25) { self.view.transform = .identity }
+                push.animate(open: true, velocity: vx)
             }
         default:
             break
