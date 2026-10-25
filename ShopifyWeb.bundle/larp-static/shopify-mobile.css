@@ -679,6 +679,25 @@ button.tr-chip:active{background:#ececec}
 .tr-k{width:72px;height:72px;border-radius:50%;background:#f3f3f3;border:1px solid var(--bd2);font-size:28px;font-weight:550;display:flex;align-items:center;justify-content:center;transition:transform .12s,background .12s}
 .tr-k:active{transform:scale(.9);background:#e2e2e2}
 .tr-k svg{width:26px;height:26px}
+.tr-rc{padding:4px 16px;border-radius:16px;background:var(--bg2);border:1px solid var(--bd2)}
+.tr-rc>div{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:13px 0;border-bottom:1px solid var(--bd2);font-size:16px}
+.tr-rc>div>span{color:var(--tx2);flex:none}
+.tr-rc>div>b{font-weight:550;text-align:right;min-width:0;overflow-wrap:anywhere}
+.tr-rc .tot{border-bottom:0;padding-top:15px}
+.tr-rc .tot span{color:var(--tx);font-weight:600}
+.tr-rc .tot b{font-size:24px;font-weight:750;letter-spacing:-.4px}
+.sl{position:relative;height:64px;border-radius:32px;background:#303030;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+.sl-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:32px;background:#1a9d54;opacity:.95;transition:background .3s}
+.sl-t{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-left:46px;font-size:17px;font-weight:600;letter-spacing:.2px;background:linear-gradient(100deg,rgba(255,255,255,.55) 35%,#fff 50%,rgba(255,255,255,.55) 65%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:swshim 2.2s linear infinite;pointer-events:none}
+.sl.done .sl-t,.sl.drag .sl-t{animation:none;-webkit-text-fill-color:#fff;background:none}
+@keyframes swshim{from{background-position:120% 0}to{background-position:-100% 0}}
+.sl-k{position:absolute;left:4px;top:4px;width:56px;height:56px;border-radius:50%;background:#fff;color:#303030;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:grab;box-shadow:0 4px 14px -4px rgba(0,0,0,.45)}
+.sl-k svg{animation:swnudge 1.6s ease-in-out infinite}
+.sl.drag .sl-k svg,.sl.done .sl-k svg{animation:none}
+.sl.ok .sl-k{color:#1a9d54}
+.sl-ck path{stroke-dasharray:30;stroke-dashoffset:30;animation:okdraw .35s ease-out forwards}
+@keyframes swnudge{50%{transform:translateX(4px)}}
+.sl-spin{width:24px;height:24px;border-radius:50%;border:3px solid #ddd;border-top-color:#303030;animation:spin .6s linear infinite}
 .btn-p b{font-weight:inherit}
 @media (max-height:740px){.tr-k,.tr-pad>span{width:60px;height:60px}.tr-pad{grid-template-columns:repeat(3,60px);gap:8px 20px}.tr-amt2 b{font-size:50px}.tr-amt2{margin-top:10px;min-height:60px}}
 html.ios-bold .tr-h{font-weight:800}
