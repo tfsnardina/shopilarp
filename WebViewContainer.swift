@@ -73,6 +73,7 @@ enum WebViewContainer {
         document.documentElement.classList.add('checker-native');
         document.documentElement.classList.toggle('ios-bold', \(UIAccessibility.isBoldTextEnabled ? "true" : "false"));
         document.documentElement.classList.toggle('native-glass-tabbar', \(NativeGlass.isAvailable ? "true" : "false"));
+        document.documentElement.classList.toggle('native-glass-drawer', \(NativeGlass.isAvailable ? "true" : "false"));
         (function(){
           var settings = \(jsStringLiteral(settings));
           var payload = \(jsStringLiteral(payload));
@@ -145,6 +146,13 @@ enum WebViewContainer {
                 let hidden = (dict["hidden"] as? NSNumber)?.boolValue ?? false
                 DispatchQueue.main.async { [weak self] in
                     self?.host?.updateGlassTabBar(active: active, hidden: hidden)
+                }
+                return
+            }
+            if message.name == "larpDrawer", let dict = message.body as? [String: Any] {
+                let open = (dict["open"] as? NSNumber)?.boolValue ?? false
+                DispatchQueue.main.async { [weak self] in
+                    self?.host?.updateGlassDrawerBar(open: open)
                 }
                 return
             }
@@ -239,6 +247,8 @@ final class WebHostViewController: UIViewController {
     private var homeIndicatorBottom: CGFloat = 34
     private var glassTabBar: UIView?
     private var glassTabBarBottom: NSLayoutConstraint?
+    private var glassDrawerBar: UIView?
+    private var glassDrawerBarBottom: NSLayoutConstraint?
 
     init(coordinator: WebViewContainer.Coordinator) {
         self.coordinator = coordinator
@@ -264,6 +274,7 @@ final class WebHostViewController: UIViewController {
         let web = makeWebView()
         showWebView(web)
         installGlassTabBar()
+        installGlassDrawerBar()
 
         guard let entry = WebViewContainer.resolveWebEntry() else {
             coordinator.showLoadError(on: web, message: WebViewContainer.bundleDebugHint())
@@ -330,6 +341,7 @@ final class WebHostViewController: UIViewController {
         old?.removeScriptMessageHandler(forName: "larpStatusBar")
         old?.removeScriptMessageHandler(forName: "larpHaptic")
         old?.removeScriptMessageHandler(forName: "larpTabbar")
+        old?.removeScriptMessageHandler(forName: "larpDrawer")
         let web = makeWebView()
         showWebView(web)
         lastLayoutInsets = .zero
@@ -345,6 +357,7 @@ final class WebHostViewController: UIViewController {
         config.userContentController.add(coordinator, name: "larpStatusBar")
         config.userContentController.add(coordinator, name: "larpHaptic")
         config.userContentController.add(coordinator, name: "larpTabbar")
+        config.userContentController.add(coordinator, name: "larpDrawer")
         config.userContentController.addUserScript(
             WKUserScript(
                 source: WebViewContainer.nativeChromeScript(),
@@ -380,6 +393,7 @@ final class WebHostViewController: UIViewController {
             web.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
         if let glass = glassTabBar { view.bringSubviewToFront(glass) }
+        if let drawerGlass = glassDrawerBar { view.bringSubviewToFront(drawerGlass) }
     }
 
     // MARK: - Barre d'onglets Liquid Glass native (iOS 26)
@@ -424,6 +438,40 @@ final class WebHostViewController: UIViewController {
         #endif
     }
 
+    // MARK: - Barre du menu (≡) Liquid Glass native (iOS 26)
+
+    private func installGlassDrawerBar() {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), glassDrawerBar == nil else { return }
+        let bar = GlassDrawerBarView()
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        bar.onAction = { [weak self] name in
+            self?.runJS("window.__larpNativeDrawer && window.__larpNativeDrawer(\(WebViewContainer.jsStringLiteral(name)))")
+        }
+        view.addSubview(bar)
+        let bottom = bar.bottomAnchor.constraint(
+            equalTo: view.bottomAnchor,
+            constant: -max(20, deviceSafeAreaInsets().bottom + 2)
+        )
+        NSLayoutConstraint.activate([
+            bar.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            bar.widthAnchor.constraint(equalToConstant: GlassDrawerBarView.totalWidth),
+            bar.heightAnchor.constraint(equalToConstant: GlassDrawerBarView.barHeight),
+            bottom,
+        ])
+        glassDrawerBar = bar
+        glassDrawerBarBottom = bottom
+        #endif
+    }
+
+    /// Appelé par la page web : menu ouvert ou fermé.
+    func updateGlassDrawerBar(open: Bool) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), let bar = glassDrawerBar as? GlassDrawerBarView else { return }
+        bar.setShown(open, animated: true)
+        #endif
+    }
+
     /// Insets of this view only. Do not invent 47/34 — that double-pads when the system already inset the window.
     func deviceSafeAreaInsets() -> UIEdgeInsets {
         let raw = view.safeAreaInsets
@@ -445,6 +493,7 @@ final class WebHostViewController: UIViewController {
         if insets != lastLayoutInsets {
             lastLayoutInsets = insets
             glassTabBarBottom?.constant = -(insets.bottom + 8)
+            glassDrawerBarBottom?.constant = -max(20, insets.bottom + 2)
             coordinator.pushSafeArea(to: webView, insets: insets)
         }
     }
