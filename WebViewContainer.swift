@@ -209,8 +209,13 @@ enum WebViewContainer {
             if message.name == "larpProduct" {
                 let dict = (message.body as? [String: Any]) ?? [:]
                 DispatchQueue.main.async { [weak self] in
-                    if (dict["mode"] as? String) == "edit" {
+                    let mode = dict["mode"] as? String
+                    if mode == "edit" {
                         self?.host?.presentProductDetail(info: dict)
+                    } else if mode == "order" {
+                        self?.host?.presentOrderDetail(info: dict)
+                    } else if mode == "orderUpdate" {
+                        self?.host?.updateOrderDetail(info: dict)
                     } else {
                         self?.host?.presentProductCreator(
                             currency: (dict["sym"] as? String) ?? "€",
@@ -536,6 +541,48 @@ final class WebHostViewController: UIViewController {
         detail.didMove(toParent: self)
         productDetail = detail
         detail.slideIn()
+        #endif
+    }
+
+    // MARK: - Page commande native (clic sur une commande)
+
+    /// Ouvre la page commande native, au même endroit et de la même façon que la fiche produit.
+    func presentOrderDetail(info: [String: Any]) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), productDetail == nil, presentedViewController == nil else { return }
+        let detail = OrderDetailViewController(info: info)
+        detail.onAct = { [weak self, weak detail] payload in
+            guard let self else { return }
+            if (payload["act"] as? String) == "customer" {
+                // La fiche client est une page web : on ferme d'abord la page native qui la masquerait.
+                detail?.closeAnimated()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) { [weak self] in
+                    self?.sendProductEvent("__larpNativeOrderAct", payload)
+                }
+            } else {
+                self.sendProductEvent("__larpNativeOrderAct", payload)
+            }
+        }
+        detail.onClose = { [weak self] in self?.removeProductDetail() }
+        addChild(detail)
+        detail.view.frame = view.bounds
+        detail.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        if let anchor = glassChrome ?? webView {
+            view.insertSubview(detail.view, aboveSubview: anchor)
+        } else {
+            view.addSubview(detail.view)
+        }
+        detail.didMove(toParent: self)
+        productDetail = detail
+        detail.slideIn()
+        #endif
+    }
+
+    /// La page web a appliqué une action (traitée, payée…) : la page native se met à jour.
+    func updateOrderDetail(info: [String: Any]) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), let detail = productDetail as? OrderDetailViewController else { return }
+        detail.update(info: info)
         #endif
     }
 
