@@ -52,6 +52,7 @@ final class GlassChromeView: UIView {
                 }
                 item.frame = frame
                 item.update(d)
+                item.applyDim(CGFloat((d["dim"] as? NSNumber)?.doubleValue ?? 0))
             }
             for (id, v) in views where !seen.contains(id) {
                 v.removeFromSuperview()
@@ -100,6 +101,27 @@ class GlassChromeItem: UIView {
     }
 
     func update(_ d: [String: Any]) {}
+
+    /// Assombrissement quand une feuille (voile noir) recouvre la page : le verre reste, comme sur iOS.
+    private let dimView = UIView()
+    func applyDim(_ amount: CGFloat) {
+        if dimView.superview == nil {
+            dimView.backgroundColor = .black
+            dimView.isUserInteractionEnabled = false
+            addSubview(dimView)
+        }
+        dimView.alpha = amount
+        dimView.isHidden = amount < 0.005
+        bringSubviewToFront(dimView)
+        // Sous le voile, les touchers passent à la page (le voile ferme la feuille).
+        isUserInteractionEnabled = amount < 0.01
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        dimView.frame = bounds
+        dimView.layer.cornerRadius = min(bounds.width, bounds.height) / 2
+    }
 }
 
 /// Correspondance icônes de la page web -> symboles SF.
@@ -338,6 +360,12 @@ final class GlassChips: GlassChromeItem {
     }
 
     private var yOffset: CGFloat { 0 }
+
+    /// Seule la pastille de verre s'assombrit (le texte et le fond sont déjà sous le voile de la page).
+    override func applyDim(_ amount: CGFloat) {
+        pill.contentView.backgroundColor = UIColor.black.withAlphaComponent(amount)
+        isUserInteractionEnabled = amount < 0.01
+    }
 
     override func layoutSubviews() {
         super.layoutSubviews()
