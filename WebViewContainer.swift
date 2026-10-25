@@ -75,6 +75,7 @@ enum WebViewContainer {
         document.documentElement.classList.toggle('ios-bold', \(UIAccessibility.isBoldTextEnabled ? "true" : "false"));
         document.documentElement.classList.toggle('native-glass-tabbar', \(NativeGlass.isAvailable ? "true" : "false"));
         document.documentElement.classList.toggle('native-glass-drawer', \(NativeGlass.isAvailable ? "true" : "false"));
+        document.documentElement.classList.toggle('native-glass-hdr', \(NativeGlass.isAvailable ? "true" : "false"));
         (function(){
           var settings = \(jsStringLiteral(settings));
           var payload = \(jsStringLiteral(payload));
@@ -169,6 +170,13 @@ enum WebViewContainer {
                 let hidden = (dict["hidden"] as? NSNumber)?.boolValue ?? false
                 DispatchQueue.main.async { [weak self] in
                     self?.host?.updateGlassTabBar(active: active, hidden: hidden)
+                }
+                return
+            }
+            if message.name == "larpGlass", let dict = message.body as? [String: Any] {
+                let items = (dict["items"] as? [[String: Any]]) ?? []
+                DispatchQueue.main.async { [weak self] in
+                    self?.host?.updateGlassChrome(items: items)
                 }
                 return
             }
@@ -301,6 +309,7 @@ final class WebHostViewController: UIViewController {
     private var productDetail: UIViewController?
     private var glassTabBarBottom: NSLayoutConstraint?
     private var glassDrawerBar: UIView?
+    private var glassChrome: UIView?
     private var pullHost: PullRefreshHost?
     private var glassDrawerBarBottom: NSLayoutConstraint?
 
@@ -327,6 +336,7 @@ final class WebHostViewController: UIViewController {
 
         let web = makeWebView()
         showWebView(web)
+        installGlassChrome()
         installGlassTabBar()
         installGlassDrawerBar()
         installPullHost()
@@ -390,6 +400,7 @@ final class WebHostViewController: UIViewController {
     func reloadShopHome() {
         guard let root = coordinator.wwwRoot else { return }
         removeProductDetail()
+        updateGlassChrome(items: [])
         let old = webView?.configuration.userContentController
         old?.removeScriptMessageHandler(forName: "shopifyOrder")
         old?.removeScriptMessageHandler(forName: "larpStore")
@@ -398,6 +409,7 @@ final class WebHostViewController: UIViewController {
         old?.removeScriptMessageHandler(forName: "larpHaptic")
         old?.removeScriptMessageHandler(forName: "larpTabbar")
         old?.removeScriptMessageHandler(forName: "larpDrawer")
+        old?.removeScriptMessageHandler(forName: "larpGlass")
         old?.removeScriptMessageHandler(forName: "larpPtr")
         let web = makeWebView()
         showWebView(web)
@@ -415,6 +427,7 @@ final class WebHostViewController: UIViewController {
         config.userContentController.add(coordinator, name: "larpHaptic")
         config.userContentController.add(coordinator, name: "larpTabbar")
         config.userContentController.add(coordinator, name: "larpDrawer")
+        config.userContentController.add(coordinator, name: "larpGlass")
         config.userContentController.add(coordinator, name: "larpProduct")
         config.userContentController.add(coordinator, name: "larpPtr")
         config.userContentController.addUserScript(
@@ -451,6 +464,7 @@ final class WebHostViewController: UIViewController {
             web.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             web.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
+        if let chrome = glassChrome { view.bringSubviewToFront(chrome) }
         if let glass = glassTabBar { view.bringSubviewToFront(glass) }
         if let host = pullHost { view.bringSubviewToFront(host) }
         if let drawerGlass = glassDrawerBar { view.bringSubviewToFront(drawerGlass) }
@@ -494,6 +508,7 @@ final class WebHostViewController: UIViewController {
         }
         detail.didMove(toParent: self)
         productDetail = detail
+        glassChrome?.isHidden = true
         detail.slideIn()
         #endif
     }
@@ -505,6 +520,7 @@ final class WebHostViewController: UIViewController {
         detail.view.removeFromSuperview()
         detail.removeFromParent()
         productDetail = nil
+        glassChrome?.isHidden = false
     }
 
     private func sendProductEvent(_ function: String, _ payload: [String: Any]) {
@@ -512,6 +528,32 @@ final class WebHostViewController: UIViewController {
               let json = String(data: data, encoding: .utf8) else { return }
         let literal = WebViewContainer.jsStringLiteral(json)
         runJS("window.\(function) && window.\(function)(JSON.parse(\(literal)))")
+    }
+
+    // MARK: - Boutons / recherche / filtres Liquid Glass natifs (iOS 26)
+
+    private func installGlassChrome() {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), glassChrome == nil else { return }
+        let chrome = GlassChromeView(frame: view.bounds)
+        chrome.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        chrome.onTap = { [weak self] id, index in
+            self?.runJS("window.__larpGlassTap && window.__larpGlassTap(\(WebViewContainer.jsStringLiteral(id)), \(index))")
+        }
+        chrome.onText = { [weak self] id, text in
+            self?.runJS("window.__larpGlassText && window.__larpGlassText(\(WebViewContainer.jsStringLiteral(id)), \(WebViewContainer.jsStringLiteral(text)))")
+        }
+        view.addSubview(chrome)
+        glassChrome = chrome
+        #endif
+    }
+
+    /// Appelé par la page web : éléments de verre à afficher (positions en points, repère de la WebView).
+    func updateGlassChrome(items: [[String: Any]]) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), let chrome = glassChrome as? GlassChromeView else { return }
+        chrome.apply(items)
+        #endif
     }
 
     // MARK: - Barre d'onglets Liquid Glass native (iOS 26)
