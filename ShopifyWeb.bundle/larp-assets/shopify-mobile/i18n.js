@@ -486,7 +486,21 @@
     ["Sales", "Ventes", "Ventas", "Verkäufe"],
     ["Visitors", "Visiteurs", "Visitantes", "Besucher"],
     ["Order", "Commande", "Pedido", "Bestellung"],
-    ["Product", "Produit", "Producto", "Produkt"]
+    ["Product", "Produit", "Producto", "Produkt"],
+    ["Get your first order", "Recevez votre première commande", "Recibe tu primer pedido", "Erhalte deine erste Bestellung"],
+    ["Use Quick Sale to sell anywhere, to anyone, right from your phone", "Utilisez Quick Sale pour vendre n’importe où et à n’importe qui, simplement avec votre téléphone", "Usa Quick Sale para vender en cualquier lugar y a cualquiera, directamente desde tu teléfono", "Verkaufe mit Quick Sale überall und an jeden, direkt von deinem Telefon aus"],
+    ["Set up Quick Sale", "Configurer Quick Sale", "Configurar Quick Sale", "Quick Sale einrichten"],
+    ["Add your first product", "Ajoutez votre premier produit", "Añade tu primer producto", "Füge dein erstes Produkt hinzu"],
+    ["Start by adding products to your store that your customers will love", "Commencez par ajouter à votre boutique des produits que vos clients adoreront", "Empieza añadiendo a tu tienda productos que tus clientes van a adorar", "Füge deinem Shop zuerst Produkte hinzu, die deine Kunden lieben werden"],
+    ["Add your products", "Ajouter vos produits", "Añadir tus productos", "Produkte hinzufügen"],
+    ["Other ways to add products", "Autres façons d’ajouter des produits", "Otras formas de añadir productos", "Weitere Möglichkeiten, Produkte hinzuzufügen"],
+    ["Discover products to sell", "Découvrir des produits à vendre", "Descubrir productos para vender", "Produkte zum Verkaufen entdecken"],
+    ["Add a sample product", "Ajouter un exemple de produit", "Añadir un producto de ejemplo", "Beispielprodukt hinzufügen"],
+    ["Subscribe to keep selling", "Abonnez-vous pour continuer à vendre", "Suscríbete para seguir vendiendo", "Abonniere, um weiter zu verkaufen"],
+    ["3 days left", "3 jours restants", "Quedan 3 días", "Noch 3 Tage"],
+    ["Product sourcing opens on the full admin", "La recherche de produits s’ouvre dans l’admin complet", "La búsqueda de productos se abre en el admin completo", "Die Produktsuche öffnet sich im vollständigen Admin"],
+    ["Choose a plan on the full admin", "Choisissez un abonnement dans l’admin complet", "Elige un plan en el admin completo", "Wähle einen Tarif im vollständigen Admin"],
+    ["Sample product added", "Exemple de produit ajouté", "Producto de ejemplo añadido", "Beispielprodukt hinzugefügt"]
   ];
 
   var DICT = { fr: {}, es: {}, de: {} }, TO_EN = {};
