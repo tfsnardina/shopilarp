@@ -174,6 +174,10 @@ enum WebViewContainer {
                 return
             }
             if message.name == "larpGlass", let dict = message.body as? [String: Any] {
+                if let dy = (dict["dy"] as? NSNumber)?.doubleValue {
+                    DispatchQueue.main.async { [weak self] in self?.host?.dragGlassSheet(CGFloat(dy)) }
+                    return
+                }
                 let items = (dict["items"] as? [[String: Any]]) ?? []
                 DispatchQueue.main.async { [weak self] in
                     self?.host?.updateGlassChrome(items: items)
@@ -501,14 +505,13 @@ final class WebHostViewController: UIViewController {
         addChild(detail)
         detail.view.frame = view.bounds
         detail.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        if let web = webView {
-            view.insertSubview(detail.view, aboveSubview: web)
+        if let anchor = glassChrome ?? webView {
+            view.insertSubview(detail.view, aboveSubview: anchor)
         } else {
             view.addSubview(detail.view)
         }
         detail.didMove(toParent: self)
         productDetail = detail
-        glassChrome?.isHidden = true
         detail.slideIn()
         #endif
     }
@@ -520,7 +523,6 @@ final class WebHostViewController: UIViewController {
         detail.view.removeFromSuperview()
         detail.removeFromParent()
         productDetail = nil
-        glassChrome?.isHidden = false
     }
 
     private func sendProductEvent(_ function: String, _ payload: [String: Any]) {
@@ -545,6 +547,14 @@ final class WebHostViewController: UIViewController {
         }
         view.addSubview(chrome)
         glassChrome = chrome
+        #endif
+    }
+
+    /// Glissement de la feuille commande : les boutons suivent le doigt sans attendre le prochain rendu.
+    func dragGlassSheet(_ dy: CGFloat) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), let chrome = glassChrome as? GlassChromeView else { return }
+        chrome.dragSheet(dy)
         #endif
     }
 
