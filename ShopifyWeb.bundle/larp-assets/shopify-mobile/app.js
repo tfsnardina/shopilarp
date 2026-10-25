@@ -1347,6 +1347,7 @@
   }
   window.addEventListener("popstate", function () {
     if (ignorePop > 0) { ignorePop--; return; }
+    if (skEl) return closeSidekick(true);
     if (drawerEl) return closeDrawer(true);
     if (stack.length) pop(true);
   });
@@ -1356,9 +1357,9 @@
     el.className = "page" + (opts.cls ? " " + opts.cls : "");
     if (opts.notabs) el.setAttribute("data-notabs", "");
     if (opts.modal) el.classList.add("modal");
-    el.innerHTML = '<div class="pg-nav' + (opts.title ? " titled" : "") + '"><button class="nb-c" data-back aria-label="' + (opts.modal ? "Close" : "Back") + '">' + ic(opts.modal ? "x" : "chev-left") + "</button>" +
+    el.innerHTML = (opts.navHtml || ('<div class="pg-nav' + (opts.title ? " titled" : "") + '"><button class="nb-c" data-back aria-label="' + (opts.modal ? "Close" : "Back") + '">' + ic(opts.modal ? "x" : "chev-left") + "</button>" +
       (opts.title ? '<h1 class="pg-t">' + esc(opts.title) + (opts.titleChev ? ic("chev-down") : "") + "</h1>" : '<span class="fl"></span>') +
-      (opts.actions || "") + '</div><div class="pg-b">' + body + "</div>";
+      (opts.actions || "") + "</div>")) + '<div class="pg-b">' + body + "</div>";
     $("[data-back]", el).addEventListener("click", function () { pop(false); });
     if (!opts.modal) edgeSwipe(el);
     push(el, opts.modal ? "modal" : "page");
@@ -2143,16 +2144,19 @@
   var recentQ = (function () { try { return JSON.parse(localStorage.getItem("sh-recent") || "[]"); } catch (e) { return []; } })();
   function openSearch() {
     var cat = "All";
-    var body = '<div class="srch"><div class="sbar"><label class="sfield">' + ic("search") + '<input type="search" id="gq" placeholder="Search" autocomplete="off" enterkeyhint="search"></label><button class="cb" data-act="scan" aria-label="Scan">' + ic("barcode") + "</button></div>" +
-      '<div class="chips" id="gchips">' + ["All", "Orders", "Products", "Customers"].map(function (c) { return '<button class="chip' + (c === cat ? " on" : "") + '" data-gc="' + c + '">' + c + "</button>"; }).join("") + "</div>" +
+    var nav = '<div class="pg-nav sr-nav"><label class="sfield">' + ic("search") + '<input type="search" id="gq" placeholder="Search" autocomplete="off" enterkeyhint="search"><button type="button" class="sr-scan" data-act="scan" aria-label="Scan">' + ic("barcode") + "</button></label>" +
+      '<button class="nb-c sr-x" data-back aria-label="Close">' + ic("x") + "</button></div>";
+    var body = '<div class="srch">' +
+      '<div class="chips" id="gchips">' + [["All", "Everything"], ["Orders", "Orders"], ["Products", "Products"], ["Customers", "Customers"]].map(function (c) { return '<button class="chip' + (c[0] === cat ? " on" : "") + '" data-gc="' + c[0] + '">' + c[1] + "</button>"; }).join("") +
+      '<button class="chip flt" id="gflt" aria-label="Filters">' + ic("filter") + "</button></div>" +
       '<div id="gres"></div></div>';
-    var el = page(body, { cls: "search", title: "Search" });
+    var el = page(body, { cls: "search", modal: true, notabs: true, navHtml: nav });
     var inp = $("#gq", el), res = $("#gres", el);
     function idle() {
       var r = recentQ.slice(0, 6);
-      res.innerHTML = (r.length ? '<div class="mh"><span>Recent searches</span><button class="lnk" id="gclr">Clear</button></div>' + r.map(function (q) { return '<button class="srow" data-q="' + esc(q) + '">' + ic("recent") + "<span>" + esc(q) + "</span></button>"; }).join("") : "") +
-        '<div class="mh"><span>Suggested</span></div>' + [["Unfulfilled orders", "fulfill"], ["Low inventory", "inventory"], ["Customers", "customers"]].map(function (x) { return '<button class="srow" data-act="' + x[1] + '">' + ic("search") + "<span>" + x[0] + "</span></button>"; }).join("") +
-        '<div class="slinks"><button class="lnk" data-act="soon:Shopify App Store">Search the Shopify App Store</button><button class="lnk" data-act="help">Search the Help Center</button></div>';
+      res.innerHTML = r.length ?
+        '<div class="mh"><span>Recent searches</span><button class="lnk" id="gclr">Clear</button></div>' + r.map(function (q) { return '<button class="srow" data-q="' + esc(q) + '">' + ic("recent") + "<span>" + esc(q) + "</span></button>"; }).join("") :
+        '<div class="empty sr-empty">' + ic("search") + "<b>No recent searches</b></div>";
       var c = $("#gclr", res); if (c) c.addEventListener("click", function () { recentQ = []; try { localStorage.removeItem("sh-recent"); } catch (e) { } idle(); });
       $$("[data-q]", res).forEach(function (b) { b.addEventListener("click", function () { inp.value = b.getAttribute("data-q"); run(); }); });
     }
@@ -2165,6 +2169,7 @@
       res.innerHTML = (os.length ? '<div class="mh"><span>Orders</span></div>' + os.map(orderRow).join("") : "") + (ps.length ? '<div class="mh"><span>Products</span></div>' + ps.map(prodRow).join("") : "") + (cs.length ? '<div class="mh"><span>Customers</span></div>' + cs.map(custRow).join("") : "") || emptyState("No results for \u201c" + inp.value.trim() + "\u201d", "Try a different search term");
     }
     $$("[data-gc]", el).forEach(function (b) { b.addEventListener("click", function () { cat = b.getAttribute("data-gc"); $$("[data-gc]", el).forEach(function (x) { x.classList.toggle("on", x === b); }); hap(4); run(); }); });
+    $("#gflt", el).addEventListener("click", function () { hap(4); toast("Filters are not available yet"); });
     inp.addEventListener("input", run);
     inp.addEventListener("keydown", function (e) {
       if (e.key !== "Enter") return;
@@ -2174,9 +2179,9 @@
       inp.blur();
     });
     idle();
-    setTimeout(function () { try { inp.focus({ preventScroll: true }); } catch (e) { } }, 420);
+    setTimeout(function () { try { inp.focus({ preventScroll: true }); } catch (e) { } }, 320);
   }
-  function openSidekick() {
+  function openSidekickChat(first) {
     var R = rangeData("30d"), Rt = rangeData("today");
     var sugg = ["How are sales today?", "What are my best sellers?", "Which orders need attention?", "Write a product description"];
     var g = greeting().replace("!", "");
@@ -2214,6 +2219,54 @@
     qi.addEventListener("input", sync);
     qi.addEventListener("keydown", function (e) { if (e.key === "Enter") { ask(qi.value.trim()); qi.value = ""; sync(); } });
     go.addEventListener("click", function () { if (qi.value.trim()) { ask(qi.value.trim()); qi.value = ""; sync(); } else toast("Listening\u2026"); });
+    if (first) setTimeout(function () { ask(first); }, 480);
+  }
+  /* Sidekick : barre flottante au-dessus du clavier (bouton droit de la barre d'onglets) */
+  var skEl = null;
+  function openSidekick() {
+    if (skEl) return;
+    var el = document.createElement("div");
+    el.className = "sk-ov";
+    el.innerHTML = '<div class="sk-ov-scrim" data-skclose></div><div class="sk-ov-dock">' +
+      '<div class="sk-ov-top"><button class="sk-glass sk-hist" data-skhist>' + ic("recent") + "<span>Chat history</span></button>" +
+      '<button class="sk-glass sk-circ sk-opts" data-skopts aria-label="Options">' + ic("filter") + "</button></div>" +
+      '<div class="sk-ov-row"><div class="sk-glass sk-card"><input id="skov-q" placeholder="Work with Sidekick" autocomplete="off" enterkeyhint="send">' +
+      '<div class="sk-card-bar"><span class="sk-face">' + mascot() + '</span><span class="sk-fill"></span>' +
+      '<button class="sk-ib" data-skplus aria-label="Attach">' + ic("plus") + '</button><button class="sk-ib" id="skov-go" aria-label="Voice">' + ic("mic") + "</button></div></div>" +
+      '<button class="sk-glass sk-circ sk-x" data-skclose aria-label="Close">' + ic("x") + "</button></div></div>";
+    app.appendChild(el);
+    skEl = el;
+    $("#tabbar").classList.add("hide");
+    try { history.pushState({ sk: 1 }, ""); } catch (e) { }
+    var qi = $("#skov-q", el), go = $("#skov-go", el);
+    function sync() { var has = !!qi.value.trim(); go.classList.toggle("send", has); go.innerHTML = has ? ic("arrow-up") : ic("mic"); }
+    function send() {
+      var q = qi.value.trim(); if (!q) return;
+      hap(5); closeSidekick();
+      setTimeout(function () { openSidekickChat(q); }, 360);
+    }
+    qi.addEventListener("input", sync);
+    qi.addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
+    go.addEventListener("click", function () { if (qi.value.trim()) send(); else toast("Listening\u2026"); });
+    el.addEventListener("click", function (e) {
+      var t = e.target.closest("[data-skclose],[data-skhist],[data-skopts],[data-skplus]");
+      if (!t) return;
+      if (t.hasAttribute("data-skclose")) { hap(4); return closeSidekick(); }
+      if (t.hasAttribute("data-skhist")) { hap(4); return toast("No previous chats"); }
+      if (t.hasAttribute("data-skopts")) { hap(4); return toast("Private chat"); }
+      if (t.hasAttribute("data-skplus")) { hap(4); return toast("Attachments are not available yet"); }
+    });
+    requestAnimationFrame(function () { requestAnimationFrame(function () { el.classList.add("on"); }); });
+    setTimeout(function () { try { qi.focus({ preventScroll: true }); } catch (e) { } }, 120);
+  }
+  function closeSidekick(fromHistory) {
+    if (!skEl) return;
+    var el = skEl; skEl = null;
+    try { var ae = document.activeElement; if (ae && ae.blur) ae.blur(); } catch (e) { }
+    el.classList.remove("on");
+    $("#tabbar").classList.toggle("hide", !!(stack.length && stack[stack.length - 1].el.hasAttribute("data-notabs")));
+    if (!fromHistory) { ignorePop++; try { history.back(); } catch (e) { ignorePop--; } }
+    setTimeout(function () { el.remove(); }, 340);
   }
   // Sidekick's mascot: white face, navy hair, purple mask.
   function mascot() {
@@ -2988,6 +3041,17 @@
     window.__larpNativeTab = function (name) { var b = tbEl.querySelector('.tb[data-tab="' + name + '"]'); if (b) b.click(); };
     window.__larpNativeAct = function (name) { var b = tbEl.querySelector('[data-act="' + name + '"]'); if (b) b.click(); };
     post();
+  })();
+  /* Hauteur du clavier -> --kb (relais natif via Swift, repli visualViewport sur le web) */
+  (function () {
+    var vv = window.visualViewport; if (!vv) return;
+    function upd() {
+      var kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      if (kb < 80) kb = 0;
+      if (document.documentElement.getAttribute("data-native-kb")) return;
+      document.documentElement.style.setProperty("--kb", kb + "px");
+    }
+    vv.addEventListener("resize", upd); vv.addEventListener("scroll", upd);
   })();
   scheduleOrder(true);
 })();
