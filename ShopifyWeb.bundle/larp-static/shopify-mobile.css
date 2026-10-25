@@ -1199,3 +1199,51 @@ html.native-glass-tabbar #tabbar,html.native-glass-tabbar #tabbar *{opacity:0!im
 .gl-scr .chip{transition:background .2s,box-shadow .2s,transform .25s cubic-bezier(.34,1.56,.64,1)}
 .gl-scr .chip.on{background:linear-gradient(180deg,#fff,#f0f0f2);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 .5px rgba(0,0,0,.1),0 4px 12px rgba(0,0,0,.08)}
 .gl-scr .chip:active{transform:scale(.95)}
+
+/* ── Recherche (bouton gauche) : champ en verre + bouton fermer, comme la vidéo ── */
+.page.search{background:#fff}
+.page.search.modal{border-radius:0;box-shadow:none;opacity:0;transform:translateY(16px);transition:transform .38s var(--ease),opacity .26s}
+.page.search.modal.on{opacity:1;transform:none}
+.pg-nav.sr-nav{display:flex;align-items:center;gap:10px;min-height:0;padding:calc(var(--top) + 8px) 14px 2px}
+.sr-nav .sfield{flex:1;height:46px;padding:0 12px 0 13px;border-radius:23px;color:#6b6b6b;background:rgba(250,250,251,.86);-webkit-backdrop-filter:blur(18px) saturate(170%);backdrop-filter:blur(18px) saturate(170%);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 .5px rgba(0,0,0,.12),0 5px 16px rgba(0,0,0,.06)}
+.sr-nav .sfield input{font-size:17px}
+.sr-nav .sfield input::placeholder{color:#6f6f6f}
+.sr-scan{flex:none;width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:#4a4a4a}
+.sr-scan .ic{width:22px;height:22px}
+.sr-nav .sr-x{width:46px;height:46px;background:rgba(250,250,251,.86);-webkit-backdrop-filter:blur(18px) saturate(170%);backdrop-filter:blur(18px) saturate(170%);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 .5px rgba(0,0,0,.12),0 5px 16px rgba(0,0,0,.06)}
+.page.search .chips{padding:14px 14px 6px;gap:2px}
+.page.search .chip{height:38px;padding:0 17px;font-size:16px}
+.page.search .chip.flt{padding:0 14px;color:#4a4a4a}
+.page.search .chip.flt .ic{width:20px;height:20px}
+.sr-empty{padding:64px 24px;gap:10px}
+.sr-empty .ic{width:36px;height:36px;color:#b4b4b4}
+.sr-empty b{font-size:14.5px;font-weight:650;color:#6b6b6b}
+
+/* ── Sidekick (bouton droit) : barre flottante au-dessus du clavier ── */
+.sk-ov{position:absolute;inset:0;z-index:60;pointer-events:none}
+.sk-ov.on{pointer-events:auto}
+.sk-ov-scrim{position:absolute;inset:0;background:rgba(0,0,0,0);transition:background .3s}
+.sk-ov.on .sk-ov-scrim{background:rgba(0,0,0,.04)}
+.sk-ov-dock{position:absolute;left:0;right:0;bottom:calc(var(--kb,0px) + max(var(--bot,0px),12px));display:flex;flex-direction:column;gap:8px;padding:0 16px;opacity:0;transform:translateY(26px);transition:transform .42s var(--ease),opacity .26s,bottom .26s var(--ease)}
+.sk-ov.on .sk-ov-dock{opacity:1;transform:none}
+.sk-glass{background:rgba(252,252,253,.84);-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 .5px rgba(0,0,0,.1),0 8px 26px rgba(0,0,0,.12);color:#303030}
+.sk-ov-top{display:flex;align-items:center;gap:8px;padding-left:2px}
+.sk-hist{display:flex;align-items:center;gap:9px;height:42px;padding:0 17px 0 13px;border-radius:21px;font-size:15.5px;font-weight:500;transition:transform .2s}
+.sk-hist .ic,.sk-opts .ic{width:19px;height:19px}
+.sk-circ{flex:none;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:transform .2s}
+.sk-hist:active,.sk-circ:active{transform:scale(.94)}
+.sk-ov-row{display:flex;align-items:flex-end;gap:10px}
+.sk-card{flex:1;min-width:0;border-radius:30px;padding:19px 16px 12px 20px}
+.sk-card input{display:block;width:100%;border:0;outline:0;background:none;font-size:19px;letter-spacing:-.2px;color:#111;-webkit-appearance:none;padding:0}
+.sk-card input::placeholder{color:#7b7b7b}
+.sk-card-bar{display:flex;align-items:center;gap:6px;margin-top:20px}
+.sk-face{display:block;width:26px;height:26px;flex:none}
+.sk-face svg{display:block;width:100%;height:100%}
+.sk-fill{flex:1}
+.sk-ib{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#4a4a4a;transition:background .2s,color .2s}
+.sk-ib .ic{width:22px;height:22px}
+.sk-ib.send{background:#303030;color:#fff}
+.sk-ib.send .ic{width:19px;height:19px}
+.sk-x{width:58px;height:58px;margin-bottom:6px}
+.sk-x .ic{width:22px;height:22px}
+html.ios-bold .sk-hist{font-weight:650}
