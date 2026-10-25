@@ -2049,8 +2049,9 @@
           done = true; k.style.transition = "transform .2s var(--ease)"; fill.style.transition = "width .2s var(--ease)"; set(max);
           sw.classList.add("done"); txt.textContent = "Sending…"; txt.style.opacity = 1; k.innerHTML = '<span class="sl-spin"></span>';
           burst();
-          setTimeout(function () { k.innerHTML = SWC; sw.classList.add("ok"); }, 650);
-          setTimeout(send, 1000);
+          var wait = 2000 + Math.random() * 3000;   // loading lasts a random 2 to 5 seconds
+          setTimeout(function () { k.innerHTML = SWC; sw.classList.add("ok"); hap("success"); }, wait - 350);
+          setTimeout(send, wait);
         } else {
           k.style.transition = "transform .45s var(--ease)"; fill.style.transition = "width .45s var(--ease)"; set(0); hap("light");
         }
