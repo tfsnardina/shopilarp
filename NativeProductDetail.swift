@@ -338,7 +338,9 @@ final class PCDNumberPill: UIVisualEffectView {
 // MARK: - Fiche produit
 
 @available(iOS 26.0, *)
-final class ProductDetailViewController: UIViewController, UIScrollViewDelegate, UIGestureRecognizerDelegate {
+final class ProductDetailViewController: UIViewController, UIScrollViewDelegate, UIGestureRecognizerDelegate, DetailPushHosting {
+    let push = DetailPushTransition()
+
     /// Appelé à l'enregistrement : idx, id, title, desc, category, price, inv, vendor, type, status, tags, collections, vars, physical, img.
     var onSave: (([String: Any]) -> Void)?
     var onDelete: ((Int) -> Void)?
@@ -465,19 +467,15 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
     }
 
     func slideIn() {
-        view.transform = CGAffineTransform(translationX: view.bounds.width, y: 0)
-        UIView.animate(withDuration: 0.34, delay: 0, options: [.curveEaseOut]) {
-            self.view.transform = .identity
-        }
+        push.attach(to: view)
+        push.slideIn()
     }
 
-    func closeAnimated() {
+    func closeAnimated(velocity: CGFloat = 0) {
         view.endEditing(true)
-        UIView.animate(withDuration: 0.28, delay: 0, options: [.curveEaseOut], animations: {
-            self.view.transform = CGAffineTransform(translationX: self.view.bounds.width, y: 0)
-        }, completion: { _ in
-            self.onClose?()
-        })
+        push.close(velocity: velocity) { [weak self] in
+            self?.onClose?()
+        }
     }
 
     // MARK: Construction
@@ -1103,21 +1101,22 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
     // MARK: Retour par glissement depuis le bord gauche
 
     @objc private func edgePan(_ g: UIScreenEdgePanGestureRecognizer) {
-        let x = max(0, g.translation(in: view).x)
+        let w = max(view.bounds.width, 1)
+        let x = max(0, g.translation(in: view.superview).x)
         switch g.state {
-        case .changed:
-            view.transform = CGAffineTransform(translationX: x, y: 0)
+        case .began, .changed:
+            push.setProgress(1 - x / w)
         case .ended, .cancelled:
-            let fast = g.velocity(in: view).x > 600
-            if g.state == .ended && (x > view.bounds.width * 0.33 || fast) {
+            let vx = g.velocity(in: view.superview).x
+            if g.state == .ended && (x > w * 0.33 || vx > 600) {
                 if isDirty {
-                    UIView.animate(withDuration: 0.2) { self.view.transform = .identity }
+                    push.animate(open: true, velocity: 0)
                     backTapped()
                 } else {
-                    closeAnimated()
+                    closeAnimated(velocity: vx)
                 }
             } else {
-                UIView.animate(withDuration: 0.25) { self.view.transform = .identity }
+                push.animate(open: true, velocity: vx)
             }
         default:
             break
