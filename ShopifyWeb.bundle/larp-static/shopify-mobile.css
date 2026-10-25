@@ -1275,3 +1275,14 @@ html.ios-bold .sk-hist{font-weight:650}
 .sk-ov.answered .sk-card{background:#fff;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08),0 6px 22px rgba(0,0,0,.1)}
 .sk-ov.thinking .sk-ov-top,.sk-ov.answered .sk-ov-top{display:none}
 .sk-ov.thinking .sk-chev{display:flex}
+
+/* ── Liquid Glass natif : en-têtes Commandes / Produits + fiche commande ──
+   Les éléments web restent en place (mise en page + clics relayés) mais sont invisibles : le verre est natif (UIGlassEffect). */
+html.native-glass-hdr .gl-tools{position:sticky;top:calc(var(--top) + 62px);z-index:5;padding-bottom:2px;background:linear-gradient(180deg,rgba(255,255,255,.97) 82%,rgba(255,255,255,0))}
+html.native-glass-hdr:not(.glass-cover) .gl-hd .gl-btn,
+html.native-glass-hdr:not(.glass-cover) .gl-hd .gl-chev,
+html.native-glass-hdr:not(.glass-cover) .gl-scr .sfield,
+html.native-glass-hdr:not(.glass-cover) .gl-scr .cb,
+html.native-glass-hdr:not(.glass-cover) .gl-scr .chip{visibility:hidden}
+html.native-glass-hdr #layers>:last-child .sh.notifs.order .sh-h.nav .sh-x,
+html.native-glass-hdr #layers>:last-child .sh.notifs.order .sh-h.nav .nb-c{visibility:hidden}
