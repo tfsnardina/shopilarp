@@ -730,6 +730,12 @@ final class ProductCreatorViewController: UIViewController {
     private var collections = [tr("Page d'accueil", "Home page")]
     private var variants = ""
     private var physical = true
+    private var img = ""
+    private var imgImage: UIImage?
+    private let photoPicker = PCPhotoPicker()
+    private let mediaIcon = UIImageView(image: PCTheme.symbol("photo", 26, .regular))
+    private let mediaThumb = UIImageView()
+    private let mediaLabel = UILabel()
 
     private let saveButton = PCGlassButton(title: tr("Enregistrer", "Save"), tint: PCTheme.ink, foreground: .white)
     private let statusPill = PCStatusPill()
@@ -961,9 +967,7 @@ final class ProductCreatorViewController: UIViewController {
     }
 
     private func makeMediaBlock() -> UIView {
-        let box = UIImageView(image: PCTheme.symbol("photo", 26, .regular))
-        box.tintColor = UIColor(white: 0.55, alpha: 1)
-        box.contentMode = .center
+        let box = UIView()
         box.backgroundColor = .white
         box.layer.cornerRadius = 20
         box.layer.cornerCurve = .continuous
@@ -973,17 +977,35 @@ final class ProductCreatorViewController: UIViewController {
         box.layer.shadowOffset = CGSize(width: 0, height: 4)
         box.widthAnchor.constraint(equalToConstant: 72).isActive = true
         box.heightAnchor.constraint(equalToConstant: 72).isActive = true
-        let add = UILabel()
-        add.text = tr("Ajouter des images", "Add images")
-        add.font = .systemFont(ofSize: 15, weight: .medium)
-        add.textColor = PCTheme.ink
+        mediaIcon.tintColor = UIColor(white: 0.55, alpha: 1)
+        mediaIcon.contentMode = .center
+        mediaIcon.translatesAutoresizingMaskIntoConstraints = false
+        mediaThumb.contentMode = .scaleAspectFill
+        mediaThumb.clipsToBounds = true
+        mediaThumb.layer.cornerRadius = 20
+        mediaThumb.layer.cornerCurve = .continuous
+        mediaThumb.isHidden = true
+        mediaThumb.translatesAutoresizingMaskIntoConstraints = false
+        box.addSubview(mediaIcon)
+        box.addSubview(mediaThumb)
+        for v in [mediaIcon, mediaThumb] {
+            NSLayoutConstraint.activate([
+                v.leadingAnchor.constraint(equalTo: box.leadingAnchor),
+                v.trailingAnchor.constraint(equalTo: box.trailingAnchor),
+                v.topAnchor.constraint(equalTo: box.topAnchor),
+                v.bottomAnchor.constraint(equalTo: box.bottomAnchor),
+            ])
+        }
+        mediaLabel.text = tr("Ajouter des images", "Add images")
+        mediaLabel.font = .systemFont(ofSize: 15, weight: .medium)
+        mediaLabel.textColor = PCTheme.ink
         let sub = UILabel()
         sub.text = tr("Choisissez un forfait pour ajouter d'autres types de supports multimédias.", "Choose a plan to add other types of media.")
         sub.font = .systemFont(ofSize: 15)
         sub.textColor = PCTheme.sub
         sub.textAlignment = .center
         sub.numberOfLines = 0
-        let stack = UIStackView(arrangedSubviews: [box, add, sub])
+        let stack = UIStackView(arrangedSubviews: [box, mediaLabel, sub])
         stack.axis = .vertical
         stack.alignment = .center
         stack.spacing = 10
@@ -997,7 +1019,7 @@ final class ProductCreatorViewController: UIViewController {
             stack.leadingAnchor.constraint(equalTo: control.leadingAnchor, constant: 24),
             stack.trailingAnchor.constraint(equalTo: control.trailingAnchor, constant: -24),
         ])
-        control.addAction(UIAction { [weak self] _ in self?.openFiles() }, for: .touchUpInside)
+        control.addAction(UIAction { [weak self] _ in PCTheme.haptic(); self?.mediaTapped() }, for: .touchUpInside)
         return control
     }
 
@@ -1105,17 +1127,44 @@ final class ProductCreatorViewController: UIViewController {
         present(sheet, animated: true)
     }
 
-    private func openFiles() {
-        let sheet = PCSearchSheet(config: .init(
-            title: tr("Sélection de fichiers", "Select files"),
-            placeholder: tr("Rechercher des fichiers", "Search files"),
-            emptyTitle: tr("Aucun fichier pour le moment", "No files yet"),
-            emptySubtitle: tr("Importez des fichiers dans votre boutique pour les sélectionner ici.", "Upload files to your store to select them here."),
-            allowAdd: false,
-            headerIcons: ["camera", "plus"],
-            searchIcons: ["arrow.up.arrow.down", "line.3.horizontal.decrease", "list.bullet"],
-            detents: [.large()]
-        ), selected: [])
+    private func refreshMedia() {
+        if let imgImage {
+            mediaThumb.image = imgImage
+            mediaThumb.isHidden = false
+            mediaIcon.isHidden = true
+            mediaLabel.text = tr("Modifier l'image", "Edit image")
+        } else {
+            mediaThumb.image = nil
+            mediaThumb.isHidden = true
+            mediaIcon.isHidden = false
+            mediaLabel.text = tr("Ajouter des images", "Add images")
+        }
+    }
+
+    private func setImage(_ dataURL: String) {
+        img = dataURL
+        imgImage = dataURL.isEmpty ? nil : PCImage.image(fromDataURL: dataURL)
+        refreshMedia()
+    }
+
+    private func pickPhoto() {
+        photoPicker.present(from: self) { [weak self] image in
+            guard let self, let image, let data = PCImage.squareDataURL(image) else { return }
+            self.setImage(data)
+        }
+    }
+
+    private func mediaTapped() {
+        view.endEditing(true)
+        if img.isEmpty { pickPhoto(); return }
+        let sheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        sheet.addAction(UIAlertAction(title: tr("Choisir une autre photo", "Choose another photo"), style: .default) { [weak self] _ in
+            self?.pickPhoto()
+        })
+        sheet.addAction(UIAlertAction(title: tr("Supprimer la photo", "Remove photo"), style: .destructive) { [weak self] _ in
+            self?.setImage("")
+        })
+        sheet.addAction(UIAlertAction(title: tr("Annuler", "Cancel"), style: .cancel))
         present(sheet, animated: true)
     }
 
@@ -1143,6 +1192,7 @@ final class ProductCreatorViewController: UIViewController {
             "collections": collections,
             "vars": variants,
             "physical": physical,
+            "img": img,
         ])
         dismiss(animated: true)
     }
