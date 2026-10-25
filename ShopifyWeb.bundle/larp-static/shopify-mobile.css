@@ -650,11 +650,18 @@ html.ios-bold .pv-list h3{font-weight:700}
 .tr-prog i::after{content:"";position:absolute;inset:0;background:#303030;transform:scaleX(0);transform-origin:left;transition:transform .5s var(--ease)}
 .tr-prog i.on::after{transform:none}
 .tr-wrap{flex:1;display:flex;flex-direction:column;min-height:0}
-.tr-pane{flex:1;display:flex;flex-direction:column}
-.tr-pane.in{animation:trin .45s var(--ease) both}
+.tr-panes{flex:1;position:relative;min-height:0;overflow:hidden}
+.tr-pane{position:absolute;inset:0;display:flex;flex-direction:column;overflow-x:hidden;overflow-y:auto;background:#fff}
+.tr-pane.in{animation:trin .42s var(--ease) both}
 .tr-pane.in.back{animation-name:trinb}
-@keyframes trin{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
-@keyframes trinb{from{opacity:0;transform:translateX(-30px)}to{opacity:1;transform:none}}
+.tr-pane.out{animation:trout .42s var(--ease) both;pointer-events:none}
+.tr-pane.out.back{animation-name:troutb}
+@keyframes trin{from{transform:translateX(100%)}to{transform:none}}
+@keyframes trinb{from{transform:translateX(-30%);opacity:0}to{transform:none;opacity:1}}
+@keyframes trout{from{transform:none;opacity:1}to{transform:translateX(-30%);opacity:0}}
+@keyframes troutb{from{transform:none}to{transform:translateX(100%)}}
+.tr-footw{flex:none}
+.tr-footw .tr-foot{margin-top:0;padding-top:12px}
 .tr-h{margin:16px 0 4px;font-size:22px;font-weight:700;letter-spacing:-.4px}
 .tr-p{margin:0 0 16px;font-size:15px;color:var(--tx2)}
 .tr-foot{margin-top:auto;padding-top:16px}
