@@ -2775,12 +2775,23 @@
   function showLogin(onContinue) {
     var w = document.createElement("div");
     w.id = "login";
-    w.innerHTML = '<div class="lg-card">' +
+    var initial = (S.name || "?").trim().charAt(0).toUpperCase() || "?";
+    w.innerHTML = '<div class="lg-top"><div class="lg-mark">' + esc(initial) + '</div><div class="lg-word">' + esc(S.name) + '</div></div>' +
+      '<div class="lg-card">' +
       '<h1>Se connecter</h1>' +
       '<p>Continuer vers ' + esc(S.name) + ' Mobile</p>' +
       '<div id="lgStepEmail">' +
       '<label class="np-f"><span>E-mail</span><input id="lgEmail" type="email" value="exemple@exemple.com" autocapitalize="off" autocorrect="off" spellcheck="false"></label>' +
       '<button type="button" class="btn-p" id="lgNext"><span>Continuer avec l\u2019e-mail</span></button>' +
+      '<div class="lg-div">ou</div>' +
+      '<button type="button" class="lg-key" id="lgKey">' + ic("key") + '<span>Se connecter avec une cl\u00e9 d\u2019acc\u00e8s</span><span class="lg-badge">Derni\u00e8re utilisation</span></button>' +
+      '<div class="lg-alt">' +
+      '<button type="button" aria-label="E-mail">' + ic("mail") + '</button>' +
+      '<button type="button" aria-label="T\u00e9l\u00e9phone">' + ic("phone") + '</button>' +
+      '<button type="button" aria-label="Identifiant biom\u00e9trique">' + ic("fid") + '</button>' +
+      '<button type="button" aria-label="Assistance">' + ic("chat") + '</button>' +
+      '</div>' +
+      '<p class="lg-new">Nouveau\u00a0? <b>D\u00e9marrer \u2192</b></p>' +
       '</div>' +
       '<div id="lgStepPass" hidden>' +
       '<div class="lg-acct"><span id="lgEmailShown"></span><button type="button" id="lgChange">Changer d\u2019e-mail</button></div>' +
@@ -2788,8 +2799,12 @@
       '<a href="javascript:void(0)" class="lg-forgot" id="lgForgot">Mot de passe oubli\u00e9\u00a0?</a>' +
       '<button type="button" class="btn-p" id="lgGo"><span>Se connecter</span></button>' +
       '</div>' +
-      '</div>';
+      '</div>' +
+      '<p class="lg-help">Besoin d\u2019aide\u00a0?</p>';
     app.appendChild(w);
+    var lgKey = $("#lgKey", w);
+    if (lgKey) lgKey.addEventListener("click", function () { hap("light"); });
+    $$(".lg-alt button", w).forEach(function (b) { b.addEventListener("click", function () { hap("light"); }); });
     statusBar("dark");
     var done = false;
     $("#lgNext", w).addEventListener("click", function () {
