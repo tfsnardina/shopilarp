@@ -1567,6 +1567,11 @@
     return p;
   }
   function openNewProduct() {
+    // iOS 26 : l'écran de création est natif (Liquid Glass) ; la page reçoit le résultat via __larpNativeProductSave.
+    if (window.__LARP_NATIVE_PRODUCT__ && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpProduct) {
+      window.webkit.messageHandlers.larpProduct.postMessage({ sym: S.sym, vendor: S.name || "" });
+      return;
+    }
     var d = { img: "", status: "Active" }, saving = false, sym = esc(S.sym);
     var body = '<div class="np">' +
       '<div class="np-c"><div class="np-l">Media</div><div class="np-media"><button type="button" class="np-ph" id="npPh">' + ic("image") + "<span>Add photo</span></button><button type=\"button\" class=\"np-rm\" id=\"npRm\" hidden>Remove photo</button></div></div>" +
@@ -1632,6 +1637,12 @@
     });
     setTimeout(function () { try { g("npTitle").focus({ preventScroll: true }); } catch (e) { } }, 520);
   }
+  window.__larpNativeProductSave = function (n) {
+    createProduct({ title: n.title, price: n.price || 0, compare: 0, inv: n.inv || 0, sku: "", vars: n.vars || "", type: n.type || "", vendor: n.vendor || "", status: n.status === "Draft" ? "Draft" : "Active", img: "" });
+    pFilter = "All"; pQuery = ""; rendered.products = 0;
+    if (current === "products") renderProducts();
+    setTimeout(function () { toast("Product saved"); }, 320);
+  };
 
   /* ── Customers ───────────────────────────────────────────── */
   function lastOrderOf(c) { for (var i = 0; i < orders.length; i++) if (orders[i].c === c) return orders[i]; return null; }
