@@ -40,8 +40,8 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIRequiresFullScreen: YES
         INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
-        MARKETING_VERSION: "1.0.21"
-        CURRENT_PROJECT_VERSION: "21"
+        MARKETING_VERSION: "1.0.22"
+        CURRENT_PROJECT_VERSION: "22"
     postbuildScripts:
       - name: Ensure ShopifyWeb.bundle in app
         script: |
@@ -59,8 +59,8 @@ targets:
           /usr/libexec/PlistBuddy -c "Delete :UILaunchScreen" "$PLIST" || true
           /usr/libexec/PlistBuddy -c "Add :UILaunchScreen dict" "$PLIST"
           /usr/libexec/PlistBuddy -c "Set :UIRequiresFullScreen true" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :UIRequiresFullScreen bool true" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.21" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.21" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 21" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 21" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.22" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.22" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 22" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 22" "$PLIST"
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Shopify" "$PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string Shopify" "$PLIST"
           /usr/libexec/PlistBuddy -c "Print :UILaunchScreen" "$PLIST"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")" = "1.0.21"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")" = "1.0.22"
