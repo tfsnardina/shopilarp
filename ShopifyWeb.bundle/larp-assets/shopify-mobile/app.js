@@ -1140,9 +1140,9 @@
         '<button class="gl-cta" data-act="quicksale">Set up Quick Sale</button></div></div></div>';
       return;
     }
-    el.innerHTML = '<div class="gl-page">' + head + '<div class="gl-body">' +
+    el.innerHTML = '<div class="gl-page">' + head + '<div class="gl-body"><div class="gl-tools">' +
       '<div class="sbar"><label class="sfield">' + ic("search") + '<input id="oq" type="search" placeholder="All locations" value="' + esc(oQuery) + '" autocomplete="off"></label><button class="cb" data-act="locations" aria-label="Locations">' + ic("location") + '</button><button class="cb dot" data-act="sort" aria-label="Sort">' + ic("sort") + '</button><button class="cb" data-act="ofilter" aria-label="Filter">' + ic("filter") + "</button></div>" +
-      '<div class="chips">' + ["All", "Unfulfilled", "Unpaid", "Open", "Archived"].map(function (c) { return '<button class="chip' + (c === oFilter ? " on" : "") + '" data-of="' + c + '">' + c + "</button>"; }).join("") + "</div>" +
+      '<div class="chips">' + ["All", "Unfulfilled", "Unpaid", "Open", "Archived"].map(function (c) { return '<button class="chip' + (c === oFilter ? " on" : "") + '" data-of="' + c + '">' + c + "</button>"; }).join("") + "</div></div>" +
       '<div class="olist" id="olist">' + (list.length ? orderList(list, oShown) : emptyState("No orders found", "Try changing the filters or search term")) + "</div></div></div>";
     $$(".chip", el).forEach(function (b) { b.addEventListener("click", function () { oFilter = b.getAttribute("data-of"); oShown = 40; hap(5); renderOrders(); }); });
     var q = $("#oq");
@@ -1178,9 +1178,9 @@
         "</div></div></div>" + trial + "</div>";
       return;
     }
-    el.innerHTML = '<div class="gl-page">' + head + '<div class="gl-body">' +
+    el.innerHTML = '<div class="gl-page">' + head + '<div class="gl-body"><div class="gl-tools">' +
       '<div class="sbar"><label class="sfield">' + ic("search") + '<input id="pq" type="search" placeholder="Filter products" value="' + esc(pQuery) + '" autocomplete="off"></label><button class="cb" data-act="sort" aria-label="Sort">' + ic("sort") + '</button><button class="cb" data-act="pfilter" aria-label="Filter">' + ic("filter") + "</button></div>" +
-      '<div class="chips">' + ["All", "Active", "Draft", "Archived"].map(function (c) { return '<button class="chip' + (c === pFilter ? " on" : "") + '" data-pf="' + c + '">' + c + "</button>"; }).join("") + "</div>" +
+      '<div class="chips">' + ["All", "Active", "Draft", "Archived"].map(function (c) { return '<button class="chip' + (c === pFilter ? " on" : "") + '" data-pf="' + c + '">' + c + "</button>"; }).join("") + "</div></div>" +
       '<div class="plist" id="plist">' + (list.length ? list.map(prodRow).join("") : emptyState("No products found", "Try changing the filters or search term")) + "</div></div>" + trial + "</div>";
     $$(".chip", el).forEach(function (b) { b.addEventListener("click", function () { pFilter = b.getAttribute("data-pf"); hap(5); renderProducts(); }); });
     var q = $("#pq");
@@ -3162,6 +3162,109 @@
     window.__larpNativeTab = function (name) { var b = tbEl.querySelector('.tb[data-tab="' + name + '"]'); if (b) b.click(); };
     window.__larpNativeAct = function (name) { var b = tbEl.querySelector('[data-act="' + name + '"]'); if (b) b.click(); };
     post();
+  })();
+
+  /* Pont Liquid Glass natif (iOS 26) : boutons, recherche et filtres des pages Commandes / Produits
+     et boutons de la fiche commande. Les éléments web restent dans le DOM (invisibles) et servent de relais. */
+  (function () {
+    var root = document.documentElement;
+    if (!root.classList.contains("native-glass-hdr")) return;
+    var mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpGlass;
+    if (!mh) return;
+    var last = "", until = 0, running = false;
+    function rect(el) { var r = el.getBoundingClientRect(); return { x: +r.left.toFixed(1), y: +r.top.toFixed(1), w: +r.width.toFixed(1), h: +r.height.toFixed(1) }; }
+    function iconOf(el) {
+      var i = el.querySelector(".ic"); if (!i) return "";
+      var m = /\bi-([\w-]+)/.exec(i.className); return m ? m[1] : "";
+    }
+    function mk(id, kind, el, extra) {
+      el.setAttribute("data-gid", id);
+      var o = rect(el); o.id = id; o.kind = kind;
+      for (var k in extra) o[k] = extra[k];
+      return o;
+    }
+    function covered() {
+      if (document.getElementById("splash") || document.getElementById("loading") || document.getElementById("welcome") || document.getElementById("login")) return true;
+      if (app.querySelector(".sk-ov") || document.querySelector(".dr-bot")) return true;
+      return false;
+    }
+    function collect() {
+      var items = [], cover = false;
+      if (covered()) return { items: items, cover: true };
+      var top = layers.lastElementChild;
+      if (top) {
+        cover = true;
+        var ord = top.querySelector(".sh.notifs.order");
+        if (ord) {
+          var x = ord.querySelector(".sh-h.nav .sh-x");
+          if (x) items.push(mk("o:x", "btn", x, { icon: "x" }));
+          $$(".sh-h.nav .nb-c", ord).forEach(function (b, n) { items.push(mk("o:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b) })); });
+        }
+        return { items: items, cover: cover };
+      }
+      var scr = document.querySelector("#screens .scr.on.gl-scr");
+      if (!scr) return { items: items, cover: false };
+      var chev = scr.querySelector(".gl-hd .gl-chev");
+      if (chev) items.push(mk("h:title", "mini", chev, { icon: "chev-down" }));
+      $$(".gl-hd .gl-btn", scr).forEach(function (b, n) {
+        var id = "h:" + (b.getAttribute("data-act") || n);
+        if (b.classList.contains("txt")) items.push(mk(id, "txt", b, { title: b.textContent.trim() }));
+        else items.push(mk(id, "btn", b, { icon: iconOf(b) }));
+      });
+      var sf = scr.querySelector(".sfield input");
+      if (sf) items.push(mk("s:search", "search", sf.parentNode, { placeholder: sf.placeholder || "", text: sf.value || "" }));
+      $$(".sbar .cb", scr).forEach(function (b, n) {
+        items.push(mk("s:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b), dot: b.classList.contains("dot") }));
+      });
+      var ch = scr.querySelector(".chips");
+      if (ch) {
+        var chips = $$(".chip", ch), sel = -1;
+        chips.forEach(function (c, n) { if (c.classList.contains("on")) sel = n; });
+        var o = mk("c:chips", "chips", ch, { labels: chips.map(function (c) { return c.textContent.trim(); }), sel: sel });
+        if (chips.length) { var fr = chips[0].getBoundingClientRect(), cr = ch.getBoundingClientRect(); o.y = +fr.top.toFixed(1); o.h = +fr.height.toFixed(1); o.lead = +(fr.left - cr.left).toFixed(1); }
+        items.push(o);
+      }
+      return { items: items, cover: false };
+    }
+    function tick() {
+      var d; try { d = collect(); } catch (e) { return; }
+      var j = JSON.stringify(d);
+      if (j !== last) {
+        last = j;
+        root.classList.toggle("glass-cover", !!d.cover);
+        try { mh.postMessage(d); } catch (e) { }
+      }
+    }
+    function loop() {
+      tick();
+      if (performance.now() < until) requestAnimationFrame(loop); else running = false;
+    }
+    function kick(ms) {
+      until = Math.max(until, performance.now() + (ms || 900));
+      if (!running) { running = true; requestAnimationFrame(loop); }
+    }
+    ["scroll", "resize", "click", "touchstart", "touchend", "transitionend", "animationend", "input"].forEach(function (ev) {
+      window.addEventListener(ev, function () { kick(); }, true);
+    });
+    try {
+      var mo = new MutationObserver(function () { kick(); });
+      mo.observe(document.getElementById("screens"), { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+      mo.observe(layers, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
+      mo.observe(app, { childList: true });
+    } catch (e) { }
+    setInterval(tick, 400);
+    window.__larpGlassTap = function (id, idx) {
+      var el = document.querySelector('[data-gid="' + id + '"]'); if (!el) return;
+      if (id === "c:chips") { var c = $$(".chip", el)[idx]; if (c) c.click(); return; }
+      if (id === "h:title") { var t = el.closest(".gl-tt"); if (t) t.click(); return; }
+      el.click(); kick();
+    };
+    window.__larpGlassText = function (id, text) {
+      var el = document.querySelector('[data-gid="' + id + '"]'); if (!el) return;
+      var inp = el.querySelector("input"); if (!inp) return;
+      inp.value = text; inp.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    kick(1500);
   })();
   /* Hauteur du clavier -> --kb (relais natif via Swift, repli visualViewport sur le web) */
   (function () {
