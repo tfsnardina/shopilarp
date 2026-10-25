@@ -1055,3 +1055,14 @@ html.ios-bold .ac-pref{font-weight:700}
 .wl-go:active{transform:scale(.97);background:#000}
 @media (max-height:700px){.wl-txt h1{font-size:24px}.wl-txt ul{margin-top:16px}.wl-txt li{margin-bottom:8px}.wl-art svg{width:min(52vw,220px)}}
 html.ios-bold .wl-txt h1{font-weight:850}
+#login{position:absolute;inset:0;z-index:93;background:#101114;display:flex;align-items:flex-end;justify-content:center;opacity:0;transition:opacity .35s ease}
+#login.in{opacity:1}
+#login.out{opacity:0;pointer-events:none;transition:opacity .4s ease}
+.lg-card{width:100%;box-sizing:border-box;background:#fff;border-radius:26px 26px 0 0;padding:30px 22px calc(var(--bot) + 24px)}
+.lg-card h1{margin:0 0 6px;font-size:25px;font-weight:750;letter-spacing:-.6px;color:var(--tx)}
+.lg-card>p{margin:0 0 20px;font-size:15px;color:var(--tx2)}
+.lg-acct{display:flex;flex-direction:column;gap:4px;padding:12px 14px;margin-bottom:14px;border-radius:12px;background:#f2f2f3}
+.lg-acct span{font-size:15.5px;color:var(--tx);word-break:break-all}
+.lg-acct button{align-self:flex-start;margin-top:2px;color:#1f6fd6;font-size:14px;font-weight:600;background:none}
+.lg-acct button:active{opacity:.6}
+html.ios-bold .lg-card h1{font-weight:850}
