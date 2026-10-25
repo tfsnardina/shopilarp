@@ -91,7 +91,7 @@ final class GlassTabBarView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     private func configureActionButton(_ button: UIButton, image: String, action: String) {
-        button.setImage(UIImage(named: image)?.withRenderingMode(.alwaysTemplate), for: .normal)
+        button.setImage(GlassIcons.image(image), for: .normal)
         button.tintColor = Self.idleTint
         button.accessibilityLabel = action
         button.addAction(UIAction { [weak self] _ in self?.onAction?(action) }, for: .touchUpInside)
@@ -139,7 +139,7 @@ final class GlassTabBarView: UIView {
         for (index, tab) in tabs.enumerated() {
             let isOn = tab.name == active
             let button = tabButtons[index]
-            button.setImage(UIImage(named: isOn ? tab.on : tab.off)?.withRenderingMode(.alwaysTemplate), for: .normal)
+            button.setImage(GlassIcons.image(isOn ? tab.on : tab.off), for: .normal)
             button.tintColor = isOn ? Self.activeTint : Self.idleTint
         }
         let target = indicatorFrame(for: active)
