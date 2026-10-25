@@ -2780,7 +2780,9 @@
       '<div class="lg-card">' +
       '<h1>Se connecter</h1>' +
       '<p>Continuer vers ' + esc(S.name) + ' Mobile</p>' +
-      '<div id="lgStepEmail">' +
+      '<div class="lg-steps">' +
+      '<div class="lg-step" id="lgStepEmail">' +
+      '<span class="lg-stepno">\u00c9tape 1 sur 2</span>' +
       '<label class="np-f"><span>E-mail</span><input id="lgEmail" type="email" value="exemple@exemple.com" autocapitalize="off" autocorrect="off" spellcheck="false"></label>' +
       '<button type="button" class="btn-p" id="lgNext"><span>Continuer avec l\u2019e-mail</span></button>' +
       '<div class="lg-div">ou</div>' +
@@ -2793,30 +2795,43 @@
       '</div>' +
       '<p class="lg-new">Nouveau\u00a0? <b>D\u00e9marrer \u2192</b></p>' +
       '</div>' +
-      '<div id="lgStepPass" hidden>' +
+      '<div class="lg-step" id="lgStepPass" hidden>' +
+      '<span class="lg-stepno">\u00c9tape 2 sur 2</span>' +
       '<div class="lg-acct"><span id="lgEmailShown"></span><button type="button" id="lgChange">Changer d\u2019e-mail</button></div>' +
       '<label class="np-f"><span>Mot de passe</span><span class="lg-pw"><input id="lgPass" type="password" value="101014" autocapitalize="off" autocorrect="off" spellcheck="false"><button type="button" class="lg-eye" id="lgEye" aria-label="Afficher le mot de passe">' + ic("eye") + '</button></span></label>' +
       '<a href="javascript:void(0)" class="lg-forgot" id="lgForgot">Mot de passe oubli\u00e9\u00a0?</a>' +
       '<button type="button" class="btn-p" id="lgGo"><span>Se connecter</span></button>' +
       '</div>' +
       '</div>' +
-      '<p class="lg-help">Besoin d\u2019aide\u00a0?</p>';
+      '<p class="lg-help">Besoin d\u2019aide\u00a0?</p>' +
+      '</div>';
     app.appendChild(w);
     var lgKey = $("#lgKey", w);
     if (lgKey) lgKey.addEventListener("click", function () { hap("light"); });
     $$(".lg-alt button", w).forEach(function (b) { b.addEventListener("click", function () { hap("light"); }); });
     statusBar("dark");
     var done = false;
+    /* Slides the current step out and the next step in, instead of a hard hidden-attribute swap. */
+    function swapStep(fromEl, toEl, dir) {
+      fromEl.classList.add(dir > 0 ? "lg-hide-l" : "lg-hide-r");
+      setTimeout(function () {
+        fromEl.hidden = true;
+        fromEl.classList.remove("lg-hide-l", "lg-hide-r");
+        toEl.hidden = false;
+        toEl.classList.add(dir > 0 ? "lg-hide-r" : "lg-hide-l");
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { toEl.classList.remove("lg-hide-l", "lg-hide-r"); });
+        });
+      }, 220);
+    }
     $("#lgNext", w).addEventListener("click", function () {
       var email = $("#lgEmail", w).value.trim() || "exemple@exemple.com";
       $("#lgEmailShown", w).textContent = email;
-      $("#lgStepEmail", w).hidden = true;
-      $("#lgStepPass", w).hidden = false;
+      swapStep($("#lgStepEmail", w), $("#lgStepPass", w), 1);
       hap("light");
     });
     $("#lgChange", w).addEventListener("click", function () {
-      $("#lgStepPass", w).hidden = true;
-      $("#lgStepEmail", w).hidden = false;
+      swapStep($("#lgStepPass", w), $("#lgStepEmail", w), -1);
       hap("light");
     });
     $("#lgEye", w).addEventListener("click", function () {
