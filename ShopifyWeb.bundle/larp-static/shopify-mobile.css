@@ -1108,3 +1108,8 @@ html.ios-bold .lg-card h1{font-weight:900}
 .lg-new{text-align:center;font-size:15px;color:var(--tx2);margin:0}
 .lg-new b{color:#1f6fd6;font-weight:700}
 .lg-help{flex:none;text-align:center;margin-top:auto;padding-top:20px;font-size:14px;color:#8e8e93}
+.lg-err{margin:-8px 0 14px;font-size:14px;font-weight:600;color:#d72c0d}
+.lg-err[hidden]{display:none}
+.lg-logo{display:flex;align-items:center;justify-content:center}
+.lg-logo .ic{width:50px;height:50px}
+#login .lg-top{padding:calc(var(--top) + 18px) 24px 20px}
