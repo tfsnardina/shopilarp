@@ -371,6 +371,17 @@ em.flat{color:#8a8a8a}
 .dr-qs{display:flex;align-items:center;gap:9px;height:50px;padding:0 22px 0 18px;border-radius:25px;background:linear-gradient(180deg,#2a52e8,#1534b3);color:#fff;font-size:18px;font-weight:550;box-shadow:inset 0 1px 0 rgba(255,255,255,.18)}
 .dr-qs .ic{width:22px;height:22px}
 #drawer:not(.on) .dr-bg{pointer-events:none}
+/* ── Liquid Glass (menu ≡) ── repli CSS iOS < 26 + ligne active / pilules */
+:root{--lg-hi:inset 0 1px 0 rgba(255,255,255,.42),inset 0 -1px 0 rgba(255,255,255,.07),inset 0 0 0 .5px rgba(255,255,255,.16)}
+.dr-bg{background:rgba(0,0,0,.8)}
+.dr-item.cur>.dr-row{background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.07));-webkit-backdrop-filter:blur(18px) saturate(180%);backdrop-filter:blur(18px) saturate(180%);border-radius:18px;box-shadow:var(--lg-hi),0 6px 20px rgba(0,0,0,.35)}
+.dr-row{transition:background .2s,transform .25s var(--ease)}
+.dr-row:active{background:rgba(255,255,255,.14);transform:scale(.985)}
+.dr-c{background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.07));-webkit-backdrop-filter:blur(22px) saturate(180%) brightness(1.1);backdrop-filter:blur(22px) saturate(180%) brightness(1.1);box-shadow:var(--lg-hi),0 10px 28px rgba(0,0,0,.45);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.dr-qs{background:linear-gradient(180deg,rgba(70,110,255,.78),rgba(21,52,179,.72));-webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);box-shadow:var(--lg-hi),0 10px 28px rgba(20,50,180,.45);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.dr-c:active,.dr-qs:active{transform:scale(.93)}
+/* iOS 26 : la vraie barre Liquid Glass native prend le relais, la barre web reste invisible */
+html.native-glass-drawer .dr-bot{opacity:0!important;pointer-events:none!important}
 #s-menu.grey{background:linear-gradient(#000 0,#000 40%,#f1f1f1 40%)}
 
 /* Store popover */
