@@ -718,7 +718,7 @@ final class ProductCreatorViewController: UIViewController {
     var onSave: (([String: Any]) -> Void)?
 
     private let currency: String
-    private var title = ""
+    private var productTitle = ""
     private var desc = ""
     private var category = ""
     private var price: Double?
@@ -844,7 +844,7 @@ final class ProductCreatorViewController: UIViewController {
         titleField.returnKeyType = .done
         titleField.autocapitalizationType = .sentences
         titleField.addAction(UIAction { [weak self] _ in
-            self?.title = self?.titleField.text ?? ""
+            self?.productTitle = self?.titleField.text ?? ""
             self?.refresh()
         }, for: .editingChanged)
         titleField.addAction(UIAction { [weak self] _ in self?.titleField.resignFirstResponder() }, for: .editingDidEndOnExit)
@@ -951,8 +951,8 @@ final class ProductCreatorViewController: UIViewController {
         ])
         control.addAction(UIAction { [weak self] _ in
             PCTheme.haptic()
-            self?.title = tr("Exemple de produit", "Sample product")
-            self?.titleField.text = self?.title
+            self?.productTitle = tr("Exemple de produit", "Sample product")
+            self?.titleField.text = self?.productTitle
             self?.price = 29
             self?.priceFormatted()
             self?.refresh()
@@ -1005,7 +1005,7 @@ final class ProductCreatorViewController: UIViewController {
 
     private func refresh() {
         statusPill.setActive(isActive)
-        saveButton.isEnabled = !title.trimmingCharacters(in: .whitespaces).isEmpty
+        saveButton.isEnabled = !productTitle.trimmingCharacters(in: .whitespaces).isEmpty
         descRow.titleLabel.text = desc.isEmpty ? tr("Ajouter une description", "Add description") : desc
         descRow.titleLabel.numberOfLines = 2
         categoryRow.titleLabel.text = category.isEmpty ? tr("Sélectionner une catégorie", "Select a category") : category
@@ -1126,7 +1126,7 @@ final class ProductCreatorViewController: UIViewController {
     }
 
     private func save() {
-        let t = title.trimmingCharacters(in: .whitespaces)
+        let t = productTitle.trimmingCharacters(in: .whitespaces)
         guard !t.isEmpty else { return }
         view.endEditing(true)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
