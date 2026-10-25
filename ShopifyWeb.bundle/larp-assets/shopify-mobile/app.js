@@ -2903,5 +2903,24 @@
       }, 900);
     }, 1000);
   }
+  /* Pont vers la barre d'onglets Liquid Glass native (iOS 26) : la barre web reste dans le DOM (invisible) et sert de relais. */
+  (function () {
+    var tbEl = document.getElementById("tabbar"), appEl = document.getElementById("app");
+    if (!tbEl) return;
+    function post() {
+      try {
+        var mh = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpTabbar;
+        if (!mh) return;
+        var on = tbEl.querySelector(".tb.on");
+        var cover = !!(document.getElementById("splash") || document.getElementById("loading") || document.getElementById("welcome") || document.getElementById("login"));
+        mh.postMessage({ active: on ? on.getAttribute("data-tab") : "home", hidden: cover || tbEl.classList.contains("hide") });
+      } catch (e) { }
+    }
+    try { new MutationObserver(post).observe(tbEl, { attributes: true, attributeFilter: ["class"], subtree: true }); } catch (e) { }
+    try { if (appEl) new MutationObserver(post).observe(appEl, { childList: true }); } catch (e) { }
+    window.__larpNativeTab = function (name) { var b = tbEl.querySelector('.tb[data-tab="' + name + '"]'); if (b) b.click(); };
+    window.__larpNativeAct = function (name) { var b = tbEl.querySelector('[data-act="' + name + '"]'); if (b) b.click(); };
+    post();
+  })();
   scheduleOrder(true);
 })();
