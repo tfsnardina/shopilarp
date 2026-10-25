@@ -72,6 +72,7 @@ enum WebViewContainer {
         window.__CHECKER_NATIVE__=true;
         document.documentElement.classList.add('checker-native');
         document.documentElement.classList.toggle('ios-bold', \(UIAccessibility.isBoldTextEnabled ? "true" : "false"));
+        document.documentElement.classList.toggle('native-glass-tabbar', \(NativeGlass.isAvailable ? "true" : "false"));
         (function(){
           var settings = \(jsStringLiteral(settings));
           var payload = \(jsStringLiteral(payload));
@@ -136,6 +137,14 @@ enum WebViewContainer {
                     DispatchQueue.main.async { [weak self] in
                         self?.host?.reloadShopHome()
                     }
+                }
+                return
+            }
+            if message.name == "larpTabbar", let dict = message.body as? [String: Any] {
+                let active = (dict["active"] as? String) ?? "home"
+                let hidden = (dict["hidden"] as? NSNumber)?.boolValue ?? false
+                DispatchQueue.main.async { [weak self] in
+                    self?.host?.updateGlassTabBar(active: active, hidden: hidden)
                 }
                 return
             }
@@ -228,6 +237,8 @@ final class WebHostViewController: UIViewController {
     private var webView: WKWebView!
     private var lastLayoutInsets: UIEdgeInsets = .zero
     private var homeIndicatorBottom: CGFloat = 34
+    private var glassTabBar: UIView?
+    private var glassTabBarBottom: NSLayoutConstraint?
 
     init(coordinator: WebViewContainer.Coordinator) {
         self.coordinator = coordinator
@@ -252,6 +263,7 @@ final class WebHostViewController: UIViewController {
 
         let web = makeWebView()
         showWebView(web)
+        installGlassTabBar()
 
         guard let entry = WebViewContainer.resolveWebEntry() else {
             coordinator.showLoadError(on: web, message: WebViewContainer.bundleDebugHint())
@@ -317,6 +329,7 @@ final class WebHostViewController: UIViewController {
         old?.removeScriptMessageHandler(forName: "shopifySchedule")
         old?.removeScriptMessageHandler(forName: "larpStatusBar")
         old?.removeScriptMessageHandler(forName: "larpHaptic")
+        old?.removeScriptMessageHandler(forName: "larpTabbar")
         let web = makeWebView()
         showWebView(web)
         lastLayoutInsets = .zero
@@ -331,6 +344,7 @@ final class WebHostViewController: UIViewController {
         config.userContentController.add(coordinator, name: "shopifySchedule")
         config.userContentController.add(coordinator, name: "larpStatusBar")
         config.userContentController.add(coordinator, name: "larpHaptic")
+        config.userContentController.add(coordinator, name: "larpTabbar")
         config.userContentController.addUserScript(
             WKUserScript(
                 source: WebViewContainer.nativeChromeScript(),
@@ -365,6 +379,49 @@ final class WebHostViewController: UIViewController {
             web.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             web.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
+        if let glass = glassTabBar { view.bringSubviewToFront(glass) }
+    }
+
+    // MARK: - Barre d'onglets Liquid Glass native (iOS 26)
+
+    private func runJS(_ source: String) {
+        webView?.evaluateJavaScript(source, completionHandler: nil)
+    }
+
+    private func installGlassTabBar() {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), glassTabBar == nil else { return }
+        let bar = GlassTabBarView()
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        bar.onTab = { [weak self] name in
+            self?.runJS("window.__larpNativeTab && window.__larpNativeTab(\(WebViewContainer.jsStringLiteral(name)))")
+        }
+        bar.onAction = { [weak self] name in
+            self?.runJS("window.__larpNativeAct && window.__larpNativeAct(\(WebViewContainer.jsStringLiteral(name)))")
+        }
+        view.addSubview(bar)
+        let bottom = bar.bottomAnchor.constraint(
+            equalTo: view.bottomAnchor,
+            constant: -(deviceSafeAreaInsets().bottom + 8)
+        )
+        NSLayoutConstraint.activate([
+            bar.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            bar.widthAnchor.constraint(equalToConstant: GlassTabBarView.totalWidth),
+            bar.heightAnchor.constraint(equalToConstant: GlassTabBarView.barHeight),
+            bottom,
+        ])
+        glassTabBar = bar
+        glassTabBarBottom = bottom
+        #endif
+    }
+
+    /// Appelé par la page web : onglet actif + barre visible ou non.
+    func updateGlassTabBar(active: String, hidden: Bool) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), let bar = glassTabBar as? GlassTabBarView else { return }
+        bar.setActive(active, animated: bar.isShown)
+        bar.setShown(!hidden, animated: true)
+        #endif
     }
 
     /// Insets of this view only. Do not invent 47/34 — that double-pads when the system already inset the window.
@@ -387,6 +444,7 @@ final class WebHostViewController: UIViewController {
         let insets = deviceSafeAreaInsets()
         if insets != lastLayoutInsets {
             lastLayoutInsets = insets
+            glassTabBarBottom?.constant = -(insets.bottom + 8)
             coordinator.pushSafeArea(to: webView, insets: insets)
         }
     }
