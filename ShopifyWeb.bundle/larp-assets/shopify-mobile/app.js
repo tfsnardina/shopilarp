@@ -1553,8 +1553,84 @@
       return '<div class="li">' + thumb(x.p, 48) + '<div class="li-t"><b>' + esc(x.p.title) + "</b>" + (v ? "<span>" + esc(v) + "</span>" : "") + "<em>" + money(x.price) + '</em></div><span class="li-q">× ' + x.q + "</span></div>";
     }).join("");
   }
+  /* ── Native order page (iOS 26, Liquid Glass) ───────────────
+     Same idea as the native product page: the web side only builds a plain, already-translated
+     description of the order; Swift draws it. Actions come back through __larpNativeOrderAct. */
+  function defaultCarrier() { return S.country === "US" ? "USPS" : S.country === "CA" ? "Canada Post" : S.country === "GB" ? "Royal Mail" : S.country === "AU" ? "Australia Post" : "DHL Express"; }
+  function nativeOrderInfo(o) {
+    var T = L10n, n_ = units(o), ful = o.ful === "Fulfilled", c = o.c, pos = o.ch === "Point of Sale";
+    var taxSub = VAT ? T("Included") : o.reg + " " + (o.rate * 100).toFixed(o.rate * 1000 % 10 ? 3 : 2).replace(/0+$/, "").replace(/\.$/, "") + "%";
+    var lines = [{ l: T("Subtotal"), s: T(n_ + " item" + (n_ === 1 ? "" : "s")), v: money(o.sub) }];
+    if (o.disc) lines.push({ l: T("Discount"), s: o.code || T("Custom discount"), v: "-" + money(o.disc) });
+    lines.push({ l: T("Shipping"), s: T(o.shipM), v: money(o.ship) });
+    lines.push({ l: T("Taxes"), s: taxSub, v: money(o.tax) });
+    var paid = [{ l: T(o.pay === "Authorized" ? "Authorized" : o.pay === "Payment pending" ? "Expected payment" : "Paid"), s: "", v: money(o.total) }];
+    if (o.refunded > 0) {
+      paid.push({ l: T("Refunded"), s: "", v: "-" + money(o.refunded) });
+      paid.push({ l: T("Net payment"), s: "", v: money(o.total - o.refunded) });
+    }
+    var items = o.items.map(function (x) {
+      var v = x.p.vnames.length > 1 ? x.p.vnames[Math.abs(o.n + x.p.i) % x.p.vnames.length] : "";
+      return { title: x.p.title, variant: v, price: money(x.price), qty: x.q, img: x.p.img || "" };
+    });
+    var k = c ? Math.max(1, c.n) : 1;
+    var conv = [
+      { i: "cart", t: T("This is their " + ordinal(k) + " order") },
+      { i: "globe", t: T("1st session was " + (o.ch === "Online Store" ? "from Google" : "from " + o.ch)) },
+      { i: "clock", t: T((2 + (o.n % 4)) + " sessions over " + (1 + (o.n % 3)) + " day" + (o.n % 3 ? "s" : "")) }
+    ];
+    var lb = {};
+    ["Items", "Payment", "Fulfillment", "Contact information", "Customer", "Notes", "Conversion summary", "Order risk", "Timeline", "Total",
+      "Fulfill items", "Capture payment", "Mark as paid", "Track", "Email details", "Phone details", "Address", "Copy address", "Copied", "Print", "More actions",
+      "Edit order", "Refund", "Print packing slip", "Archive", "Tracking number", "Add tracking number", "Shipping carrier",
+      "Send shipment details to your customer now", "Cancel", "Order status", "No phone number", "No contact details"].forEach(function (key) { lb[key] = T(key); });
+    return {
+      mode: "order", n: o.n, title: "#" + o.n,
+      sub: T(relAt(o.ts)) + " \u2022 " + T(o.ch === "Online Store" ? "Online store" : o.ch),
+      pay: T(o.pay), payKind: o.pay === "Payment pending" || o.pay === "Authorized" ? "warn" : "neu",
+      ful: T(o.ful), fulKind: ful ? "ok" : "att",
+      shipSub: pos ? T("Picked up in store") : T("Ship to customer \u2022 " + o.city),
+      items: items, unitsCount: n_, fulfilled: ful, carrier: o.carrier || defaultCarrier(), trk: o.trk || "", defaultCarrier: defaultCarrier(),
+      canCapture: o.pay === "Authorized", canMarkPaid: o.pay === "Payment pending",
+      lines: lines, total: money(o.total), paid: paid,
+      addr: [o.c ? o.c.name : "", o.street, S.country === "FR" ? o.zip + " " + o.city : o.city + ", " + o.reg + " " + o.zip, countryName()].filter(Boolean),
+      email: c ? c.email : "", phone: c ? (c.phone || "") : "",
+      customer: c ? { name: c.name, sub: T(count(c.n) + " order" + (c.n === 1 ? "" : "s")), idx: custs.indexOf(c), initials: initials(c.name) } : null,
+      note: o.note || "", noEmptyNote: T("No notes from customer"),
+      conv: conv, risk: o.risk, riskLabel: T(o.risk === "Low" ? "Chargeback risk is low" : o.risk === "Medium" ? "Chargeback risk is medium" : "Chargeback risk is high"),
+      timeline: timeline(o).map(function (e) { return { when: T(e[0]), text: T(e[1]) }; }),
+      lb: lb
+    };
+  }
+  function nativeOrderPost(info) {
+    try { window.webkit.messageHandlers.larpProduct.postMessage(info); return true; } catch (e) { return false; }
+  }
+  // Actions triggered from the native order page.
+  window.__larpNativeOrderAct = function (m) {
+    var o = findOrder(m.n), msg = "";
+    if (m.act === "customer") { openCustomer(m.idx); return; }
+    if (!o) return;
+    if (m.act === "fulfill") {
+      var carrier = m.carrier || defaultCarrier();
+      o.ful = "Fulfilled"; o.fat = nowMs(); o.carrier = carrier;
+      var v = String(m.trk || "").trim();
+      o.trk = v || (carrier === "USPS" ? "9400 1" + rnd(3) + " " + rnd(4) + " " + rnd(4) + " " + rnd(4) + " " + rnd(2) : rnd(12));
+      hap(14); msg = "Items fulfilled";
+    } else if (m.act === "capture") {
+      o.pay = "Paid"; creditOrder(o); hap(14); msg = "Payment captured";
+    } else if (m.act === "markpaid") {
+      o.pay = "Paid"; creditOrder(o); hap(10); msg = "Order marked as paid";
+    } else return;
+    refreshAll();
+    var info = nativeOrderInfo(o); info.mode = "orderUpdate"; info.toast = L10n(msg);
+    nativeOrderPost(info);
+  };
   function openOrder(n) {
     var o = findOrder(n); if (!o) return;
+    // iOS 26: the order page is native (Liquid Glass), laid out like the native product page.
+    if (window.__LARP_NATIVE_PRODUCT__ && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpProduct) {
+      if (nativeOrderPost(nativeOrderInfo(o))) return;
+    }
     var n_ = units(o);
     var ful = o.ful === "Fulfilled";
     var fulSec = '<div class="sec"><div class="sec-h">' + (ful ? badge("Fulfilled", "ok") : badge(o.ful, "att")) + '<span class="fl"></span>' + ic("more", "sm") + "</div>" +
