@@ -1240,7 +1240,7 @@
     postDrawer(false);
     statusBar(glStatus ? "dark" : "light");
     el.classList.remove("on");
-    $("#tabbar").classList.toggle("hide", !!(stack.length && stack[stack.length - 1].el.hasAttribute("data-notabs")));
+    $("#tabbar").classList.toggle("hide", !!(stack.length && noTabs(stack[stack.length - 1].el)));
     if (!fromHistory) { ignorePop++; try { history.back(); } catch (e) { ignorePop--; } }
     setTimeout(function () { el.remove(); }, 380);
   }
@@ -1305,6 +1305,9 @@
   });
 
   /* ── Layers: pushed pages and sheets ─────────────────────── */
+  // La barre d'onglets doit se cacher sous une page "plein écran" ET sous toute feuille (sh-wrap) :
+  // sinon elle flotte par-dessus les boutons du bas ("Continuer", "Capture", options…).
+  function noTabs(el) { return !!el && (el.hasAttribute("data-notabs") || el.classList.contains("sh-wrap")); }
   var stack = [];
   function push(el, kind) {
     layers.appendChild(el);
@@ -1315,7 +1318,7 @@
     requestAnimationFrame(function () {
       el.classList.add("on");
       if (kind === "page") under.classList.add("pushed");
-      if (kind === "page" || kind === "modal") $("#tabbar").classList.toggle("hide", !!el.hasAttribute("data-notabs"));
+      $("#tabbar").classList.toggle("hide", noTabs(el));
     });
   }
   // Every layer gets a history entry, so the Android back button and the
@@ -1328,7 +1331,7 @@
     top.el.classList.remove("on");
     if (top.kind === "page") top.under.classList.remove("pushed");
     var below = stack.length ? stack[stack.length - 1].el : null;
-    $("#tabbar").classList.toggle("hide", !!(below && below.hasAttribute("data-notabs")));
+    $("#tabbar").classList.toggle("hide", noTabs(below));
     setTimeout(function () { top.el.remove(); }, 420);
     if (top.onClose) top.onClose();
   }
@@ -2284,7 +2287,7 @@
     var el = skEl; skEl = null;
     try { var ae = document.activeElement; if (ae && ae.blur) ae.blur(); } catch (e) { }
     el.classList.remove("on");
-    $("#tabbar").classList.toggle("hide", !!(stack.length && stack[stack.length - 1].el.hasAttribute("data-notabs")));
+    $("#tabbar").classList.toggle("hide", !!(stack.length && noTabs(stack[stack.length - 1].el)));
     if (!fromHistory) { ignorePop++; try { history.back(); } catch (e) { ignorePop--; } }
     setTimeout(function () { el.remove(); }, 340);
   }
