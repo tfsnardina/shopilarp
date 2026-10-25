@@ -2766,8 +2766,9 @@
     $("#wlGo", w).addEventListener("click", function () {
       if (done) return; done = true;
       hap("medium"); markWelcome();
-      w.classList.add("out");
-      setTimeout(function () { w.remove(); showLogin(onContinue); }, 650);
+      Array.prototype.forEach.call(w.children, function (c) { c.style.transition = "opacity .15s ease"; c.style.animation = "none"; c.style.opacity = "0"; });
+      showLogin(onContinue);   // le login se fond par-dessus le welcome : l'accueil n'est jamais visible
+      setTimeout(function () { w.remove(); }, 600);
     });
     requestAnimationFrame(function () { w.classList.add("in"); });
   }
@@ -2776,14 +2777,15 @@
     var w = document.createElement("div");
     w.id = "login";
     var initial = (S.name || "?").trim().charAt(0).toUpperCase() || "?";
-    w.innerHTML = '<div class="lg-top"><div class="lg-mark">' + esc(initial) + '</div><div class="lg-word">' + esc(S.name) + '</div></div>' +
+    w.innerHTML = '<div class="lg-top"><div class="lg-logo">' + ic("bag-color") + '</div></div>' +
       '<div class="lg-card">' +
       '<h1>Se connecter</h1>' +
       '<p>Continuer vers ' + esc(S.name) + ' Mobile</p>' +
       '<div class="lg-steps">' +
       '<div class="lg-step" id="lgStepEmail">' +
       '<span class="lg-stepno">\u00c9tape 1 sur 2</span>' +
-      '<label class="np-f"><span>E-mail</span><input id="lgEmail" type="email" value="exemple@exemple.com" autocapitalize="off" autocorrect="off" spellcheck="false"></label>' +
+      '<label class="np-f"><span>E-mail</span><input id="lgEmail" type="email" value="" placeholder="exemple@exemple.com" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>' +
+      '<p class="lg-err" id="lgErrEmail" role="alert" hidden></p>' +
       '<button type="button" class="btn-p" id="lgNext"><span>Continuer avec l\u2019e-mail</span></button>' +
       '<div class="lg-div">ou</div>' +
       '<button type="button" class="lg-key" id="lgKey">' + ic("key") + '<span>Se connecter avec une cl\u00e9 d\u2019acc\u00e8s</span><span class="lg-badge">Derni\u00e8re utilisation</span></button>' +
@@ -2798,7 +2800,8 @@
       '<div class="lg-step" id="lgStepPass" hidden>' +
       '<span class="lg-stepno">\u00c9tape 2 sur 2</span>' +
       '<div class="lg-acct"><span id="lgEmailShown"></span><button type="button" id="lgChange">Changer d\u2019e-mail</button></div>' +
-      '<label class="np-f"><span>Mot de passe</span><span class="lg-pw"><input id="lgPass" type="password" value="101014" autocapitalize="off" autocorrect="off" spellcheck="false"><button type="button" class="lg-eye" id="lgEye" aria-label="Afficher le mot de passe">' + ic("eye") + '</button></span></label>' +
+      '<label class="np-f"><span>Mot de passe</span><span class="lg-pw"><input id="lgPass" type="password" value="" placeholder="Mot de passe" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false"><button type="button" class="lg-eye" id="lgEye" aria-label="Afficher le mot de passe">' + ic("eye") + '</button></span></label>' +
+      '<p class="lg-err" id="lgErrPass" role="alert" hidden></p>' +
       '<a href="javascript:void(0)" class="lg-forgot" id="lgForgot">Mot de passe oubli\u00e9\u00a0?</a>' +
       '<button type="button" class="btn-p" id="lgGo"><span>Se connecter</span></button>' +
       '</div>' +
@@ -2824,13 +2827,27 @@
         });
       }, 220);
     }
-    $("#lgNext", w).addEventListener("click", function () {
-      var email = $("#lgEmail", w).value.trim() || "exemple@exemple.com";
+    var OK_EMAIL = "exemple@exemple.com", OK_PASS = "101014";
+    function setErr(id, msg) {
+      var el = $(id, w); if (!el) return;
+      if (msg) { el.textContent = msg; el.hidden = false; } else { el.hidden = true; el.textContent = ""; }
+    }
+    function goNext() {
+      var email = $("#lgEmail", w).value.trim();
+      if (!email) { setErr("#lgErrEmail", "Saisis ton adresse e-mail."); hap("light"); return; }
+      if (email.toLowerCase() !== OK_EMAIL) { setErr("#lgErrEmail", "Adresse e-mail incorrecte."); hap("light"); return; }
+      setErr("#lgErrEmail", "");
       $("#lgEmailShown", w).textContent = email;
       swapStep($("#lgStepEmail", w), $("#lgStepPass", w), 1);
       hap("light");
-    });
+    }
+    $("#lgNext", w).addEventListener("click", goNext);
+    $("#lgEmail", w).addEventListener("input", function () { setErr("#lgErrEmail", ""); });
+    $("#lgEmail", w).addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); goNext(); } });
+    $("#lgPass", w).addEventListener("input", function () { setErr("#lgErrPass", ""); });
+    $("#lgPass", w).addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); $("#lgGo", w).click(); } });
     $("#lgChange", w).addEventListener("click", function () {
+      setErr("#lgErrPass", ""); $("#lgPass", w).value = "";
       swapStep($("#lgStepPass", w), $("#lgStepEmail", w), -1);
       hap("light");
     });
@@ -2842,7 +2859,11 @@
     });
     $("#lgForgot", w).addEventListener("click", function () { hap("light"); });
     $("#lgGo", w).addEventListener("click", function () {
-      if (done) return; done = true;
+      if (done) return;
+      var pw = $("#lgPass", w).value;
+      if (!pw) { setErr("#lgErrPass", "Saisis ton mot de passe."); hap("light"); return; }
+      if (pw !== OK_PASS) { setErr("#lgErrPass", "Mot de passe incorrect."); hap("light"); return; }
+      done = true;
       hap("medium");
       w.classList.add("out");
       setTimeout(function () { w.remove(); }, 400);
