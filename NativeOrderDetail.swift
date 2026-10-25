@@ -216,16 +216,16 @@ final class ODItemRow: UIView {
 /// Un bouton de verre pleine largeur dans une carte.
 @available(iOS 26.0, *)
 final class ODButtonRow: UIView {
-    init(button: UIView) {
+    init(button: UIView, inset: CGFloat = 16, top: CGFloat = 8, bottom: CGFloat = 14) {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         button.setContentHuggingPriority(.defaultLow, for: .horizontal)
         addSubview(button)
         NSLayoutConstraint.activate([
-            button.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
-            button.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
-            button.topAnchor.constraint(equalTo: topAnchor, constant: 8),
-            button.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -14),
+            button.leadingAnchor.constraint(equalTo: leadingAnchor, constant: inset),
+            button.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -inset),
+            button.topAnchor.constraint(equalTo: topAnchor, constant: top),
+            button.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -bottom),
         ])
     }
 
@@ -301,6 +301,7 @@ final class ODAddressRow: UIView {
         t.text = title
         t.font = .systemFont(ofSize: 13)
         t.textColor = PCTheme.sub
+        t.isHidden = title.isEmpty
         let body = UILabel()
         body.text = lines.joined(separator: "\n")
         body.font = .systemFont(ofSize: 16)
@@ -432,6 +433,90 @@ final class ODTimelineRow: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }
 
+/// Bouton rond « … » en verre avec menu (haut de page, comme dans l'app Shopify).
+@available(iOS 26.0, *)
+final class ODMoreButton: UIVisualEffectView {
+    let button = UIButton(type: .system)
+
+    init() {
+        let effect = UIGlassEffect()
+        effect.isInteractive = true
+        super.init(effect: effect)
+        cornerConfiguration = .capsule()
+        translatesAutoresizingMaskIntoConstraints = false
+        button.setImage(PCTheme.symbol("ellipsis", 18, .bold), for: .normal)
+        button.tintColor = PCTheme.ink
+        button.showsMenuAsPrimaryAction = true
+        button.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(button)
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: 44),
+            heightAnchor.constraint(equalToConstant: 44),
+            button.leadingAnchor.constraint(equalTo: leadingAnchor),
+            button.trailingAnchor.constraint(equalTo: trailingAnchor),
+            button.topAnchor.constraint(equalTo: topAnchor),
+            button.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
+/// Carte client : nom en bleu, nombre de commandes, e-mail en bleu + bouton copier.
+@available(iOS 26.0, *)
+final class ODClientCard: UIView {
+    let nameButton = UIButton(type: .system)
+    let copyButton = UIButton(type: .system)
+
+    init(name: String, sub: String, email: String, phone: String) {
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        nameButton.setTitle(name, for: .normal)
+        nameButton.titleLabel?.font = .systemFont(ofSize: 16)
+        nameButton.setTitleColor(PCTheme.blue, for: .normal)
+        nameButton.contentHorizontalAlignment = .leading
+        let subLabel = UILabel()
+        subLabel.text = sub
+        subLabel.font = .systemFont(ofSize: 16)
+        subLabel.textColor = PCTheme.ink
+        let mail = UILabel()
+        mail.text = email
+        mail.font = .systemFont(ofSize: 16)
+        mail.textColor = PCTheme.blue
+        mail.isHidden = email.isEmpty
+        let tel = UILabel()
+        tel.text = phone
+        tel.font = .systemFont(ofSize: 16)
+        tel.textColor = PCTheme.ink
+        tel.isHidden = phone.isEmpty
+
+        copyButton.setImage(PCTheme.symbol("doc.on.clipboard", 17, .regular), for: .normal)
+        copyButton.tintColor = PCTheme.ink
+        copyButton.isHidden = email.isEmpty
+        copyButton.setContentHuggingPriority(.required, for: .horizontal)
+        copyButton.widthAnchor.constraint(equalToConstant: 34).isActive = true
+        copyButton.heightAnchor.constraint(equalToConstant: 30).isActive = true
+
+        let mailRow = UIStackView(arrangedSubviews: [mail, UIView(), copyButton])
+        mailRow.alignment = .center
+        let col = UIStackView(arrangedSubviews: [nameButton, subLabel, tel, mailRow])
+        col.axis = .vertical
+        col.spacing = 4
+        col.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(col)
+        NSLayoutConstraint.activate([
+            col.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            col.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            col.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+            col.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
 // MARK: - Feuille « Traiter les articles »
 
 @available(iOS 26.0, *)
@@ -545,7 +630,7 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
     private let topFade = UIView()
     private let fadeLayer = CAGradientLayer()
     private let backButton = PCGlassButton(symbol: "chevron.left", circle: true)
-    private let actionPill = PCDActionPill()
+    private let moreButton = ODMoreButton()
     private let barTitle = UILabel()
     private let titleWrap = UIView()
     private var titleShown = false
@@ -661,12 +746,6 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
         view.addSubview(topFade)
 
         backButton.onTap = { [weak self] in self?.closeAnimated() }
-        actionPill.shareButton.setImage(PCTheme.symbol("printer", 18, .medium), for: .normal)
-        actionPill.shareButton.addAction(UIAction { [weak self] _ in
-            guard let self else { return }
-            self.showToast(self.lb("Print packing slip"))
-        }, for: .touchUpInside)
-        actionPill.moreButton.showsMenuAsPrimaryAction = true
 
         barTitle.font = .systemFont(ofSize: 17, weight: .semibold)
         barTitle.textColor = PCTheme.ink
@@ -676,17 +755,17 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
 
         view.addSubview(barTitle)
         view.addSubview(backButton)
-        view.addSubview(actionPill)
+        view.addSubview(moreButton)
         let guide = view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
             backButton.topAnchor.constraint(equalTo: guide.topAnchor, constant: 6),
             backButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            actionPill.topAnchor.constraint(equalTo: guide.topAnchor, constant: 6),
-            actionPill.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            moreButton.topAnchor.constraint(equalTo: guide.topAnchor, constant: 6),
+            moreButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             barTitle.centerYAnchor.constraint(equalTo: backButton.centerYAnchor),
             barTitle.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             barTitle.leadingAnchor.constraint(greaterThanOrEqualTo: backButton.trailingAnchor, constant: 12),
-            barTitle.trailingAnchor.constraint(lessThanOrEqualTo: actionPill.leadingAnchor, constant: -12),
+            barTitle.trailingAnchor.constraint(lessThanOrEqualTo: moreButton.leadingAnchor, constant: -12),
         ])
     }
 
@@ -704,36 +783,51 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
         ])
     }
 
-    private func header(_ title: String, count: Int? = nil) -> UIView {
+    private func moreMenuButton() -> UIButton {
+        let b = UIButton(type: .system)
+        b.setImage(PCTheme.symbol("ellipsis", 17, .bold), for: .normal)
+        b.tintColor = PCTheme.ink
+        b.showsMenuAsPrimaryAction = true
+        b.menu = makeMoreMenu()
+        b.translatesAutoresizingMaskIntoConstraints = false
+        b.widthAnchor.constraint(equalToConstant: 36).isActive = true
+        b.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        return b
+    }
+
+    private func header(_ title: String, count: Int? = nil, more: Bool = false) -> UIView {
         let label = UILabel()
         label.text = title
         label.font = .systemFont(ofSize: 17, weight: .bold)
         label.textColor = PCTheme.ink
+        label.numberOfLines = 0
         let stack = UIStackView(arrangedSubviews: [label])
         stack.axis = .horizontal
         stack.alignment = .center
         stack.spacing = 8
         stack.isLayoutMarginsRelativeArrangement = true
-        stack.layoutMargins = UIEdgeInsets(top: 0, left: 15, bottom: 0, right: 15)
+        stack.layoutMargins = UIEdgeInsets(top: 0, left: 15, bottom: 0, right: more ? 6 : 15)
         if let count {
             let c = UILabel()
             c.text = "\(count)"
             c.font = .systemFont(ofSize: 16, weight: .semibold)
             c.textColor = UIColor(white: 0.55, alpha: 1)
+            c.setContentHuggingPriority(.required, for: .horizontal)
             stack.addArrangedSubview(c)
         }
         stack.addArrangedSubview(UIView())
+        if more { stack.addArrangedSubview(moreMenuButton()) }
         return stack
     }
 
-    private func addHeader(_ title: String, count: Int? = nil) {
-        if let last = content.arrangedSubviews.last { content.setCustomSpacing(26, after: last) }
-        content.addArrangedSubview(header(title, count: count))
+    private func addHeader(_ title: String, count: Int? = nil, more: Bool = false) {
+        if let last = content.arrangedSubviews.last { content.setCustomSpacing(22, after: last) }
+        content.addArrangedSubview(header(title, count: count, more: more))
     }
 
     /// Bouton principal (noir, en verre) ou secondaire (verre clair).
     private func primaryButton(_ title: String, disables: Bool = true, _ handler: @escaping () -> Void) -> PCGlassButton {
-        let b = PCGlassButton(title: title, tint: PCTheme.ink, foreground: .white, height: 48)
+        let b = PCGlassButton(title: title, tint: PCTheme.ink, foreground: .white, height: 50)
         b.onTap = { [weak b] in
             if disables { b?.isEnabled = false }   // la page est reconstruite dès que la réponse arrive
             handler()
@@ -752,24 +846,34 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
             content.removeArrangedSubview(v)
             v.removeFromSuperview()
         }
-        actionPill.moreButton.menu = makeMoreMenu()
+        moreButton.button.menu = makeMoreMenu()
         barTitle.text = str("title")
 
-        // En-tête : numéro + date / canal.
+        // En-tête : « #1017 » + pastilles de statut, puis la ligne de date / canal.
         let title = UILabel()
         title.text = str("title")
         title.font = .systemFont(ofSize: 30, weight: .bold)
         title.textColor = PCTheme.ink
+        title.setContentHuggingPriority(.required, for: .horizontal)
+        title.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let line = UIStackView(arrangedSubviews: [
+            title,
+            ODBadge(text: str("ful"), kind: str("fulKind")),
+            ODBadge(text: str("pay"), kind: str("payKind")),
+            UIView(),
+        ])
+        line.alignment = .center
+        line.spacing = 8
         let sub = UILabel()
         sub.text = str("sub")
-        sub.font = .systemFont(ofSize: 15)
+        sub.font = .systemFont(ofSize: 14)
         sub.textColor = PCTheme.sub
         sub.numberOfLines = 0
-        let head = UIStackView(arrangedSubviews: [title, sub])
+        let head = UIStackView(arrangedSubviews: [line, sub])
         head.axis = .vertical
-        head.spacing = 3
+        head.spacing = 4
         head.isLayoutMarginsRelativeArrangement = true
-        head.layoutMargins = UIEdgeInsets(top: 4, left: 15, bottom: 6, right: 15)
+        head.layoutMargins = UIEdgeInsets(top: 4, left: 15, bottom: 2, right: 15)
         titleWrap.subviews.forEach { $0.removeFromSuperview() }
         head.translatesAutoresizingMaskIntoConstraints = false
         titleWrap.addSubview(head)
@@ -781,26 +885,60 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
         ])
         content.addArrangedSubview(titleWrap)
 
-        // Statut : paiement + exécution.
-        content.addArrangedSubview(PCDetailCard(rows: [
-            ODStatusRow(title: lb("Payment"), badge: ODBadge(text: str("pay"), kind: str("payKind"))),
-            ODSeparator(),
-            ODStatusRow(title: lb("Fulfillment"), badge: ODBadge(text: str("ful"), kind: str("fulKind"))),
-        ]))
-
+        buildCustomer()
+        buildAddress()
         buildItems()
         buildPayment()
-        buildContact()
-        buildCustomer()
         buildNotes()
         buildConversion()
         buildRisk()
         buildTimeline()
     }
 
+    private func buildCustomer() {
+        addHeader(lb("Customer"), more: true)
+        guard let c = info["customer"] as? [String: Any] else {
+            let row = PCDRow(symbol: nil, title: lb("No customer"), chevron: false)
+            row.titleLabel.textColor = PCTheme.sub
+            content.addArrangedSubview(PCDetailCard(rows: [row]))
+            return
+        }
+        let card = ODClientCard(
+            name: (c["name"] as? String) ?? "",
+            sub: (c["sub"] as? String) ?? "",
+            email: str("email"),
+            phone: str("phone")
+        )
+        let idx = (c["idx"] as? NSNumber)?.intValue ?? -1
+        card.nameButton.addAction(UIAction { [weak self] _ in
+            PCTheme.haptic()
+            self?.send(["act": "customer", "idx": idx])
+        }, for: .touchUpInside)
+        card.copyButton.addAction(UIAction { [weak self] _ in
+            guard let self else { return }
+            UIPasteboard.general.string = self.str("email")
+            PCTheme.haptic()
+            self.showToast(self.lb("Copied"))
+        }, for: .touchUpInside)
+        content.addArrangedSubview(PCDetailCard(rows: [card]))
+    }
+
+    private func buildAddress() {
+        addHeader(lb("Shipping and billing address"), more: true)
+        let lines = (info["addr"] as? [String]) ?? []
+        let address = ODAddressRow(title: "", lines: lines)
+        address.copyButton.addAction(UIAction { [weak self] _ in
+            guard let self else { return }
+            UIPasteboard.general.string = lines.joined(separator: "\n")
+            PCTheme.haptic()
+            self.showToast(self.lb("Copied"))
+        }, for: .touchUpInside)
+        content.addArrangedSubview(PCDetailCard(rows: [address]))
+    }
+
     private func buildItems() {
         let n = (info["unitsCount"] as? NSNumber)?.intValue ?? 0
-        addHeader(lb("Items"), count: n)
+        addHeader(lb("Products"), count: n, more: true)
 
         var rows: [UIView] = []
         let shipSub = UILabel()
@@ -839,85 +977,39 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
     }
 
     private func buildPayment() {
-        addHeader(lb("Payment"))
-        let topPad = UIView()
-        topPad.heightAnchor.constraint(equalToConstant: 4).isActive = true
-        var rows: [UIView] = [topPad]
+        addHeader(lb("Payment"), more: true)
+        var rows: [UIView] = []
+        func add(_ v: UIView) {
+            if !rows.isEmpty { rows.append(ODSeparator()) }
+            rows.append(v)
+        }
         for l in list("lines") {
-            rows.append(ODKVRow(label: (l["l"] as? String) ?? "", sub: (l["s"] as? String) ?? "", value: (l["v"] as? String) ?? ""))
+            add(ODKVRow(label: (l["l"] as? String) ?? "", sub: (l["s"] as? String) ?? "", value: (l["v"] as? String) ?? ""))
         }
-        rows.append(ODSeparator())
-        rows.append(ODKVRow(label: lb("Total"), value: str("total"), bold: true))
-        rows.append(ODSeparator())
+        add(ODKVRow(label: lb("Total"), value: str("total"), bold: true))
         for l in list("paid") {
-            rows.append(ODKVRow(label: (l["l"] as? String) ?? "", value: (l["v"] as? String) ?? ""))
+            add(ODKVRow(label: (l["l"] as? String) ?? "", value: (l["v"] as? String) ?? ""))
         }
+        content.addArrangedSubview(PCDetailCard(rows: rows, inset: 2))
+
+        // Gros bouton noir sous la carte, comme « Marquer comme payé » dans l'app Shopify.
         if flag("canCapture") {
-            rows.append(ODButtonRow(button: primaryButton(lb("Capture payment")) { [weak self] in
+            content.addArrangedSubview(ODButtonRow(button: primaryButton(lb("Capture payment")) { [weak self] in
                 self?.send(["act": "capture"])
-            }))
+            }, inset: 0, top: 2, bottom: 0))
         } else if flag("canMarkPaid") {
-            rows.append(ODButtonRow(button: primaryButton(lb("Mark as paid")) { [weak self] in
+            content.addArrangedSubview(ODButtonRow(button: primaryButton(lb("Mark as paid")) { [weak self] in
                 self?.send(["act": "markpaid"])
-            }))
-        } else {
-            let pad = UIView()
-            pad.heightAnchor.constraint(equalToConstant: 4).isActive = true
-            rows.append(pad)
+            }, inset: 0, top: 2, bottom: 0))
         }
-        content.addArrangedSubview(PCDetailCard(rows: rows))
-    }
-
-    private func buildContact() {
-        addHeader(lb("Contact information"))
-        let email = secondaryButton(lb("Email details"), symbol: "envelope") { [weak self] in
-            guard let self else { return }
-            let v = self.str("email")
-            self.showToast(v.isEmpty ? self.lb("No contact details") : v)
-        }
-        let phone = secondaryButton(lb("Phone details"), symbol: "phone") { [weak self] in
-            guard let self else { return }
-            let v = self.str("phone")
-            self.showToast(v.isEmpty ? self.lb("No phone number") : v)
-        }
-        [email, phone].forEach { $0.setContentHuggingPriority(.defaultLow, for: .horizontal) }
-        let buttons = UIStackView(arrangedSubviews: [email, phone])
-        buttons.axis = .horizontal
-        buttons.distribution = .fillEqually
-        buttons.spacing = 10
-        buttons.isLayoutMarginsRelativeArrangement = true
-        buttons.layoutMargins = UIEdgeInsets(top: 14, left: 14, bottom: 6, right: 14)
-
-        let lines = (info["addr"] as? [String]) ?? []
-        let address = ODAddressRow(title: lb("Address"), lines: lines)
-        address.copyButton.addAction(UIAction { [weak self] _ in
-            guard let self else { return }
-            UIPasteboard.general.string = lines.joined(separator: "\n")
-            PCTheme.haptic()
-            self.showToast(self.lb("Copied"))
-        }, for: .touchUpInside)
-        content.addArrangedSubview(PCDetailCard(rows: [buttons, address]))
-    }
-
-    private func buildCustomer() {
-        guard let c = info["customer"] as? [String: Any] else { return }
-        addHeader(lb("Customer"))
-        let row = ODCustomerRow(
-            name: (c["name"] as? String) ?? "",
-            sub: (c["sub"] as? String) ?? "",
-            initials: (c["initials"] as? String) ?? ""
-        )
-        let idx = (c["idx"] as? NSNumber)?.intValue ?? -1
-        row.onTap { [weak self] in self?.send(["act": "customer", "idx": idx]) }
-        content.addArrangedSubview(PCDetailCard(rows: [row]))
     }
 
     private func buildNotes() {
-        addHeader(lb("Notes"))
         let note = str("note")
-        let row = PCDRow(symbol: nil, title: note.isEmpty ? str("noEmptyNote") : note, chevron: false)
-        row.titleLabel.textColor = note.isEmpty ? PCTheme.sub : PCTheme.ink
-        content.addArrangedSubview(PCDetailCard(rows: [row]))
+        let row = PCDRow(symbol: "note.text", title: lb("Notes"), bold: true)
+        row.setSub(note.isEmpty ? str("noEmptyNote") : note)
+        if let c = content.arrangedSubviews.last { content.setCustomSpacing(18, after: c) }
+        content.addArrangedSubview(PCDetailCard(rows: [row], inset: 4))
     }
 
     private func buildConversion() {
