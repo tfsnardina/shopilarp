@@ -161,9 +161,12 @@
     try { if (navigator.vibrate) navigator.vibrate(typeof a === "number" ? a : a || 8); } catch (e2) { }
   }
   var toastT;
-  function toast(msg) {
-    toastEl.textContent = msg; toastEl.classList.add("on"); clearTimeout(toastT);
-    toastT = setTimeout(function () { toastEl.classList.remove("on"); }, 2400);
+  function toast(msg, kind, ms) {
+    toastEl.textContent = msg;
+    if (kind) { var ti = document.createElement("i"); ti.className = "tt-ic " + kind; if (kind === "ok") ti.innerHTML = '<i class="ic i-check"></i>'; toastEl.insertBefore(ti, toastEl.firstChild); }
+    toastEl.classList.toggle("up", typeof current === "string" && current === "products" && typeof stack !== "undefined" && !stack.length);
+    toastEl.classList.add("on"); clearTimeout(toastT);
+    if (ms !== 0) toastT = setTimeout(function () { toastEl.classList.remove("on"); }, ms || 2400);
   }
 
   /* ── Data ────────────────────────────────────────────────── */
@@ -1154,6 +1157,8 @@
 
   /* ── Products ────────────────────────────────────────────── */
   var pFilter = "All", pQuery = "";
+  var pSel = null;                         // null = mode normal ; tableau = mode sélection (produits cochés)
+  function prodByI(n) { for (var k = 0; k < prods.length; k++) if (prods[k].i === n) return prods[k]; return null; }
   function invLine(p) {
     var v = p.vars > 1 ? " \u00b7 " + p.vars + " variants" : "";
     if (p.inv <= 0) return '<span class="neg">0 available</span>' + v;
@@ -1163,10 +1168,13 @@
   function renderProducts() {
     var el = $("#s-products");
     el.classList.add("gl-scr");
+    if (pSel && !prods.length) pSel = null;
+    el.classList.toggle("selecting", !!pSel);
+    postSel();
     var list = prodsSorted(prods.filter(function (p) { return (pFilter === "All" || p.status === pFilter) && (!pQuery || p.title.toLowerCase().indexOf(pQuery.toLowerCase()) >= 0); }));
     var none = !prods.length && !pQuery && pFilter === "All";
-    var head = glHead("Products", "prodviews", glBtn("newproduct", "Add product", "plus-circle") + (none ? "" : '<button class="gl-btn txt" data-act="select">Select</button>'));
-    var trial = '<div class="gl-dock"><button class="gl-trial" data-act="trial"><b>Subscribe to keep selling</b><span><i></i>3 days left</span></button></div>';
+    var head = glHead("Products", "prodviews", pSel ? "" : glBtn("newproduct", "Add product", "plus-circle") + (none || !EMPTY ? "" : glBtn("prodsmore", "More", "more")));
+    var trial = pSel ? selBarHtml() : '<div class="gl-dock"><button class="gl-trial" data-act="trial"><b>Subscribe to keep selling</b><span><i></i>3 days left</span></button></div>';
     if (none) {
       el.innerHTML = '<div class="gl-page">' + head + '<div class="gl-body"><div class="gl-empty gl-empty-p">' +
         '<img class="gl-hero" src="' + IMG + 'products-hero.webp" alt="" width="143" height="143">' +
@@ -1178,6 +1186,7 @@
         "</div></div></div>" + trial + "</div>";
       return;
     }
+    el.classList.toggle("selecting", !!pSel);
     el.innerHTML = '<div class="gl-page">' + head + '<div class="gl-body"><div class="gl-tools">' +
       '<div class="sbar"><label class="sfield">' + ic("search") + '<input id="pq" type="search" placeholder="Filter products" value="' + esc(pQuery) + '" autocomplete="off"></label><button class="cb" data-act="sort" aria-label="Sort">' + ic("sort") + '</button><button class="cb" data-act="pfilter" aria-label="Filter">' + ic("filter") + "</button></div>" +
       '<div class="chips">' + ["All", "Active", "Draft", "Archived"].map(function (c) { return '<button class="chip' + (c === pFilter ? " on" : "") + '" data-pf="' + c + '">' + c + "</button>"; }).join("") + "</div></div>" +
@@ -1187,7 +1196,8 @@
     q.addEventListener("input", function () { pQuery = q.value; var l = prodsSorted(prods.filter(function (p) { return (pFilter === "All" || p.status === pFilter) && p.title.toLowerCase().indexOf(pQuery.toLowerCase()) >= 0; })); $("#plist").innerHTML = l.length ? l.map(prodRow).join("") : emptyState("No products found", "Try changing the filters or search term"); });
   }
   function prodRow(p) {
-    return '<button class="prow" data-prod="' + p.i + '">' + thumb(p, 44) + '<div class="pr-t"><b>' + esc(p.title) + "</b><span>" + invLine(p) + "</span></div>" + badge(p.status, p.status === "Active" ? "ok" : p.status === "Draft" ? "info" : "neu") + "</button>";
+    var on = pSel && pSel.indexOf(p) >= 0;
+    return '<button class="prow' + (pSel ? " selmode" : "") + (on ? " picked" : "") + '" data-prod="' + p.i + '">' + (pSel ? '<span class="pr-ck">' + ic("check") + "</span>" : "") + thumb(p, 44) + '<div class="pr-t"><b>' + esc(p.title) + "</b><span>" + invLine(p) + "</span></div>" + badge(p.status, p.status === "Active" ? "ok" : p.status === "Draft" ? "info" : "neu") + "</button>";
   }
 
   /* ── Menu: drawer + sections under the ≡ tab ───────────── */
@@ -1283,6 +1293,94 @@
     setTab("menu");
   }
   var menuView = "analytics";
+  /* ── Sélection multiple + suppression groupée ──────────── */
+  function selBarHtml() {
+    var n = pSel ? pSel.length : 0;
+    return '<div class="gl-dock gl-seldock"><div class="gl-selbar" id="selbar">' +
+      '<button class="sb-n" data-act="selexit" aria-label="Exit selection">' + ic("x-circle") + '<b id="selN">' + n + "</b></button><span class=\"fl\"></span>" +
+      '<button class="sb-del" id="selDel" data-act="seldel"' + (n ? "" : " disabled") + ">Delete</button>" +
+      '<button class="sb-more" id="selMore" data-act="selmore" aria-label="More"' + (n ? "" : " disabled") + ">" + ic("more") + "</button></div></div>";
+  }
+  // iOS 26 : la barre de sélection est du vrai Liquid Glass natif (GlassSelectionBar.swift) et la confirmation une UIAlertController.
+  // La barre HTML ci-dessous reste le relais (invisible) et le repli hors iOS 26 / navigateur.
+  var pBusy = false;
+  function nativeHandler(name) {
+    try { if (!document.documentElement.classList.contains("native-glass-drawer")) return null; var h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers[name]; return h || null; } catch (e) { return null; }
+  }
+  function postSel() {
+    var h = nativeHandler("larpSelect"); if (!h) return;
+    var shown = !!pSel && current === "products" && !stack.length;
+    try { h.postMessage({ shown: shown, count: pSel ? pSel.length : 0, busy: pBusy }); } catch (e) { }
+  }
+  window.__larpNativeSelect = function (name) {
+    if (!pSel || pBusy) return;
+    if (name === "selexit") return exitSelect();
+    if (!pSel.length) return;
+    if (name === "seldel") return confirmDelete();
+    if (name === "selmore") return selMoreSheet();
+  };
+  var confirmCb = null;
+  window.__larpConfirmResult = function (id, ok) {
+    var cb = confirmCb; confirmCb = null;
+    if (cb && ok) cb();
+  };
+  function syncSelBar() {
+    postSel();
+    var n = pSel ? pSel.length : 0, b = $("#selbar"); if (!b) return;
+    $("#selN").textContent = n;
+    var busy = b.classList.contains("busy");
+    $("#selDel").disabled = !n || busy; $("#selMore").disabled = !n || busy;
+  }
+  function enterSelect() { pSel = []; rendered.products = 0; renderProducts(); rendered.products = 1; var sc = $("#s-products"); if (sc) sc.scrollTop = 0; }
+  function exitSelect() { pSel = null; renderProducts(); }
+  function toggleSel(n) {
+    var p = prodByI(n); if (!p || !pSel) return;
+    var k = pSel.indexOf(p); if (k >= 0) pSel.splice(k, 1); else pSel.push(p);
+    var row = $('#plist .prow[data-prod="' + n + '"]'); if (row) row.classList.toggle("picked", k < 0);
+    hap(4); syncSelBar();
+  }
+  function visibleProds() { return prodsSorted(prods.filter(function (p) { return (pFilter === "All" || p.status === pFilter) && (!pQuery || p.title.toLowerCase().indexOf(pQuery.toLowerCase()) >= 0); })); }
+  function actionsSheet() {
+    var el = sheet("", '<h2 class="act-h">Actions</h2><div class="opts"><button class="opt act" data-o="select">' + ic("check-circle") + "<span>Select products</span></button></div>");
+    $(".opt", el).addEventListener("click", function () { hap(6); pop(false); setTimeout(enterSelect, 200); });
+  }
+  function selMoreSheet() {
+    var all = visibleProds(), every = all.length && all.every(function (p) { return pSel.indexOf(p) >= 0; });
+    optSheet("Actions", [every ? "Deselect all" : "Select all"], "", function (v) {
+      if (!pSel) return;
+      if (every) pSel = pSel.filter(function (p) { return all.indexOf(p) < 0; });
+      else all.forEach(function (p) { if (pSel.indexOf(p) < 0) pSel.push(p); });
+      $$("#plist .prow").forEach(function (r) { var q = prodByI(+r.getAttribute("data-prod")); r.classList.toggle("picked", !!q && pSel.indexOf(q) >= 0); });
+      syncSelBar();
+    });
+  }
+  function confirmDelete() {
+    if (!pSel || !pSel.length) return;
+    var nh = nativeHandler("larpConfirm");
+    if (nh) {
+      var T = function (x) { try { return window.I18N ? window.I18N.tr(x) : x; } catch (e) { return x; } };
+      confirmCb = function () { hap(10); setTimeout(runDelete, 120); };
+      try { nh.postMessage({ id: "delprods", title: T("Delete products?"), message: T("This action cannot be undone."), cancel: T("Cancel"), confirm: T("Delete") }); return; } catch (e) { confirmCb = null; }
+    }
+    var el = sheet("", '<div class="al"><h3>Delete products?</h3><p>This action cannot be undone.</p><div class="al-b"><button class="al-c" data-o="c">Cancel</button><button class="al-d" data-o="d">Delete</button></div></div>', { cls: "alert" });
+    $(".al-c", el).addEventListener("click", function () { hap(5); pop(false); });
+    $(".al-d", el).addEventListener("click", function () { hap(10); pop(false); setTimeout(runDelete, 220); });
+  }
+  function runDelete() {
+    if (!pSel || !pSel.length) return;
+    var list = pSel.slice(), bar = $("#selbar");
+    pBusy = true;
+    if (bar) bar.classList.add("busy");
+    syncSelBar();
+    toast("Deleting products…", "spin", 0);
+    setTimeout(function () {
+      deleteProducts(list);
+      pBusy = false; pSel = null; pFilter = "All"; pQuery = "";
+      rendered.products = 0; renderProducts(); rendered.products = 1;
+      hap(14); toast("Products deleted", "ok");
+    }, 900);
+  }
+
   var MV = {
     analytics: "Analytics", customers: "Customers", finance: "Finance", growth: "Growth", discounts: "Discounts", content: "Content", markets: "Markets",
     onlinestore: "Online Store", inbox: "Inbox", pos: "Point of Sale", shop: "Shop", social: "Facebook & Instagram", apps: "Apps", settings: "Settings",
@@ -1303,6 +1401,7 @@
   var RENDER = { home: renderHome, orders: renderOrders, products: renderProducts, menu: renderMenu };
   function setTab(name, keep) {
     if (!RENDER[name]) return;
+    if (pSel && name !== "products") { pSel = null; pBusy = false; rendered.products = 0; postSel(); }
     if (!rendered[name] || !keep) { RENDER[name](); rendered[name] = 1; }
     current = name;
     $$(".scr").forEach(function (s) { s.classList.toggle("on", s.id === "s-" + name); });
@@ -1340,6 +1439,7 @@
     layers.appendChild(el);
     var under = stack.length ? stack[stack.length - 1].el : $("#screens");
     stack.push({ el: el, kind: kind, under: under });
+    postSel();
     try { history.pushState({ l: stack.length }, ""); } catch (e) { }
     el.getBoundingClientRect();
     requestAnimationFrame(function () {
@@ -1354,6 +1454,7 @@
   var ignorePop = 0;
   function pop(fromHistory) {
     var top = stack.pop(); if (!top) return;
+    postSel();
     if (!fromHistory) { ignorePop++; try { history.back(); } catch (e) { ignorePop--; } }
     top.el.classList.remove("on");
     if (top.kind === "page") top.under.classList.remove("pushed");
@@ -1372,6 +1473,7 @@
       (function (e) { setTimeout(function () { e.remove(); }, 420); })(t.el);
     }
     $("#tabbar").classList.remove("hide");
+    postSel();
     ignorePop++;
     try { history.go(-n); } catch (e) { ignorePop--; }
   }
@@ -1710,15 +1812,24 @@
     saveState();
     refreshAll();
   };
-  window.__larpNativeProductDelete = function (n) {
-    var p = prods[n.idx]; if (!EMPTY || !p) return;
-    prods.splice(n.idx, 1); prods.forEach(function (q, k) { q.i = k; });
+  // Supprime une liste de produits (mémoire + réglages sauvegardés) ; partagé par la page produit native et la sélection multiple.
+  function deleteProducts(list) {
+    if (!EMPTY || !list.length) return;
     var cfg = savedSettingsObj();
-    if (Array.isArray(cfg.products)) cfg.products = cfg.products.filter(function (c) { return !(c && ((p.pid && c.id === p.pid) || (!p.pid && c.title === p.title))); });
     if (!Array.isArray(cfg.__deleted)) cfg.__deleted = [];
-    cfg.__deleted.push(p.pid ? "id:" + p.pid : "t:" + p.title);
+    list.forEach(function (p) {
+      var k = prods.indexOf(p); if (k < 0) return;
+      prods.splice(k, 1);
+      if (Array.isArray(cfg.products)) cfg.products = cfg.products.filter(function (c) { return !(c && ((p.pid && c.id === p.pid) || (!p.pid && c.title === p.title))); });
+      cfg.__deleted.push(p.pid ? "id:" + p.pid : "t:" + p.title);
+    });
+    prods.forEach(function (q, k) { q.i = k; });
     writeSettings(cfg);
     saveState();
+  }
+  window.__larpNativeProductDelete = function (n) {
+    var p = prods[n.idx]; if (!EMPTY || !p) return;
+    deleteProducts([p]);
     pFilter = "All"; pQuery = "";
     refreshAll();
   };
@@ -2684,7 +2795,7 @@
     var t = e.target.closest("button, [data-act], [data-order], [data-prod], [data-cust]");
     if (!t) return;
     if (t.hasAttribute("data-order") && !t.hasAttribute("data-act")) { hap(5); if (t.classList.contains("bn")) { t.classList.remove("on"); t.classList.add("out"); } closeSheets(); return openOrder(+t.getAttribute("data-order")); }
-    if (t.hasAttribute("data-prod")) { hap(5); return openProduct(+t.getAttribute("data-prod")); }
+    if (t.hasAttribute("data-prod")) { if (pSel) return toggleSel(+t.getAttribute("data-prod")); hap(5); return openProduct(+t.getAttribute("data-prod")); }
     if (t.hasAttribute("data-cust")) { hap(5); return openCustomer(+t.getAttribute("data-cust")); }
     if (t.hasAttribute("data-fulfill")) { hap(8); return fulfillFlow(+t.getAttribute("data-fulfill")); }
     if (t.hasAttribute("data-capture")) { hap(8); return capture(+t.getAttribute("data-capture")); }
@@ -2719,7 +2830,10 @@
       });
       case "stores": return storePop();
       case "mvswitch": return optSheet(MV[menuView] || "Menu", menuView === "analytics" ? ["Analytics", "Reports", "Live View"] : [MV[menuView] || "Menu"], MV[menuView], function (v) { if (v === "Live View") openLiveView(); else if (v === "Reports") toast("Reports"); });
-      case "select": return toast("Select products");
+      case "prodsmore": return actionsSheet();
+      case "selexit": return exitSelect();
+      case "seldel": return confirmDelete();
+      case "selmore": return selMoreSheet();
       case "ancompare": return optSheet("Compare to", ["Previous period", "Previous year", "No comparison"], "Previous period", function () { });
       case "ancur": return optSheet("Currency", [S.tag || S.cur + " " + S.sym.trim()], S.tag || S.cur + " " + S.sym.trim(), function () { });
       case "account": return acctPop();
