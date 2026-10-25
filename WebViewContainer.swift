@@ -113,6 +113,8 @@ enum WebViewContainer {
                 let overlap = webView.convert(frame, from: nil).intersection(webView.bounds).height
                 scroll.contentInset.bottom = overlap
                 scroll.verticalScrollIndicatorInsets.bottom = overlap
+                // Relais vers la page : la barre Sidekick flotte au-dessus du clavier.
+                webView.evaluateJavaScript("document.documentElement.setAttribute('data-native-kb','1');document.documentElement.style.setProperty('--kb','\(Int(overlap))px');", completionHandler: nil)
             }
             let hide = NotificationCenter.default.addObserver(
                 forName: UIResponder.keyboardWillHideNotification,
@@ -121,6 +123,7 @@ enum WebViewContainer {
             ) { _ in
                 scroll.contentInset.bottom = 0
                 scroll.verticalScrollIndicatorInsets.bottom = 0
+                webView.evaluateJavaScript("document.documentElement.style.setProperty('--kb','0px');", completionHandler: nil)
             }
             keyboardObservers = [show, hide]
         }
