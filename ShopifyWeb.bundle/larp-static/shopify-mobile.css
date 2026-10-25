@@ -1284,5 +1284,7 @@ html.native-glass-hdr:not(.glass-cover) .gl-hd .gl-chev,
 html.native-glass-hdr:not(.glass-cover) .gl-scr .sfield,
 html.native-glass-hdr:not(.glass-cover) .gl-scr .cb,
 html.native-glass-hdr:not(.glass-cover) .gl-scr .chip{visibility:hidden}
-html.native-glass-hdr #layers>:last-child .sh.notifs.order .sh-h.nav .sh-x,
-html.native-glass-hdr #layers>:last-child .sh.notifs.order .sh-h.nav .nb-c{visibility:hidden}
+html.native-glass-hdr #layers>:last-child .sh.notifs:is(.order,.payouts,.transfer) .sh-h.nav .sh-x,
+html.native-glass-hdr #layers>:last-child .sh.notifs:is(.order,.payouts,.transfer) .sh-h.nav .nb-c,
+html.native-glass-hdr #layers>:last-child .sh.notifs:is(.payouts,.transfer) .pv-go,
+html.native-glass-hdr #layers>:last-child .sh.notifs:is(.payouts,.transfer) .btn-p{visibility:hidden}
