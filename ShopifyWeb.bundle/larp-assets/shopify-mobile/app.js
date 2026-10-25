@@ -3227,9 +3227,21 @@
         items.forEach(function (i) { i.dim = dd; });
       }
       if (ord) {
+        // Positions FINALES (sans la translation de la feuille) : le natif anime lui-même la montée / descente,
+        // sans attendre la page (sinon les boutons traînent derrière la feuille).
+        var shEl = ord, tr = 0;
+        try { tr = new DOMMatrix(getComputedStyle(shEl).transform).m42 || 0; } catch (e) { }
+        var dragging = shEl.style.transition === "none";
+        var closing = !top.classList.contains("on");
+        var target = closing ? window.innerHeight : (dragging ? Math.max(0, tr) : 0);
+        var addO = function (id, b, ic) {
+          var o = mk(id, "btn", b, { icon: ic, target: Math.round(target), drag: dragging });
+          o.y = Math.round(o.y - tr);
+          items.push(o);
+        };
         var x = ord.querySelector(".sh-h.nav .sh-x");
-        if (x) items.push(mk("o:x", "btn", x, { icon: "x" }));
-        $$(".sh-h.nav .nb-c", ord).forEach(function (b, n) { items.push(mk("o:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b) })); });
+        if (x) addO("o:x", x, "x");
+        $$(".sh-h.nav .nb-c", ord).forEach(function (b, n) { addO("o:" + (b.getAttribute("data-act") || n), b, iconOf(b)); });
       }
       return { items: items, cover: false };
     }
@@ -3260,6 +3272,12 @@
       mo.observe(app, { childList: true });
     } catch (e) { }
     setInterval(tick, 400);
+    window.addEventListener("touchmove", function () {
+      var sh = layers.lastElementChild && layers.lastElementChild.querySelector(".sh.notifs.order");
+      if (!sh || sh.style.transition !== "none") return;
+      var m = /translateY\(([-\d.]+)px\)/.exec(sh.style.transform || "");
+      if (m) { try { mh.postMessage({ dy: parseFloat(m[1]) }); } catch (e) { } }
+    }, { passive: true });
     window.__larpGlassTap = function (id, idx) {
       var el = document.querySelector('[data-gid="' + id + '"]'); if (!el) return;
       if (id === "c:chips") { var c = $$(".chip", el)[idx]; if (c) c.click(); return; }
