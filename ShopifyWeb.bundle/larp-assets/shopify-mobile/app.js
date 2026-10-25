@@ -3198,7 +3198,7 @@
         var sc = top.querySelector(".sh-scrim");
         dim = sc ? (parseFloat(getComputedStyle(sc).opacity) || 0) * 0.4 : 0;
         cut = sh.getBoundingClientRect().top;                    // ce qui est sous la feuille est masqué
-        ord = top.querySelector(".sh.notifs.order");
+        ord = top.querySelector(".sh.notifs.order, .sh.notifs.payouts, .sh.notifs.transfer");
       }
       var scr = document.querySelector("#screens .scr.on.gl-scr");
       if (scr) {
@@ -3240,8 +3240,15 @@
           items.push(o);
         };
         var x = ord.querySelector(".sh-h.nav .sh-x");
-        if (x) addO("o:x", x, "x");
+        if (x) addO("o:x", x, iconOf(x) || "x");
         $$(".sh-h.nav .nb-c", ord).forEach(function (b, n) { addO("o:" + (b.getAttribute("data-act") || n), b, iconOf(b)); });
+        // Gros boutons sombres (Transférer, Continuer…) : verre teinté.
+        $$(".pv-go, .btn-p", ord).forEach(function (b, n) {
+          if (!b.getBoundingClientRect().width) return;
+          var o = mk("o:cta" + n, "cta", b, { title: b.textContent.replace(/\s+/g, " ").trim(), icon: b.classList.contains("pv-go") ? "arrow-ur" : "", disabled: !!b.disabled, target: Math.round(target), drag: dragging });
+          o.y = Math.round(o.y - tr);
+          items.push(o);
+        });
       }
       return { items: items, cover: false };
     }
