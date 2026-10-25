@@ -169,6 +169,12 @@
   /* ── Data ────────────────────────────────────────────────── */
   var custs = EMPTY ? [] : P.cus.map(function (c) { return { name: c[0], email: c[1], phone: c[2], city: c[3], region: c[4], ts: c[5], n: c[6], spent: c[7], sub: !!c[8], tags: c[9] || [] }; });
   var demoRaw = P.demoPro || P.pro, userRaw = P.demoPro ? P.pro : [];
+  // Products deleted from the native product page stay deleted after a relaunch (the saved payload still lists them).
+  (function dropDeleted() {
+    var del = (typeof CFG === "object" && CFG && Array.isArray(CFG.__deleted)) ? CFG.__deleted : [];
+    if (!del.length || !userRaw.length) return;
+    userRaw = userRaw.filter(function (x) { return del.indexOf(x[15] ? "id:" + x[15] : "t:" + x[0]) < 0; });
+  })();
   function mkProd(x, i, hidden) {
     var img = typeof x[13] === "string" && x[13].indexOf("data:image/") === 0 ? x[13] : "";
     return { i: hidden ? -1 - i : i, title: x[0], price: x[1], compare: x[2], inv: x[3], vars: x[4], vnames: x[5] || [], type: x[6], vendor: x[7], sku: x[8], status: x[9], sold: x[10], ts: x[11], hue: x[12], img: img, share: x[14] > 0 ? x[14] : 0, pid: x[15] || "" };
@@ -177,6 +183,14 @@
   var prods = EMPTY ? userRaw.map(function (x, i) { return mkProd(x, i, false); }) : allProds;
   prods.forEach(function (p) { p.baseInv = p.inv; });
   var HUES = [233, 18, 142, 88, 201];
+  // Fields only the native product page edits (description, category, tags, collections, shipping).
+  function prodExtras(p, c) {
+    p.desc = typeof c.description === "string" ? c.description : (p.desc || "");
+    p.category = typeof c.category === "string" ? c.category : (p.category || "");
+    p.tags = Array.isArray(c.tags) ? c.tags.slice() : (p.tags || []);
+    p.collections = Array.isArray(c.collections) ? c.collections.slice() : (p.collections || null);
+    p.physical = c.physical === false ? false : (p.physical !== false);
+  }
   function splitVariants(v) { return String(v || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 12); }
   // Products created in the app (or edited in Preferences) after the saved payload was built are added back,
   // so a new product never disappears after a relaunch.
@@ -187,11 +201,24 @@
       if (!c || typeof c !== "object") return;
       var m = null;
       prods.forEach(function (p) { if (!m && !used[p.i] && ((c.id && p.pid === c.id) || (!p.pid && p.title === c.title))) m = p; });
-      if (m) { used[m.i] = 1; return; }
+      if (m) {
+        used[m.i] = 1;
+        if (c.edited) {   // edited in the native product page after the saved payload was built
+          var evn = splitVariants(c.variants);
+          if (c.title) m.title = String(c.title);
+          m.price = Math.round((Number(c.price) || 0) * f); m.compare = c.compare > 0 ? Math.round(c.compare * f) : 0;
+          m.inv = Math.max(0, Math.round(Number(c.inventory) || 0)); m.baseInv = m.inv;
+          m.vnames = evn.length ? evn : ["Default"]; m.vars = Math.max(1, evn.length || 1);
+          m.type = c.type || "General"; m.vendor = c.vendor || m.vendor; m.sku = c.sku || m.sku; m.status = c.status || m.status;
+          m.img = typeof c.image === "string" && c.image.indexOf("data:image/") === 0 ? c.image : "";
+        }
+        prodExtras(m, c);
+        return;
+      }
       var vn = splitVariants(c.variants), idx = prods.length, title = String(c.title || "Untitled product");
       var code = title.replace(/[^a-z0-9]/gi, "").slice(0, 3).toUpperCase() || "PRD";
-      var np = { i: idx, pid: c.id || "", title: title, price: Math.round((Number(c.price) || 0) * f), compare: c.compare > 0 ? Math.round(c.compare * f) : 0, inv: Math.max(0, Math.round(Number(c.inventory) || 0)), vars: Math.max(1, vn.length || 1), vnames: vn.length ? vn : ["Default"], type: c.type || "General", vendor: S.name, sku: c.sku || (code + "-" + (1000 + idx)), status: c.status || "Active", sold: 0, ts: Number(c.ts) || (S.now - 3 * DAY), hue: HUES[idx % HUES.length], img: typeof c.image === "string" && c.image.indexOf("data:image/") === 0 ? c.image : "", share: c.allocationPct > 0 ? c.allocationPct : 0 };
-      np.baseInv = np.inv; used[idx] = 1; prods.push(np);
+      var np = { i: idx, pid: c.id || "", title: title, price: Math.round((Number(c.price) || 0) * f), compare: c.compare > 0 ? Math.round(c.compare * f) : 0, inv: Math.max(0, Math.round(Number(c.inventory) || 0)), vars: Math.max(1, vn.length || 1), vnames: vn.length ? vn : ["Default"], type: c.type || "General", vendor: c.vendor || S.name, sku: c.sku || (code + "-" + (1000 + idx)), status: c.status || "Active", sold: 0, ts: Number(c.ts) || (S.now - 3 * DAY), hue: HUES[idx % HUES.length], img: typeof c.image === "string" && c.image.indexOf("data:image/") === 0 ? c.image : "", share: c.allocationPct > 0 ? c.allocationPct : 0 };
+      np.baseInv = np.inv; prodExtras(np, c); used[idx] = 1; prods.push(np);
     });
   })();
   function mkOrder(o) {
@@ -1511,8 +1538,19 @@
   }
 
   /* ── Product page ────────────────────────────────────────── */
+  function nativeProductInfo(p) {
+    var f = Math.pow(10, S.dec != null ? S.dec : 2), real = p.vnames.length > 1 || (p.vnames[0] && p.vnames[0] !== "Default");
+    return { mode: "edit", idx: p.i, id: p.pid || "", sym: S.sym, shop: S.name || "", canDelete: !!EMPTY,
+      title: p.title, desc: p.desc || "", category: p.category || "", price: p.price / f, inv: p.inv,
+      vendor: p.vendor || S.name || "", type: p.type && p.type !== "General" ? p.type : "", status: p.status || "Active",
+      tags: p.tags || [], collections: p.collections || null, vars: real ? p.vnames.join(", ") : "", physical: p.physical !== false, img: p.img || "" };
+  }
   function openProduct(i) {
     var p = prods[i]; if (!p) return;
+    // iOS 26: the product page is native (Liquid Glass), like the real Shopify app.
+    if (window.__LARP_NATIVE_PRODUCT__ && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpProduct) {
+      try { window.webkit.messageHandlers.larpProduct.postMessage(nativeProductInfo(p)); return; } catch (e) { }
+    }
     var vrows = p.vnames.length > 1 ? p.vnames.map(function (v, k) {
       var share = Math.floor(p.inv / p.vnames.length) + (k < p.inv % p.vnames.length ? 1 : 0);
       return '<div class="vr">' + thumb(p, 40) + "<div><b>" + esc(v) + "</b><span>" + count(share) + " available</span></div><em>" + money(p.price) + "</em></div>";
@@ -1558,11 +1596,12 @@
     var id = "p-" + Date.now(), share = Math.max(1, Math.round(100 / (idx + 1)));
     var p = { i: idx, pid: id, title: d.title, price: Math.round(d.price * f), compare: d.compare > d.price ? Math.round(d.compare * f) : 0, inv: d.inv, vars: Math.max(1, vn.length || 1), vnames: vn.length ? vn : ["Default"], type: d.type || "General", vendor: d.vendor || S.name, sku: d.sku || (code + "-" + (1000 + idx)), status: d.status, sold: 0, ts: nowMs(), hue: HUES[idx % HUES.length], img: d.img, share: share };
     p.baseInv = p.inv;
+    prodExtras(p, { description: d.desc || "", category: d.category || "", tags: d.tags || [], collections: d.collections || null, physical: d.physical });
     prods.push(p);
     // Written into the saved settings too: Preferences lists it and Done keeps it.
     var cfg = savedSettingsObj();
     if (!Array.isArray(cfg.products)) cfg.products = [];
-    cfg.products.push({ id: id, title: p.title, price: d.price, compare: d.compare > d.price ? d.compare : 0, allocationPct: share, inventory: d.inv, variants: vn.join(", "), image: d.img, status: p.status, type: p.type, sku: p.sku, ts: p.ts });
+    cfg.products.push({ id: id, title: p.title, price: d.price, compare: d.compare > d.price ? d.compare : 0, allocationPct: share, inventory: d.inv, variants: vn.join(", "), image: d.img, status: p.status, type: p.type, sku: p.sku, ts: p.ts, vendor: p.vendor, description: p.desc, category: p.category, tags: p.tags, collections: p.collections, physical: p.physical });
     writeSettings(cfg);
     return p;
   }
@@ -1638,10 +1677,58 @@
     setTimeout(function () { try { g("npTitle").focus({ preventScroll: true }); } catch (e) { } }, 520);
   }
   window.__larpNativeProductSave = function (n) {
-    createProduct({ title: n.title, price: n.price || 0, compare: 0, inv: n.inv || 0, sku: "", vars: n.vars || "", type: n.type || "", vendor: n.vendor || "", status: n.status === "Draft" ? "Draft" : "Active", img: "" });
+    createProduct({ title: n.title, price: n.price || 0, compare: 0, inv: n.inv || 0, sku: "", vars: n.vars || "", type: n.type || "", vendor: n.vendor || "", status: n.status === "Draft" ? "Draft" : "Active", img: typeof n.img === "string" ? n.img : "",
+      desc: n.desc || "", category: n.category || "", tags: n.tags || [], collections: n.collections || null, physical: n.physical });
     pFilter = "All"; pQuery = ""; rendered.products = 0;
     if (current === "products") renderProducts();
     setTimeout(function () { toast("Product saved"); }, 320);
+  };
+  // Edits made in the native product page: applied in memory and written into the saved settings.
+  window.__larpNativeProductUpdate = function (n) {
+    var p = prods[n.idx]; if (!p) return;
+    var f = Math.pow(10, S.dec != null ? S.dec : 2), vn = splitVariants(n.vars);
+    p.title = String(n.title || p.title);
+    p.price = Math.round((Number(n.price) || 0) * f);
+    if (p.compare && p.compare <= p.price) p.compare = 0;
+    var inv = Math.max(0, Math.round(Number(n.inv) || 0));
+    if (inv !== p.inv) { p.inv = inv; p.baseInv = inv; }
+    p.vnames = vn.length ? vn : ["Default"]; p.vars = Math.max(1, vn.length || 1);
+    p.type = n.type || "General"; p.vendor = n.vendor || S.name;
+    p.status = n.status === "Draft" || n.status === "Archived" ? n.status : "Active";
+    if (typeof n.img === "string") p.img = n.img.indexOf("data:image/") === 0 ? n.img : "";
+    prodExtras(p, { description: n.desc || "", category: n.category || "", tags: n.tags || [], collections: n.collections || null, physical: n.physical });
+    if (p.pid) {
+      var cfg = savedSettingsObj(), hit = null;
+      if (!Array.isArray(cfg.products)) cfg.products = [];
+      cfg.products.forEach(function (c) { if (c && c.id === p.pid) hit = c; });
+      if (!hit) { hit = { id: p.pid, ts: p.ts, allocationPct: p.share }; cfg.products.push(hit); }
+      hit.title = p.title; hit.price = p.price / f; hit.compare = p.compare ? p.compare / f : 0; hit.inventory = p.baseInv;
+      hit.variants = p.vnames[0] === "Default" ? "" : p.vnames.join(", "); hit.image = p.img; hit.status = p.status; hit.type = p.type; hit.sku = p.sku;
+      hit.vendor = p.vendor; hit.description = p.desc; hit.category = p.category; hit.tags = p.tags; hit.collections = p.collections; hit.physical = p.physical; hit.edited = true;
+      writeSettings(cfg);
+    }
+    saveState();
+    refreshAll();
+  };
+  window.__larpNativeProductDelete = function (n) {
+    var p = prods[n.idx]; if (!EMPTY || !p) return;
+    prods.splice(n.idx, 1); prods.forEach(function (q, k) { q.i = k; });
+    var cfg = savedSettingsObj();
+    if (Array.isArray(cfg.products)) cfg.products = cfg.products.filter(function (c) { return !(c && ((p.pid && c.id === p.pid) || (!p.pid && c.title === p.title))); });
+    if (!Array.isArray(cfg.__deleted)) cfg.__deleted = [];
+    cfg.__deleted.push(p.pid ? "id:" + p.pid : "t:" + p.title);
+    writeSettings(cfg);
+    saveState();
+    pFilter = "All"; pQuery = "";
+    refreshAll();
+  };
+  window.__larpNativeProductDuplicate = function (n) {
+    var src = prods[n.idx]; if (!src) return;
+    var f = Math.pow(10, S.dec != null ? S.dec : 2), real = src.vnames[0] !== "Default";
+    var c = createProduct({ title: String(n.title || src.title), price: src.price / f, compare: src.compare / f, inv: src.inv, sku: "", vars: real ? src.vnames.join(", ") : "", type: src.type === "General" ? "" : src.type, vendor: src.vendor, status: "Draft", img: src.img,
+      desc: src.desc || "", category: src.category || "", tags: src.tags || [], collections: src.collections || null, physical: src.physical });
+    saveState();
+    refreshAll();
   };
 
   /* ── Customers ───────────────────────────────────────────── */
