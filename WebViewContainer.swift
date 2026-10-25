@@ -254,6 +254,15 @@ enum WebViewContainer {
         ) {
             // The seed script embeds the saved settings as they are *now*. Rebuild it before every navigation,
             // otherwise the editor opens with the settings from when this web view was created (stale totals).
+            // editor.html (Préférences) est un autre document : il n'envoie jamais de message "larpTabbar",
+            // la barre native resterait donc affichée par-dessus son bouton « Done ». On la cache ici.
+            if navigationAction.targetFrame?.isMainFrame ?? true,
+               let url = navigationAction.request.url,
+               url.lastPathComponent == "editor.html" {
+                DispatchQueue.main.async { [weak self] in
+                    self?.host?.updateGlassTabBar(active: "home", hidden: true)
+                }
+            }
             let controller = webView.configuration.userContentController
             controller.removeAllUserScripts()
             controller.addUserScript(
