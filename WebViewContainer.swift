@@ -156,6 +156,12 @@ enum WebViewContainer {
                 }
                 return
             }
+            if message.name == "larpPtr", let dict = message.body as? [String: Any] {
+                DispatchQueue.main.async { [weak self] in
+                    self?.host?.handlePull(dict)
+                }
+                return
+            }
             if message.name == "larpHaptic" {
                 let kind = (message.body as? String) ?? "light"
                 DispatchQueue.main.async { Haptics.play(kind) }
@@ -248,6 +254,7 @@ final class WebHostViewController: UIViewController {
     private var glassTabBar: UIView?
     private var glassTabBarBottom: NSLayoutConstraint?
     private var glassDrawerBar: UIView?
+    private var pullHost: PullRefreshHost?
     private var glassDrawerBarBottom: NSLayoutConstraint?
 
     init(coordinator: WebViewContainer.Coordinator) {
@@ -275,6 +282,7 @@ final class WebHostViewController: UIViewController {
         showWebView(web)
         installGlassTabBar()
         installGlassDrawerBar()
+        installPullHost()
 
         guard let entry = WebViewContainer.resolveWebEntry() else {
             coordinator.showLoadError(on: web, message: WebViewContainer.bundleDebugHint())
@@ -342,6 +350,7 @@ final class WebHostViewController: UIViewController {
         old?.removeScriptMessageHandler(forName: "larpHaptic")
         old?.removeScriptMessageHandler(forName: "larpTabbar")
         old?.removeScriptMessageHandler(forName: "larpDrawer")
+        old?.removeScriptMessageHandler(forName: "larpPtr")
         let web = makeWebView()
         showWebView(web)
         lastLayoutInsets = .zero
@@ -358,6 +367,7 @@ final class WebHostViewController: UIViewController {
         config.userContentController.add(coordinator, name: "larpHaptic")
         config.userContentController.add(coordinator, name: "larpTabbar")
         config.userContentController.add(coordinator, name: "larpDrawer")
+        config.userContentController.add(coordinator, name: "larpPtr")
         config.userContentController.addUserScript(
             WKUserScript(
                 source: WebViewContainer.nativeChromeScript(),
@@ -393,6 +403,7 @@ final class WebHostViewController: UIViewController {
             web.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
         if let glass = glassTabBar { view.bringSubviewToFront(glass) }
+        if let host = pullHost { view.bringSubviewToFront(host) }
         if let drawerGlass = glassDrawerBar { view.bringSubviewToFront(drawerGlass) }
     }
 
@@ -436,6 +447,29 @@ final class WebHostViewController: UIViewController {
         bar.setActive(active, animated: bar.isShown)
         bar.setShown(!hidden, animated: true)
         #endif
+    }
+
+    // MARK: - Spinner Apple du « tirer pour rafraîchir »
+
+    private func installPullHost() {
+        guard pullHost == nil else { return }
+        let host = PullRefreshHost(frame: .zero)
+        view.addSubview(host)
+        pullHost = host
+    }
+
+    /// Messages de la page web : start (position sous l'en-tête), pull (distance), load, end.
+    func handlePull(_ d: [String: Any]) {
+        guard let host = pullHost else { return }
+        let y = CGFloat((d["y"] as? NSNumber)?.doubleValue ?? 0)
+        let top = CGFloat((d["top"] as? NSNumber)?.doubleValue ?? 0)
+        switch (d["s"] as? String) ?? "" {
+        case "start": host.place(top: top, width: view.bounds.width)
+        case "pull": host.pull(y)
+        case "load": host.beginLoading()
+        case "end": host.endLoading()
+        default: break
+        }
     }
 
     // MARK: - Barre du menu (≡) Liquid Glass native (iOS 26)
