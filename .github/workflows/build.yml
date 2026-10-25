@@ -66,6 +66,20 @@ jobs:
           echo "Bundle trouvé : $BUNDLE_DIR"
           echo "BUNDLE_SOURCE=$BUNDLE_DIR" >> "$GITHUB_ENV"
 
+      # 3b. Xcode 26 (SDK iOS 26) pour le vrai Liquid Glass ; sinon la barre web est utilisée
+      - name: Select Xcode 26 if available
+        shell: bash
+        run: |
+          set -euo pipefail
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$X" ]; then
+            sudo xcode-select -s "$X/Contents/Developer"
+          else
+            echo "Xcode 26 introuvable : build sans Liquid Glass natif."
+          fi
+          xcodebuild -version
+          swift --version
+
       # 4. Installer XcodeGen
       - name: Install XcodeGen
         shell: bash
