@@ -1174,7 +1174,7 @@
     var list = prodsSorted(prods.filter(function (p) { return (pFilter === "All" || p.status === pFilter) && (!pQuery || p.title.toLowerCase().indexOf(pQuery.toLowerCase()) >= 0); }));
     var none = !prods.length && !pQuery && pFilter === "All";
     var head = glHead("Products", "prodviews", pSel ? "" : glBtn("newproduct", "Add product", "plus-circle") + (none || !EMPTY ? "" : glBtn("prodsmore", "More", "more")));
-    var trial = pSel ? selBarHtml() : '<div class="gl-dock"><button class="gl-trial" data-act="trial"><b>Subscribe to keep selling</b><span><i></i>3 days left</span></button></div>';
+    var trial = pSel ? selBarHtml() : "";  // pastille « Subscribe to keep selling / 3 days left » retirée
     if (none) {
       el.innerHTML = '<div class="gl-page">' + head + '<div class="gl-body"><div class="gl-empty gl-empty-p">' +
         '<img class="gl-hero" src="' + IMG + 'products-hero.webp" alt="" width="143" height="143">' +
@@ -3302,31 +3302,58 @@
       if (app.querySelector(".sk-ov") || document.querySelector(".dr-bot")) return true;
       return false;
     }
+    var ORD_SEL = ".sh.notifs.order, .sh.notifs.payouts, .sh.notifs.transfer";
+    // Verre « épinglé » : pendant un défilement / un rebond, la page web bouge mais le verre natif garde
+    // la position qu'il avait au repos (sinon il suit la page avec un temps de retard et tremble).
+    var pin = {}, touching = false, lastMove = 0;
+    function pinned(o, scr) {
+      var key = (scr.id || scr.getAttribute("data-tab") || "") + "|" + o.id, p = pin[key];
+      var st = scr.scrollTop, over = st < -0.5 || st > scr.scrollHeight - scr.clientHeight + 0.5;
+      var busy = touching || over || (performance.now() - lastMove < 180);
+      if (busy && p && Math.abs(p.w - o.w) < 1 && Math.abs(p.h - o.h) < 1) { o.x = p.x; o.y = p.y; }
+      else pin[key] = { x: o.x, y: o.y, w: o.w, h: o.h };
+      return o;
+    }
     function collect() {
       var items = [];
       if (covered()) return { items: items, cover: true };
-      var top = layers.lastElementChild, cut = Infinity, dim = 0, ord = null;
+      var lays = Array.prototype.slice.call(layers.children);
+      var top = lays.length ? lays[lays.length - 1] : null;
+      var cut = Infinity, cutTop = Infinity, dim = 0, ord = null, ordLay = null, below = false;
       if (top) {
+        // Une couche sans feuille (page plein écran) recouvre tout, même si elle n'est pas tout en haut.
+        for (var li = 0; li < lays.length; li++) {
+          var shi = lays[li].querySelector(".sh");
+          if (!shi) return { items: items, cover: true };
+          cut = Math.min(cut, shi.getBoundingClientRect().top);   // ce qui est sous une feuille est masqué
+        }
         var sh = top.querySelector(".sh");
-        if (!sh) return { items: items, cover: true };           // page plein écran : elle recouvre tout
         var sc = top.querySelector(".sh-scrim");
         dim = sc ? (parseFloat(getComputedStyle(sc).opacity) || 0) * 0.4 : 0;
-        cut = sh.getBoundingClientRect().top;                    // ce qui est sous la feuille est masqué
-        ord = top.querySelector(".sh.notifs.order, .sh.notifs.payouts, .sh.notifs.transfer");
+        cutTop = sh.getBoundingClientRect().top;
+        ord = top.querySelector(ORD_SEL); ordLay = ord ? top : null;
+        if (!ord) {
+          // Feuille posée au-dessus d'une fiche commande (ex. « Traiter les articles ») :
+          // la fiche garde ses boutons de verre (assombris), l'en-tête de la page Commandes reste masqué.
+          for (var lj = lays.length - 2; lj >= 0; lj--) {
+            var o2 = lays[lj].querySelector(ORD_SEL);
+            if (o2) { ord = o2; ordLay = lays[lj]; below = true; break; }
+          }
+        }
       }
       var scr = document.querySelector("#screens .scr.on.gl-scr");
       if (scr) {
         var chev = scr.querySelector(".gl-hd .gl-chev");
-        if (chev) items.push(mk("h:title", "mini", chev, { icon: "chev-down" }));
+        if (chev) items.push(pinned(mk("h:title", "mini", chev, { icon: "chev-down" }), scr));
         $$(".gl-hd .gl-btn", scr).forEach(function (b, n) {
           var id = "h:" + (b.getAttribute("data-act") || n);
-          if (b.classList.contains("txt")) items.push(mk(id, "txt", b, { title: b.textContent.trim() }));
-          else items.push(mk(id, "btn", b, { icon: iconOf(b) }));
+          if (b.classList.contains("txt")) items.push(pinned(mk(id, "txt", b, { title: b.textContent.trim() }), scr));
+          else items.push(pinned(mk(id, "btn", b, { icon: iconOf(b) }), scr));
         });
         var sf = scr.querySelector(".sfield input");
-        if (sf) items.push(mk("s:search", "search", sf.parentNode, { placeholder: sf.placeholder || "", text: sf.value || "" }));
+        if (sf) items.push(pinned(mk("s:search", "search", sf.parentNode, { placeholder: sf.placeholder || "", text: sf.value || "" }), scr));
         $$(".sbar .cb", scr).forEach(function (b, n) {
-          items.push(mk("s:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b), dot: b.classList.contains("dot") }));
+          items.push(pinned(mk("s:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b), dot: b.classList.contains("dot") }), scr));
         });
         var ch = scr.querySelector(".chips");
         if (ch) {
@@ -3334,7 +3361,7 @@
           chips.forEach(function (c, n) { if (c.classList.contains("on")) sel = n; });
           var o = mk("c:chips", "chips", ch, { labels: chips.map(function (c) { return c.textContent.trim(); }), sel: sel });
           if (chips.length) { var fr = chips[0].getBoundingClientRect(), cr = ch.getBoundingClientRect(); o.y = +fr.top.toFixed(1); o.h = +fr.height.toFixed(1); o.lead = +(fr.left - cr.left).toFixed(1); }
-          items.push(o);
+          items.push(pinned(o, scr));
         }
         items = items.filter(function (i) { return i.y + i.h <= cut + 0.5; });
         var dd = +dim.toFixed(3);
@@ -3346,8 +3373,9 @@
         var shEl = ord, tr = 0;
         try { tr = new DOMMatrix(getComputedStyle(shEl).transform).m42 || 0; } catch (e) { }
         var dragging = shEl.style.transition === "none";
-        var closing = !top.classList.contains("on");
+        var closing = !ordLay.classList.contains("on");
         var target = closing ? window.innerHeight : (dragging ? Math.max(0, tr) : 0);
+        var first = items.length;
         var addO = function (id, b, ic) {
           var o = mk(id, "btn", b, { icon: ic, target: Math.round(target), drag: dragging });
           o.y = Math.round(o.y - tr);
@@ -3363,6 +3391,12 @@
           o.y = Math.round(o.y - tr);
           items.push(o);
         });
+        if (below) {
+          // Sous une autre feuille : seuls les boutons encore visibles au-dessus d'elle restent, assombris par son voile.
+          var dd2 = +dim.toFixed(3), mine = items.slice(first);
+          items = items.slice(0, first).concat(mine.filter(function (i) { return i.y + i.h <= cutTop + 0.5; }));
+          items.forEach(function (i) { if (i.id.indexOf("o:") === 0) i.dim = dd2; });
+        }
       }
       return { items: items, cover: false };
     }
@@ -3383,6 +3417,10 @@
       until = Math.max(until, performance.now() + (ms || 900));
       if (!running) { running = true; requestAnimationFrame(loop); }
     }
+    window.addEventListener("touchstart", function () { touching = true; }, { capture: true, passive: true });
+    ["touchend", "touchcancel"].forEach(function (ev) { window.addEventListener(ev, function () { touching = false; lastMove = performance.now(); kick(); }, { capture: true, passive: true }); });
+    window.addEventListener("scroll", function () { lastMove = performance.now(); }, { capture: true, passive: true });
+    ["resize", "orientationchange"].forEach(function (ev) { window.addEventListener(ev, function () { pin = {}; }); });
     ["scroll", "resize", "click", "touchstart", "touchend", "transitionend", "animationend", "input"].forEach(function (ev) {
       window.addEventListener(ev, function () { kick(); }, true);
     });
