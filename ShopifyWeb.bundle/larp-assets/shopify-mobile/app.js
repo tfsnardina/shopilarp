@@ -3189,40 +3189,47 @@
       return false;
     }
     function collect() {
-      var items = [], cover = false;
+      var items = [];
       if (covered()) return { items: items, cover: true };
-      var top = layers.lastElementChild;
+      var top = layers.lastElementChild, cut = Infinity, dim = 0, ord = null;
       if (top) {
-        cover = true;
-        var ord = top.querySelector(".sh.notifs.order");
-        if (ord) {
-          var x = ord.querySelector(".sh-h.nav .sh-x");
-          if (x) items.push(mk("o:x", "btn", x, { icon: "x" }));
-          $$(".sh-h.nav .nb-c", ord).forEach(function (b, n) { items.push(mk("o:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b) })); });
-        }
-        return { items: items, cover: cover };
+        var sh = top.querySelector(".sh");
+        if (!sh) return { items: items, cover: true };           // page plein écran : elle recouvre tout
+        var sc = top.querySelector(".sh-scrim");
+        dim = sc ? (parseFloat(getComputedStyle(sc).opacity) || 0) * 0.4 : 0;
+        cut = sh.getBoundingClientRect().top;                    // ce qui est sous la feuille est masqué
+        ord = top.querySelector(".sh.notifs.order");
       }
       var scr = document.querySelector("#screens .scr.on.gl-scr");
-      if (!scr) return { items: items, cover: false };
-      var chev = scr.querySelector(".gl-hd .gl-chev");
-      if (chev) items.push(mk("h:title", "mini", chev, { icon: "chev-down" }));
-      $$(".gl-hd .gl-btn", scr).forEach(function (b, n) {
-        var id = "h:" + (b.getAttribute("data-act") || n);
-        if (b.classList.contains("txt")) items.push(mk(id, "txt", b, { title: b.textContent.trim() }));
-        else items.push(mk(id, "btn", b, { icon: iconOf(b) }));
-      });
-      var sf = scr.querySelector(".sfield input");
-      if (sf) items.push(mk("s:search", "search", sf.parentNode, { placeholder: sf.placeholder || "", text: sf.value || "" }));
-      $$(".sbar .cb", scr).forEach(function (b, n) {
-        items.push(mk("s:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b), dot: b.classList.contains("dot") }));
-      });
-      var ch = scr.querySelector(".chips");
-      if (ch) {
-        var chips = $$(".chip", ch), sel = -1;
-        chips.forEach(function (c, n) { if (c.classList.contains("on")) sel = n; });
-        var o = mk("c:chips", "chips", ch, { labels: chips.map(function (c) { return c.textContent.trim(); }), sel: sel });
-        if (chips.length) { var fr = chips[0].getBoundingClientRect(), cr = ch.getBoundingClientRect(); o.y = +fr.top.toFixed(1); o.h = +fr.height.toFixed(1); o.lead = +(fr.left - cr.left).toFixed(1); }
-        items.push(o);
+      if (scr) {
+        var chev = scr.querySelector(".gl-hd .gl-chev");
+        if (chev) items.push(mk("h:title", "mini", chev, { icon: "chev-down" }));
+        $$(".gl-hd .gl-btn", scr).forEach(function (b, n) {
+          var id = "h:" + (b.getAttribute("data-act") || n);
+          if (b.classList.contains("txt")) items.push(mk(id, "txt", b, { title: b.textContent.trim() }));
+          else items.push(mk(id, "btn", b, { icon: iconOf(b) }));
+        });
+        var sf = scr.querySelector(".sfield input");
+        if (sf) items.push(mk("s:search", "search", sf.parentNode, { placeholder: sf.placeholder || "", text: sf.value || "" }));
+        $$(".sbar .cb", scr).forEach(function (b, n) {
+          items.push(mk("s:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b), dot: b.classList.contains("dot") }));
+        });
+        var ch = scr.querySelector(".chips");
+        if (ch) {
+          var chips = $$(".chip", ch), sel = -1;
+          chips.forEach(function (c, n) { if (c.classList.contains("on")) sel = n; });
+          var o = mk("c:chips", "chips", ch, { labels: chips.map(function (c) { return c.textContent.trim(); }), sel: sel });
+          if (chips.length) { var fr = chips[0].getBoundingClientRect(), cr = ch.getBoundingClientRect(); o.y = +fr.top.toFixed(1); o.h = +fr.height.toFixed(1); o.lead = +(fr.left - cr.left).toFixed(1); }
+          items.push(o);
+        }
+        items = items.filter(function (i) { return i.y + i.h <= cut + 0.5; });
+        var dd = +dim.toFixed(3);
+        items.forEach(function (i) { i.dim = dd; });
+      }
+      if (ord) {
+        var x = ord.querySelector(".sh-h.nav .sh-x");
+        if (x) items.push(mk("o:x", "btn", x, { icon: "x" }));
+        $$(".sh-h.nav .nb-c", ord).forEach(function (b, n) { items.push(mk("o:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b) })); });
       }
       return { items: items, cover: false };
     }
