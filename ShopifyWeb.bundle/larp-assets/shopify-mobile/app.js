@@ -3643,15 +3643,84 @@
     };
     kick(1500);
   })();
-  /* Rebond en haut : l'en-tête et la recherche restent en place (comme le verre natif), seule la liste rebondit. */
+  /* Tirer pour rafraîchir sur Commandes / Produits.
+     Plus de rebond natif (il faisait trembler le titre : l'en-tête était recalé à chaque événement de scroll) :
+     on désactive le rubber-band, l'en-tête + la recherche + les filtres restent fixes, et seule la liste suit le doigt
+     (ressort critique), avec le spinner natif Apple dans l'espace ouvert sous les filtres. Relâcher au-delà du seuil
+     relance le rendu de la page. */
   (function () {
-    document.addEventListener("scroll", function (e) {
-      var sc = e.target;
-      if (!sc || !sc.classList || !sc.classList.contains("gl-scr")) return;
-      var st = sc.scrollTop, y = st < 0 ? st : 0;
-      var els = sc.querySelectorAll(".gl-hd, .gl-tools");
-      for (var i = 0; i < els.length; i++) els[i].style.transform = y ? "translate3d(0," + y + "px,0)" : "";
-    }, { capture: true, passive: true });
+    if (!document.getElementById("glptr-css")) {
+      var st = document.createElement("style"); st.id = "glptr-css";
+      st.textContent = "html.checker-native .scr.gl-scr,.scr.gl-scr{overscroll-behavior-y:none}";
+      document.head.appendChild(st);
+    }
+    var nativePtr = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpPtr);
+    function post(o) { if (nativePtr) { try { window.webkit.messageHandlers.larpPtr.postMessage(o); } catch (e) { } } }
+    function bind(id, name) {
+      var sc = document.getElementById(id);
+      if (!sc || sc._glPtr) return;
+      sc._glPtr = true;
+      var THRESH = 90, HOLD = 70, MAXPULL = 170;
+      var x0 = null, y0 = null, axis = null, busy = false, shift = 0;
+      var cur = 0, vel = 0, tgt = 0, raf = 0, last = 0, onDone = null, lastT = 0;
+      function active() { return current === name && !(typeof stack !== "undefined" && stack.length) && !(typeof pSel !== "undefined" && pSel && name === "products"); }
+      function els() {
+        var body = sc.querySelector(".gl-body"), out = [];
+        if (body) Array.prototype.forEach.call(body.children, function (c) { if (!c.classList.contains("gl-tools")) out.push(c); });
+        return out;
+      }
+      function apply(v) {
+        var t = v > 0.05 ? "translate3d(0," + v.toFixed(2) + "px,0)" : "";
+        post({ s: "pull", y: Math.max(0, v) });
+        els().forEach(function (el) { el.style.transition = "none"; el.style.willChange = t ? "transform" : ""; el.style.transform = t; });
+      }
+      function clear() { els().forEach(function (el) { el.style.transition = ""; el.style.transform = ""; el.style.willChange = ""; }); }
+      function step(t) {
+        var dt = Math.min(0.032, Math.max(0.001, (t - last) / 1000)); last = t;
+        var K = 200, C = 2 * Math.sqrt(K);
+        vel += (K * (tgt - cur) - C * vel) * dt; cur += vel * dt;
+        if (Math.abs(tgt - cur) < 0.2 && Math.abs(vel) < 3) { cur = tgt; vel = 0; raf = 0; apply(cur); var d = onDone; onDone = null; if (d) d(); return; }
+        apply(cur); raf = requestAnimationFrame(step);
+      }
+      function springTo(to, done) { tgt = to; onDone = done || null; if (!raf) { last = performance.now(); raf = requestAnimationFrame(step); } }
+      function home(done) { springTo(0, function () { clear(); if (done) done(); }); }
+      function reset() { x0 = y0 = null; axis = null; shift = 0; }
+      sc.addEventListener("touchstart", function (e) {
+        if (busy || raf || e.touches.length !== 1 || sc.scrollTop > 0 || !active()) { reset(); return; }
+        x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; axis = null; shift = 0; cur = vel = 0; lastT = 0;
+        var anchor = sc.querySelector(".gl-tools") || sc.querySelector(".gl-hd");
+        post({ s: "start", top: anchor ? anchor.getBoundingClientRect().bottom : 0, light: true });
+      }, { passive: true });
+      sc.addEventListener("touchmove", function (e) {
+        if (y0 === null) return;
+        var dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0;
+        if (axis === null) {
+          if (dx === 0 && dy === 0) return;
+          axis = (dy > 0 && dy >= Math.abs(dx) && sc.scrollTop <= 0) ? "y" : "x";
+        }
+        if (axis !== "y") return;
+        if (dy <= 0 || sc.scrollTop > 0) { if (cur) { cur = 0; apply(0); clear(); } shift = 0; return; }
+        var ns = MAXPULL * (1 - Math.exp(-dy / 220)), now = e.timeStamp || performance.now();
+        if (lastT && now > lastT) vel = Math.max(-3000, Math.min(3000, (ns - cur) / ((now - lastT) / 1000)));
+        lastT = now; shift = cur = ns;
+        if (e.cancelable) e.preventDefault();
+        apply(cur);
+      }, { passive: false });
+      function end() {
+        if (y0 === null || axis !== "y" || !shift) { reset(); return; }
+        var go = shift >= THRESH; reset();
+        if (!go) { home(); return; }
+        busy = true; hap(10); post({ s: "load" });
+        springTo(HOLD);
+        setTimeout(function () {
+          post({ s: "end" });
+          home(function () { busy = false; try { refreshAll(); } catch (e) { } });
+        }, 800);
+      }
+      sc.addEventListener("touchend", end);
+      sc.addEventListener("touchcancel", function () { var had = cur; reset(); if (had) home(); });
+    }
+    bind("s-orders", "orders"); bind("s-products", "products");
   })();
   /* Hauteur du clavier -> --kb (relais natif via Swift, repli visualViewport sur le web) */
   (function () {
