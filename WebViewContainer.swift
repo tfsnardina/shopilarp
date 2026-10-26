@@ -659,7 +659,7 @@ final class WebHostViewController: UIViewController {
         view.addSubview(bar)
         let bottom = bar.bottomAnchor.constraint(
             equalTo: view.bottomAnchor,
-            constant: -(deviceSafeAreaInsets().bottom + 8)
+            constant: -(deviceSafeAreaInsets().bottom - 6)
         )
         NSLayoutConstraint.activate([
             bar.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -696,7 +696,9 @@ final class WebHostViewController: UIViewController {
         let y = CGFloat((d["y"] as? NSNumber)?.doubleValue ?? 0)
         let top = CGFloat((d["top"] as? NSNumber)?.doubleValue ?? 0)
         switch (d["s"] as? String) ?? "" {
-        case "start": host.place(top: top, width: view.bounds.width)
+        case "start":
+            host.setLight((d["light"] as? Bool) ?? false)
+            host.place(top: top, width: view.bounds.width)
         case "pull": host.pull(y)
         case "load": host.beginLoading()
         case "end": host.endLoading()
@@ -752,7 +754,7 @@ final class WebHostViewController: UIViewController {
         // Posée juste au-dessus de la barre d'onglets (8 pt de marge + 56 pt de barre + 12 pt d'écart).
         let bottom = bar.bottomAnchor.constraint(
             equalTo: view.bottomAnchor,
-            constant: -(deviceSafeAreaInsets().bottom + 76)
+            constant: -(deviceSafeAreaInsets().bottom + 62)
         )
         NSLayoutConstraint.activate([
             bar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
@@ -814,9 +816,9 @@ final class WebHostViewController: UIViewController {
         let insets = deviceSafeAreaInsets()
         if insets != lastLayoutInsets {
             lastLayoutInsets = insets
-            glassTabBarBottom?.constant = -(insets.bottom + 8)
+            glassTabBarBottom?.constant = -(insets.bottom - 6)
             glassDrawerBarBottom?.constant = -max(20, insets.bottom + 2)
-            glassSelectionBarBottom?.constant = -(insets.bottom + 76)
+            glassSelectionBarBottom?.constant = -(insets.bottom + 62)
             coordinator.pushSafeArea(to: webView, insets: insets)
         }
     }
