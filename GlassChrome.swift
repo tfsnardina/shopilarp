@@ -331,7 +331,7 @@ final class GlassSearchField: GlassChromeItem, UITextFieldDelegate {
 @available(iOS 26.0, *)
 final class GlassChips: GlassChromeItem {
     private let scroll = UIScrollView()
-    private let pill = GlassChromeItem.glass()
+    private let pill = UIView()
     private let pillDim = UIView()
     private var buttons: [UIButton] = []
     private var labels: [String] = []
@@ -340,8 +340,10 @@ final class GlassChips: GlassChromeItem {
     private var lead: CGFloat = 0
     private var pendingMove = false
 
-    private static let font = UIFont.systemFont(ofSize: 15, weight: .medium)
-    private static let pad: CGFloat = 18
+    private static let font = UIFont.systemFont(ofSize: 17, weight: .semibold)      // mesure (le plus large)
+    private static let fontOff = UIFont.systemFont(ofSize: 17, weight: .medium)
+    private static let offColor = UIColor(white: 0.40, alpha: 1)
+    private static let pad: CGFloat = 16
     private static let gap: CGFloat = 3.5
 
     override init(kind: String, id: String) {
@@ -351,7 +353,24 @@ final class GlassChips: GlassChromeItem {
         scroll.clipsToBounds = false
         scroll.delaysContentTouches = false
         addSubview(scroll)
+        // Pastille plate gris clair (comme sur la capture), pas de verre.
+        pill.backgroundColor = UIColor(white: 0.955, alpha: 1)
+        pill.layer.cornerRadius = 17.5
+        pill.layer.cornerCurve = .continuous
         scroll.addSubview(pill)
+    }
+
+    /// Chip actif : texte noir en gras ; les autres : gris, graisse moyenne.
+    private func styleButtons() {
+        for (i, b) in buttons.enumerated() where i < labels.count {
+            let on = i == selected
+            var config = b.configuration ?? UIButton.Configuration.plain()
+            var t = AttributedString(labels[i])
+            t.font = on ? GlassChips.font : GlassChips.fontOff
+            config.attributedTitle = t
+            config.baseForegroundColor = on ? GlassChromeItem.ink : GlassChips.offColor
+            b.configuration = config
+        }
     }
 
     @available(*, unavailable)
@@ -371,9 +390,9 @@ final class GlassChips: GlassChromeItem {
                 var config = UIButton.Configuration.plain()
                 config.contentInsets = .zero
                 var t = AttributedString(text)
-                t.font = GlassChips.font
+                t.font = GlassChips.fontOff
                 config.attributedTitle = t
-                config.baseForegroundColor = GlassChromeItem.ink
+                config.baseForegroundColor = GlassChips.offColor
                 b.configuration = config
                 b.addAction(UIAction { [weak self] _ in
                     guard let self else { return }
@@ -390,6 +409,7 @@ final class GlassChips: GlassChromeItem {
             selected = sel
             moveSelection(animated: !first && window != nil)
         }
+        styleButtons()
         setNeedsLayout()
     }
 
@@ -435,9 +455,9 @@ final class GlassChips: GlassChromeItem {
             pillDim.layer.cornerRadius = 17.5
             pillDim.layer.cornerCurve = .continuous
             pillDim.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            pill.contentView.addSubview(pillDim)
+            pill.addSubview(pillDim)
         }
-        pillDim.frame = pill.contentView.bounds
+        pillDim.frame = pill.bounds
         pillDim.alpha = amount
         pillDim.isHidden = amount < 0.005
         isUserInteractionEnabled = amount < 0.01
