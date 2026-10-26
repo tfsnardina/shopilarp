@@ -118,14 +118,16 @@
     var whole = opt.whole || (opt.auto && v >= 1000);
     var s = v.toLocaleString(S.loc || "en-US", { minimumFractionDigits: whole ? 0 : dec, maximumFractionDigits: whole ? 0 : dec });
     // Euro : symbole après le montant (« 2,00 € »), sauf demande explicite (opt.pre) comme sur l'accueil Shopify (« €184,25 »).
-    if (S.cur === "EUR" && !opt.pre) return (neg ? "-" : "") + s + "\u00A0" + S.sym.trim();
+    if (S.cur === "EUR") return (neg ? "-" : "") + s + "\u00A0" + S.sym.trim();
     return (neg ? "-" : "") + S.sym + s;
   }
   function compact(v, isMoney) {
     var a = Math.abs(v), s;
     if (a >= 1e6) s = trim(v / 1e6) + "M"; else if (a >= 1e3) s = trim(v / 1e3) + "K"; else s = String(Math.round(v));
+    if (isMoney && S.cur === "EUR") return s + "\u00A0" + S.sym.trim();
     return (isMoney ? S.sym : "") + s;
   }
+  function symAmt(str) { return S.cur === "EUR" ? str + "\u00A0" + S.sym.trim() : S.sym + str; }
   function trim(x) { return String(parseFloat(x.toFixed(x >= 100 ? 0 : 1))); }
   function count(n) { return Math.round(n).toLocaleString(S.loc || "en-US"); }
   function pctStr(v) { return (v >= 10 || v === 0 ? Math.round(v * 10) / 10 : v.toFixed(v < 1 ? 2 : 1)).toString().replace(/\.0$/, "") + "%"; }
@@ -531,7 +533,7 @@
     var x0 = lblW + 12, x1 = W - 2, yTop = 6, yBot = Hh - 33;
     var X = function (i) { return x0 + (n > 1 ? (i / (n - 1)) * (x1 - x0) : 0); };
     var Y = function (v) { return yBot - (Math.max(0, v) / top) * (yBot - yTop); };
-    var zl = M.k === "money" ? S.sym + "0" : M.k === "pct" ? "0%" : "0";
+    var zl = M.k === "money" ? symAmt("0") : M.k === "pct" ? "0%" : "0";
     var lab = xTicks(R);
     var svg = '<svg width="' + W + '" height="' + Hh + '" viewBox="0 0 ' + W + " " + Hh + '">' +
       '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#20a8e6" stop-opacity=".16"/><stop offset="1" stop-color="#20a8e6" stop-opacity="0"/></linearGradient></defs>' +
@@ -2028,13 +2030,13 @@
       window.webkit.messageHandlers.larpProduct.postMessage({ sym: S.sym, vendor: S.name || "" });
       return;
     }
-    var d = { img: "", status: "Active" }, saving = false, sym = esc(S.sym);
+    var d = { img: "", status: "Active" }, saving = false, sym = esc(S.sym), EURS = S.cur === "EUR";
     var body = '<div class="np">' +
       '<div class="np-c"><div class="np-l">Media</div><div class="np-media"><button type="button" class="np-ph" id="npPh">' + ic("image") + "<span>Add photo</span></button><button type=\"button\" class=\"np-rm\" id=\"npRm\" hidden>Remove photo</button></div></div>" +
       '<div class="np-c"><label class="np-f"><span>Title</span><input id="npTitle" type="text" maxlength="255" placeholder="Short sleeve t-shirt" autocomplete="off" autocapitalize="sentences" enterkeyhint="done"></label>' +
       '<div class="np-f"><span>Status</span><div class="np-seg" id="npSeg"><button type="button" class="on" data-s="Active">Active</button><button type="button" data-s="Draft">Draft</button></div><em class="np-hint" id="npSegH">Visible on your store and available to buy.</em></div></div>' +
-      '<div class="np-c"><div class="np-l">Pricing</div><div class="np-row"><label class="np-f"><span>Price</span><div class="np-in"><i>' + sym + '</i><input id="npPrice" inputmode="decimal" placeholder="0.00" autocomplete="off"></div></label>' +
-      '<label class="np-f"><span>Compare-at price</span><div class="np-in"><i>' + sym + '</i><input id="npComp" inputmode="decimal" placeholder="0.00" autocomplete="off"></div></label></div></div>' +
+      '<div class="np-c"><div class="np-l">Pricing</div><div class="np-row"><label class="np-f"><span>Price</span><div class="np-in">' + (EURS ? '' : '<i>' + sym + '</i>') + '<input id="npPrice" inputmode="decimal" placeholder="0.00" autocomplete="off">' + (EURS ? '<i>' + sym + '</i>' : '') + '</div></label>' +
+      '<label class="np-f"><span>Compare-at price</span><div class="np-in">' + (EURS ? '' : '<i>' + sym + '</i>') + '<input id="npComp" inputmode="decimal" placeholder="0.00" autocomplete="off">' + (EURS ? '<i>' + sym + '</i>' : '') + '</div></label></div></div>' +
       '<div class="np-c"><div class="np-l">Inventory</div><div class="np-row"><label class="np-f"><span>Quantity</span><input id="npInv" inputmode="numeric" placeholder="0" autocomplete="off"></label>' +
       '<label class="np-f"><span>SKU (optional)</span><input id="npSku" type="text" autocomplete="off" autocapitalize="characters"></label></div></div>' +
       '<div class="np-c"><div class="np-l">Variants</div><label class="np-f"><span>Options, separated by commas</span><input id="npVars" type="text" placeholder="S, M, L" autocomplete="off"></label></div>' +
@@ -2488,7 +2490,7 @@
         var keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", dec > 0 ? sep : "", "0", "del"].map(function (k) {
           return k === "" ? "<span></span>" : '<button class="tr-k" data-k="' + k + '"' + (k === "del" ? ' aria-label="Delete">' + DEL : ">" + k) + "</button>";
         }).join("");
-        return '<div class="tr-amt2" id="trBox"><span class="cur">' + esc(S.sym) + '</span><b id="trAmtV">0</b></div>' +
+        return '<div class="tr-amt2" id="trBox"><span class="cur"' + (S.cur === "EUR" ? ' style="order:2"' : '') + '>' + esc(S.sym) + '</span><b id="trAmtV">0</b></div>' +
           '<div class="tr-chips"><span class="tr-chip">' + (T.method === "bank" ? BKS : WAL) + "<span>" + (T.method === "bank" ? "Bank account" : "PayPal") + '</span></span><button class="tr-chip" id="trMax"><b>' + money(bal) + "</b><span>Available</span></button></div>" +
           '<div class="tr-pad">' + keys + "</div>" +
           foot('<button class="btn-p" id="trNext" disabled><span>Continue</span><b id="trNextA"></b></button>');
@@ -3280,10 +3282,10 @@
   });
   function quickSale() {
     var amt = "0";
-    var el = page('<div class="qs"><div class="qs-amt" id="qsa">' + S.sym + '0</div><p class="qs-s">Custom amount</p><div class="qs-pad">' +
+    var el = page('<div class="qs"><div class="qs-amt" id="qsa">' + symAmt("0") + '</div><p class="qs-s">Custom amount</p><div class="qs-pad">' +
       ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "\u232b"].map(function (k) { return '<button data-k="' + k + '">' + k + "</button>"; }).join("") +
-      '</div><button class="btn-p" id="qsgo">Charge ' + S.sym + "0.00</button></div>", { title: "Quick sale", modal: true, notabs: true });
-    var show = function () { var v = parseFloat(amt) || 0; $("#qsa", el).textContent = S.sym + (amt.indexOf(".") >= 0 ? amt : Number(amt).toLocaleString(S.loc || "en-US")); $("#qsgo", el).textContent = "Charge " + money(Math.round(v * 100)); };
+      '</div><button class="btn-p" id="qsgo">Charge ' + symAmt("0.00") + "</button></div>", { title: "Quick sale", modal: true, notabs: true });
+    var show = function () { var v = parseFloat(amt) || 0; $("#qsa", el).textContent = symAmt(amt.indexOf(".") >= 0 ? amt : Number(amt).toLocaleString(S.loc || "en-US")); $("#qsgo", el).textContent = "Charge " + money(Math.round(v * 100)); };
     $$("[data-k]", el).forEach(function (b) {
       b.addEventListener("click", function () {
         var k = b.getAttribute("data-k"); hap(4);
