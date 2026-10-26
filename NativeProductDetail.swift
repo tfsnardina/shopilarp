@@ -872,18 +872,26 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
     }
 
     /// Boutons du haut : « partager | … » au repos, « Enregistrer » dès qu'il y a une modification.
+    /// En création, rien n'est affiché à droite à l'ouverture (rien ne « apparaît » pendant le glissement de la page) ;
+    /// « Enregistrer » arrive ensuite dès qu'on modifie quelque chose, comme sur la fiche produit.
     private func updateChrome() {
         let dirty = isDirty
-        let canSave = !productTitle.trimmingCharacters(in: .whitespaces).isEmpty && (isCreate || dirty)
-        // En création il n'y a ni « partager » ni « … » : « Enregistrer » reste affiché (grisé tant que le titre est vide).
-        let showSave = isCreate || dirty
+        let canSave = dirty && !productTitle.trimmingCharacters(in: .whitespaces).isEmpty
         saveButton.isEnabled = canSave
-        saveButton.isHidden = !showSave
-        UIView.animate(withDuration: 0.2) {
-            self.actionPill.alpha = showSave ? 0 : 1
-            self.saveButton.alpha = showSave ? 1 : 0
+        saveButton.isHidden = !dirty
+        actionPill.isHidden = isCreate
+        guard view.window != nil else {
+            // Page pas encore à l'écran : on pose l'état final sans animation.
+            actionPill.alpha = dirty ? 0 : 1
+            saveButton.alpha = dirty ? 1 : 0
+            actionPill.isUserInteractionEnabled = !dirty
+            return
         }
-        actionPill.isUserInteractionEnabled = !showSave
+        UIView.animate(withDuration: 0.2) {
+            self.actionPill.alpha = dirty ? 0 : 1
+            self.saveButton.alpha = dirty ? 1 : 0
+        }
+        actionPill.isUserInteractionEnabled = !dirty
     }
 
     private func priceEdited() {
