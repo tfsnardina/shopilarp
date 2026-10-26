@@ -650,8 +650,8 @@
     if (!FS || !uf) return "";
     return '<div class="fs" id="firstSale"><h3>Congratulations on your first sale!</h3>' +
       '<p class="fs-b">You never forget your first ChaChing. Soak it all in and celebrate!</p>' +
-      '<p class="fs-p"><span>You’ve got a fan!</span><br><span>Your first order was made by</span> <span>' + esc(FS.c) + "</span> <span>in</span> <span>" + esc(FS.city) + "</span>.</p>" +
-      '<div class="fs-art" aria-hidden="true"><i class="s1">✦</i><i class="s2">✦</i><b>CHA<em>✶</em>CHING</b></div>' +
+      '<p class="fs-p"><span>You’ve got a fan!</span><br><span>Your first order was made by</span> <span>' + esc(FS.c) + "</span> <span>in</span> <span>" + esc(countryName()) + "</span>.</p>" +
+      '<img class="fs-art" src="' + IMG + 'chaching-art.webp" alt="" aria-hidden="true" draggable="false" oncontextmenu="return false">' +
       '<button class="fs-btn" data-act="fulfill">Fulfill your order</button></div>';
   }
   function confetti() {
@@ -2791,7 +2791,7 @@
     var wasEmpty = !orders.length;
     orders.unshift(o);
     if (wasEmpty && !FS) {
-      FS = { c: String(o.c.name || "Someone").split(" ")[0], city: o.c.city || "Austin" };
+      FS = { c: String(o.c.name || "Someone") };
       try { localStorage.setItem("sh-firstsale", JSON.stringify(FS)); } catch (e) { }
       fsConfettiPending = !quiet; rendered.home = 0;
     }
