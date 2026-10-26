@@ -2255,15 +2255,37 @@
     var el = page('<div class="lvw"><div class="lv-top"><div class="lv-globe" id="lvglobe"></div><div class="lv-now"><span>Visitors right now</span><b id="lvN">' + count(live.visitors) + '</b></div></div>' +
       '<div class="lv-grid"><div><span>Total sales</span><b>' + money(R.tot.s) + "</b></div><div><span>Sessions</span><b>" + count(R.tot.se) + "</b></div><div><span>Orders</span><b>" + count(R.tot.o) + "</b></div><div><span>Page views</span><b>" + count(Math.round(R.tot.se * 3.4)) + "</b></div></div>" +
       '<div class="an-c"><div class="an-t">Customer behavior</div><div class="beh"><div><span>Active carts</span><b id="lvCarts">' + count(live.carts) + '</b></div><div><span>Checking out</span><b id="lvCheck">' + count(live.checkingOut) + '</b></div><div><span>Purchased</span><b id="lvBought">' + count(live.purchased) + "</b></div></div></div>" +
-      '<div class="an-c"><div class="an-t">Sessions by location</div>' + locRows() + "</div></div>", { navHtml: nav, cls: "lvpage", notabs: true });
+      '<div class="an-c"><div class="an-t">Sessions by location</div><div id="lvLoc">' + locRows() + "</div></div></div>", { navHtml: nav, cls: "lvpage", notabs: true });
     globe($("#lvglobe", el));
   }
+  // Villes par défaut d'un pays (quand il n'y a encore ni commande ni client) : [ville, région, poids].
+  var LOC_DEF = {
+    FR: [["Paris", "Île-de-France", 30], ["Lyon", "Auvergne-Rhône-Alpes", 14], ["Marseille", "Provence-Alpes-Côte d'Azur", 12], ["Toulouse", "Occitanie", 9], ["Bordeaux", "Nouvelle-Aquitaine", 8], ["Lille", "Hauts-de-France", 7], ["Nantes", "Pays de la Loire", 6], ["Strasbourg", "Grand Est", 4]],
+    US: [["Los Angeles", "CA", 16], ["New York", "NY", 15], ["Chicago", "IL", 9], ["Houston", "TX", 8], ["Miami", "FL", 7], ["Seattle", "WA", 6], ["Atlanta", "GA", 5], ["Denver", "CO", 4]],
+    CA: [["Toronto", "ON", 28], ["Vancouver", "BC", 16], ["Montreal", "QC", 15], ["Calgary", "AB", 9], ["Ottawa", "ON", 7]],
+    GB: [["London", "England", 34], ["Manchester", "England", 12], ["Birmingham", "England", 9], ["Glasgow", "Scotland", 7], ["Leeds", "England", 6], ["Bristol", "England", 5]],
+    AU: [["Sydney", "NSW", 30], ["Melbourne", "VIC", 26], ["Brisbane", "QLD", 12], ["Perth", "WA", 9], ["Adelaide", "SA", 6]],
+    DE: [["Berlin", "Berlin", 22], ["Munich", "Bavaria", 15], ["Hamburg", "Hamburg", 12], ["Cologne", "North Rhine-Westphalia", 9], ["Frankfurt", "Hesse", 8]]
+  };
+  // D'où viennent les sessions : commandes récentes + clients, sinon les grandes villes du pays de la boutique.
+  function liveLocs() {
+    var m = {}, city = {};
+    function add(c, r, w) { if (!c) return; var k = c + ", " + r; m[k] = (m[k] || 0) + w; city[k] = c; }
+    orders.slice(0, 80).forEach(function (o) { add(o.city, o.reg, 3); });
+    custs.slice(0, 60).forEach(function (c) { add(c.city, c.region, 1); });
+    (LOC_DEF[S.country] || (S.country ? [] : LOC_DEF.US)).forEach(function (d) { add(d[0], d[1], d[2] * (orders.length ? 0.12 : 1)); });
+    var keys = Object.keys(m).sort(function (a, b) { return m[b] - m[a]; }).slice(0, 8);
+    return keys.map(function (k) { return { k: k, city: city[k], w: m[k] }; });
+  }
   function locRows() {
-    var m = {};
-    orders.slice(0, 80).forEach(function (o) { var k = o.city + ", " + o.reg; m[k] = (m[k] || 0) + 1; });
-    var keys = Object.keys(m).sort(function (a, b) { return m[b] - m[a]; }).slice(0, 5);
-    var tot = keys.reduce(function (a, k) { return a + m[k]; }, 0) || 1;
-    return keys.map(function (k) { return '<div class="bar-r"><span>' + esc(k) + '</span><i style="--w:' + Math.round((m[k] / tot) * 100) + '%"></i><b>' + Math.round((m[k] / tot) * 100) + "%</b></div>"; }).join("");
+    if (live.visitors < 1 && !orders.length) return '<p class="lv-none">No sessions yet</p>';
+    var L = liveLocs().slice(0, 5);
+    if (!L.length) return '<div class="bar-r"><span>' + esc(countryName()) + '</span><i style="--w:100%"></i><b>100%</b></div>';
+    var tot = L.reduce(function (a, x) { return a + x.w; }, 0) || 1, left = 100;
+    return L.map(function (x, i) {
+      var pc = i === L.length - 1 ? left : Math.round((x.w / tot) * 100); left -= pc;
+      return '<div class="bar-r"><span>' + esc(x.k) + '</span><i style="--w:' + pc + '%"></i><b>' + pc + "%</b></div>";
+    }).join("");
   }
   var LAND_MASK = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/gP8DAAAAAAAAAAAAAAAAAAAAAAD8/////wcAAAAAAAAHAAAAAAAAAAAArP/8//8fAPADAAAA4AMAAAAAAAAA4ADMh////wAABgAACADwAAAAAAAAAADwUT8A/v8PAAAAABwA/n8AOAAAAAAA+LPvD8D/fwAAAAAwIPz//wMDAADAAwD5w/4H+P8HAAAcAIP7/////z8Afv4HB//P////////8+Fv+QAAAAAAgMAPAAAAAODDB+D//x8ALAAEAAAAAAAAIPz///+///uf//v/7////////////wfw/////xE88AEAAP7+////////////gP////8HeAAcAADw5////////////ADgAf//f4AvAAAAAH78////////v8QAAAyA//8/+AcAAIBB4/////////8ADwAAAPD//9//AQAAPBT/////////A3AAAAAA/v///T8AAGD3//////////8DAwAAAMD/////AwAA+P//////////PwAAAAAA+P///2MAAAD///////////8CAAAAAAD///8/CAAA4P//////////JwAAAAAA8P///wcAAAD+/+nz/////38AAAAAAAD///8HAAAA/tgPPP//////MQAAAAAA8P//PwAAAOBH9v/n/////wcBAAAAAAD///8BAAAAPgD7f/7///8xEAAAAAAA4P//DwAAAMB5Iv//////f8YBAAAAAAD+//8AAAAA+AcA//////8jDwAAAAAAgP//AwAAAOD/Afj/////fwgAAAAAAADw/x8AAAAA/n////////8HAAAAAAAAAP4HAwAAAPD////7////fwAAAAAAAACgHyAAAACA//9/f/////8DAAAAAAAAAPQBAAAAAPz///8v////PwAAAAAAAAAAHiAAAADA/////g////8EAAAAAAAAAOAjCAAAAP7//9//4D//AgAAAAAAAAAAPAMGAADA/////Qf84BcAAAAAAAAAAAA/AAAAAPz//78fgAf+QAAAAAAAAAAAgA8AAADg////+wA4gB8EAAAAAAAAAADAAAAAAP7///8BgAP4gQAAAAAAAAAAAAgPAADA////7wAwgAwIAAAAAAAAAAAA/w8AAPj///8HAAUIAAEAAAAAAAAAAID/AQAA////fwBAAAEQAAAAAAAAAAAA+P8AAODj//8DAAA0GAAAAAAAAAAAAID/HwAAAPj/HwAAgMMBAAAAAAAAAAAA/P8BAACA//8AAAA4HwAAAAAAAAAAAMD/fwAAAPz/BwAAAOMFAQAAAAAAAAAA/P8/AACA/z8AAABgbvABAAAAAAAAAOD//w8AAPD/AwAAAAQAfAIAAAAAAAAA/P//AQAA/z8AAACAA4APAAAAAAAAAMD//x8AAPD/AwAAAAAQsAEAAAAAAAAA+P//AAAA/j8AAAAAAAAAAAAAAAAAAAD//wcAAPD/QwAAAACAIwAAAAAAAAAA8P9/AAAA/z8GAAAAAD8GAAAAAAAAAAD8/wcAAPD/cQAAAAD4fwAAAAAAAAAAgP8/AAAA/w8HAAAAgP8PAAAAAAAAAAD4/wMAAOD/MAAAAAD//wEAAAAAAAAAgP8fAAAA/g8DAAAA+P8/AAAAAAAAAAD4PwAAAOB/MAAAAID//wMAAAAAAAAAwP8DAAAA/gcAAAAA+P9/AAAAAAAAAAD8HwAAAMA/AAAAAID//wcAAAAAAAAAwP8BAAAA+AEAAAAA8P9/AAAAAAAAAAD8DwAAAIAPAAAAAAAf/gMAAAAAAAAAwH8AAAAAAAAAAAAAEIA/AAAAAAAAAAD+AwAAAAAAAAAAAAAA8AEgAAAAAAAA4A8AAAAAAAAAAAAAAAAAAAYAAAAAAAB+AAAAAAAAAAAAAAAAgAAwAAAAAAAA4AMAAAAAAAAAAAAAAAAIgAEAAAAAAAAeAAAAAAAAAAAAAAAAAAAOAAAAAAAA8AEAAAAAAAAAAAAAAAAAAAAAAAAAAAAfAAAAAAAAAAAAAAAAAAAAAAAAAAAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAD8APj///8HAAAAAAAAAAA0AAAAAADA/f/h/////w8AAAAAAAAA4AcAAED5////z///////fwAAAAAAvAb+AADA//////////////8HAAD4/////wMAAP7/////////////HwCA+f////8BAID///////////////8AAPL/////BwAO////////////////HwAA/v/////vePj//////////////38AAOD/////////////////////////PwAAeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
   // A dotted globe that turns slowly, with visitor pings on recent cities.
@@ -2275,6 +2297,8 @@
     host.appendChild(cv);
     var ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
     var pts = orders.slice(0, 40).map(function (o) { return CITY[o.city]; }).filter(Boolean);
+    var nOrd = Math.min(4, pts.length);   // les premiers points sont les commandes (violet), les autres des visiteurs (bleu)
+    liveLocs().forEach(function (l) { var c = CITY[l.city]; if (c && pts.indexOf(c) < 0) pts.push(c); });
     // Sans commande, le globe se tourne vers le pays de la boutique.
     var HOME = { US: [39, -98], CA: [56, -96], GB: [54, -2], AU: [-25, 134], DE: [51, 10], FR: [46.6, 2.4], ES: [40, -3.7], IT: [42.5, 12.5], NL: [52.2, 5.3], BE: [50.6, 4.6], IE: [53.3, -8], CH: [46.8, 8.2], NZ: [-41, 174], JP: [36, 138] };
     var home = pts[0] || HOME[S.country] || [39, -98];
@@ -2319,7 +2343,7 @@
         var c = proj(pts[k][0], pts[k][1], rot);
         if (c[2] <= 0.05) continue;
         // The first few are this hour's orders (purple, ring burst); the rest are visitors (blue, fading in and out).
-        var isOrder = k < 4, ph = (tt * (isOrder ? 0.5 : 0.35) + k * 0.37) % 1;
+        var isOrder = k < nOrd, ph = (tt * (isOrder ? 0.5 : 0.35) + k * 0.37) % 1;
         if (isOrder) {
           ctx.strokeStyle = "rgba(128,81,255," + (0.7 * (1 - ph)).toFixed(2) + ")"; ctx.lineWidth = 1.6;
           ctx.beginPath(); ctx.arc(c[0], c[1], 3.5 + ph * 12, 0, Math.PI * 2); ctx.stroke();
@@ -3097,13 +3121,14 @@
      commande tombe (« Purchased ») et il sort du tunnel. Avant chaque commande planifiée on amorce donc un acheteur
      (panier -> paiement) quelques secondes plus tôt ; les autres visiteurs, eux, remplissent des paniers et en
      abandonnent aussi, en proportion du trafic. */
+  var locTick = 0;
   var cartHold = 0;  // paniers amorcés qui vont passer en caisse : jamais abandonnés avant
   var buyerQ = [];   // heures d'arrivée des acheteurs « en caisse » qui attendent leur commande
   function showFunnel() {
     [["lvCarts", live.carts], ["lvCheck", live.checkingOut], ["lvBought", live.purchased]].forEach(function (r) {
       var n = document.getElementById(r[0]); if (!n) return;
       var t = count(r[1]);
-      if (n.textContent !== t) { n.textContent = t; n.classList.remove("pop"); void n.offsetWidth; n.classList.add("pop"); }
+      if (n.textContent !== t) { n.textContent = t; n.classList.remove("flash"); void n.offsetWidth; n.classList.add("flash"); }
     });
   }
   function funnelPrime(wait, k) {
@@ -3146,6 +3171,8 @@
     else if (live.carts > cartHold && Math.random() < 0.06) live.carts -= 1;
     live.carts = Math.max(0, live.carts); live.checkingOut = Math.max(keep, live.checkingOut);
     showFunnel();
+    var lc = document.getElementById("lvLoc");
+    if (lc && (locTick = (locTick + 1) % 5) === 0) { var h = locRows(); if (lc._h !== h) { lc._h = h; lc.innerHTML = h; if (window.I18N) window.I18N.apply(lc); } }
   }
   // Visitors right now drift a little (EXPLODING: they climb fast, every ~1.2 s).
   function showVisitors() {
@@ -3720,7 +3747,12 @@
         // Une couche sans feuille (page plein écran) recouvre tout, même si elle n'est pas tout en haut.
         for (var li = 0; li < lays.length; li++) {
           var shi = lays[li].querySelector(".sh");
-          if (!shi) return { items: items, cover: true };
+          if (!shi) {
+            // Live View (page qui arrive de la droite) : seule la croix est un vrai bouton Liquid Glass natif.
+            var lvx = li === lays.length - 1 && lays[li].classList.contains("lvpage") ? lays[li].querySelector(".lv-x") : null;
+            if (lvx && lvx.getBoundingClientRect().width) return { items: [mk("lv:x", "btn", lvx, { icon: "x" })], cover: false };
+            return { items: items, cover: true };
+          }
           cut = Math.min(cut, shi.getBoundingClientRect().top);   // ce qui est sous une feuille est masqué
         }
         var sh = top.querySelector(".sh");
@@ -3838,6 +3870,11 @@
       mo.observe(app, { childList: true });
     } catch (e) { }
     setInterval(tick, 400);
+    // Le verre natif suit la page Live View pendant le geste « retour » depuis le bord.
+    window.addEventListener("touchmove", function () {
+      var t = layers.lastElementChild;
+      if (t && t.classList.contains("lvpage")) kick(250);
+    }, { capture: true, passive: true });
     window.addEventListener("touchmove", function () {
       var sh = layers.lastElementChild && layers.lastElementChild.querySelector(".sh.notifs.order");
       if (!sh || sh.style.transition !== "none") return;
