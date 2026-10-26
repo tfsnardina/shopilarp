@@ -3722,6 +3722,64 @@
     }
     bind("s-orders", "orders"); bind("s-products", "products");
   })();
+  /* Rebond en BAS de l'accueil : le rubber-band natif est désactivé sur cette page (il ferait bouger l'en-tête en haut),
+     donc on le recrée en bas : en tirant au-delà de la fin la page suit le doigt avec une résistance, et en arrivant
+     en bas sur un lancer la page « tape » puis revient en douceur (ressort). */
+  (function () {
+    var sc = document.getElementById("s-home"); if (!sc || sc._btmBounce) return;
+    sc._btmBounce = true;
+    var MAXB = 90, cur = 0, vel = 0, raf = 0, last = 0, dragging = false, anchor = null, y0 = null, x0 = null, axis = null;
+    var lastTop = 0, lastTs = 0, sv = 0;
+    function kids() { return Array.prototype.slice.call(sc.children); }
+    function atBottom() { return sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1; }
+    function apply(v) {
+      var t = v < -0.05 ? "translate3d(0," + v.toFixed(2) + "px,0)" : "";
+      if (t) sc.style.setProperty("background", "#fff", "important"); else sc.style.removeProperty("background");
+      kids().forEach(function (el) { el.style.transition = "none"; el.style.willChange = t ? "transform" : ""; el.style.transform = t; });
+    }
+    function step(ts) {
+      var dt = Math.min(0.032, Math.max(0.001, (ts - last) / 1000)); last = ts;
+      var K = 190, C = 2 * Math.sqrt(K) * 0.9;
+      vel += (K * (0 - cur) - C * vel) * dt; cur += vel * dt;
+      if (cur > 0) { cur = 0; if (vel > 0) vel = 0; }
+      if (Math.abs(cur) < 0.2 && Math.abs(vel) < 3) { cur = 0; vel = 0; raf = 0; apply(0); kids().forEach(function (el) { el.style.transition = ""; el.style.transform = ""; el.style.willChange = ""; }); return; }
+      apply(cur); raf = requestAnimationFrame(step);
+    }
+    function run() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(step); } }
+    sc.addEventListener("touchstart", function (e) {
+      if (e.touches.length !== 1 || !sc.classList.contains("on")) { y0 = null; return; }
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      dragging = true; anchor = null; axis = null; vel = 0;
+      y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; cur = 0; apply(0);
+    }, { passive: true });
+    sc.addEventListener("touchmove", function (e) {
+      if (y0 === null) return;
+      var y = e.touches[0].clientY;
+      if (axis === null) {
+        var dx = e.touches[0].clientX - x0, dy = y - y0; if (!dx && !dy) return;
+        axis = Math.abs(dy) >= Math.abs(dx) ? "y" : "x";
+      }
+      if (axis !== "y") return;
+      if (!atBottom()) { anchor = null; return; }
+      if (anchor === null) anchor = y;
+      var over = anchor - y;
+      if (over <= 0) { anchor = y; if (cur) { cur = 0; apply(0); } return; }
+      cur = -MAXB * (1 - Math.exp(-over / 160));
+      if (e.cancelable) e.preventDefault();
+      apply(cur);
+    }, { passive: false });
+    function release() { dragging = false; y0 = null; anchor = null; if (cur) { vel = 0; run(); } }
+    sc.addEventListener("touchend", release);
+    sc.addEventListener("touchcancel", release);
+    sc.addEventListener("scroll", function () {
+      var now = performance.now(), top = sc.scrollTop;
+      if (lastTs && now > lastTs) { var v = (top - lastTop) / ((now - lastTs) / 1000); sv = sv * 0.5 + v * 0.5; }
+      lastTop = top; lastTs = now;
+      if (!dragging && sv > 350 && atBottom() && !cur) {
+        cur = 0; vel = -Math.min(1100, sv * 0.7); sv = 0; run();
+      }
+    }, { passive: true });
+  })();
   /* Hauteur du clavier -> --kb (relais natif via Swift, repli visualViewport sur le web) */
   (function () {
     var vv = window.visualViewport; if (!vv) return;
