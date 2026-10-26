@@ -2253,7 +2253,7 @@
   /* ── Live View ───────────────────────────────────────────── */
   function openLiveView() {
     var R = rangeData("today");
-    var nav = '<div class="pg-nav lv-nav"><button class="nb-c lv-x" data-back aria-label="Close">' + ic("x") + '</button><h1 class="pg-t">Live View</h1><span class="lv-sp"></span></div>';
+    var nav = '<div class="pg-nav titled lv-nav"><button class="nb-c lv-x" data-back aria-label="Close">' + ic("x") + '</button><h1 class="pg-t">Live View</h1><span class="lv-sp"></span></div>';
     var el = page('<div class="lvw"><div class="lv-top"><div class="lv-globe" id="lvglobe"></div><div class="lv-now"><span>Visitors right now</span><b id="lvN">' + count(live.visitors) + '</b></div></div>' +
       '<div class="lv-grid"><div><span>Total sales</span><b>' + money(R.tot.s) + "</b></div><div><span>Sessions</span><b>" + count(R.tot.se) + "</b></div><div><span>Orders</span><b>" + count(R.tot.o) + "</b></div><div><span>Page views</span><b>" + count(Math.round(R.tot.se * 3.4)) + "</b></div></div>" +
       '<div class="an-c"><div class="an-t">Customer behavior</div><div class="beh"><div><span>Active carts</span><b id="lvCarts">' + count(live.carts) + '</b></div><div><span>Checking out</span><b id="lvCheck">' + count(live.checkingOut) + '</b></div><div><span>Purchased</span><b id="lvBought">' + count(live.purchased) + "</b></div></div></div>" +
@@ -3134,11 +3134,11 @@
     });
   }
   function funnelPrime(wait, k) {
-    if (wait < 3.4) return;
+    if (wait < 3.4 || !prods.length) return;
     // le panier se remplit ~5 s avant la commande, le paiement démarre ~2,5 s avant
     var tCart = Math.max(0.2, wait - 5.2 - Math.random() * 2) + k * 0.35, tPay = Math.min(wait - 1.6, tCart + 1.6 + Math.random() * 1.6);
     setTimeout(function () {
-      if (document.hidden) return;
+      if (document.hidden || !prods.length) return;
       if (live.visitors < 2) live.visitors = 2 + Math.floor(Math.random() * 3);
       live.carts += 1; cartHold += 1; showFunnel();
     }, tCart * 1000);
@@ -3155,6 +3155,8 @@
     showFunnel();
   }
   function funnelTick() {
+    // Aucun produit en boutique : personne ne peut avoir de panier ni être en train de payer.
+    if (!prods.length) { live.carts = 0; live.checkingOut = 0; cartHold = 0; buyerQ.length = 0; showFunnel(); return; }
     var v = live.visitors, boom = larpVibe() === "exploding";
     var now = Date.now();
     // acheteurs oubliés (onglet en arrière-plan...) : ils abandonnent au bout de 25 s
