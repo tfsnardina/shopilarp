@@ -170,6 +170,7 @@
     ["Account added", "Compte ajouté", "Cuenta añadida", "Konto hinzugefügt"],
     ["Transferred", "Déjà viré", "Transferido", "Überwiesen"],
     ["No payouts yet", "Aucun versement pour l'instant", "Aún no hay pagos", "Noch keine Auszahlungen"],
+    ["No sessions yet", "Aucune session pour l'instant", "Aún no hay sesiones", "Noch keine Sitzungen"],
     ["Your transfers will show up here.", "Tes virements apparaîtront ici.", "Tus transferencias aparecerán aquí.", "Deine Überweisungen erscheinen hier."],
     ["No bank account yet", "Aucun compte bancaire", "Ninguna cuenta bancaria", "Noch kein Bankkonto"],
     ["Transfer sent", "Virement envoyé", "Transferencia enviada", "Überweisung gesendet"],
