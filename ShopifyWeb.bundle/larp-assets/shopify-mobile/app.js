@@ -1110,7 +1110,7 @@
   function orderRow(o) {
     var n = units(o);
     var fulBy = o.ful === "Fulfilled" || o.pay === "Refunded" ? L10n(o.shipM) : L10n("Fulfill by:") + " " + mdyL(o.ts + (o.shipM === "Express Shipping" ? 1 : 3) * DAY) + " \u2022 " + L10n(shipShort(o.shipM));
-    return '<button class="orow" data-order="' + o.n + '"><div class="or1"><b>#' + o.n + "</b><b>" + money(o.total) + "</b></div>" +
+    return '<button class="orow" data-order="' + o.n + '"><div class="or1"><b>#' + o.n + "</b><b>" + money(o.total) + " " + esc(S.cur || "") + "</b></div>" +
       '<div class="or2"><span>' + esc(o.c ? o.c.name : "No customer") + "</span><span>" + n + " item" + (n === 1 ? "" : "s") + "</span><span>" + hmPad(o.ts) + "</span></div>" +
       '<div class="or3">' + fulBadge(o) + payBadge(o) + (o.note ? ic("note", "on") : "") + "</div>" +
       '<div class="or4">' + esc(o.ch === "Point of Sale" ? L10n("Point of Sale") : fulBy) + "</div></button>";
