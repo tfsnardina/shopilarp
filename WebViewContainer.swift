@@ -1,5 +1,6 @@
 import UIKit
 import WebKit
+import CoreHaptics
 
 enum WebViewContainer {
     struct WebEntry {
@@ -844,9 +845,83 @@ enum Haptics {
     private static let medium = UIImpactFeedbackGenerator(style: .medium)
     private static let heavy = UIImpactFeedbackGenerator(style: .heavy)
     private static let notify = UINotificationFeedbackGenerator()
+    private static let rigid = UIImpactFeedbackGenerator(style: .rigid)
+    private static var engine: CHHapticEngine?
+
+    /// EXPLOSION : un choc sec, un grondement qui s'éteint et une pluie de débris (Core Haptics).
+    /// Sans moteur haptique (simulateur, vieil appareil) : rafale de générateurs d'impact.
+    static func explosion() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { fallbackExplosion(); return }
+        do {
+            if engine == nil {
+                let e = try CHHapticEngine()
+                e.isAutoShutdownEnabled = true
+                engine = e
+            }
+            guard let eng = engine else { fallbackExplosion(); return }
+            try eng.start()
+            var events: [CHHapticEvent] = []
+            events.append(CHHapticEvent(
+                eventType: .hapticTransient,
+                parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+                ],
+                relativeTime: 0
+            ))
+            events.append(CHHapticEvent(
+                eventType: .hapticContinuous,
+                parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.3)
+                ],
+                relativeTime: 0.02,
+                duration: 1.4
+            ))
+            var t: TimeInterval = 0.06
+            while t < 1.5 {
+                events.append(CHHapticEvent(
+                    eventType: .hapticTransient,
+                    parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: Float.random(in: 0.7...1.0)),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: Float.random(in: 0.25...1.0))
+                    ],
+                    relativeTime: t
+                ))
+                t += 0.035 + t * 0.06
+            }
+            let decay = CHHapticParameterCurve(
+                parameterID: .hapticIntensityControl,
+                controlPoints: [
+                    CHHapticParameterCurve.ControlPoint(relativeTime: 0, value: 1.0),
+                    CHHapticParameterCurve.ControlPoint(relativeTime: 0.5, value: 0.75),
+                    CHHapticParameterCurve.ControlPoint(relativeTime: 1.5, value: 0.05)
+                ],
+                relativeTime: 0
+            )
+            let pattern = try CHHapticPattern(events: events, parameterCurves: [decay])
+            let player = try eng.makePlayer(with: pattern)
+            try player.start(atTime: CHHapticTimeImmediate)
+        } catch {
+            fallbackExplosion()
+        }
+    }
+
+    private static func fallbackExplosion() {
+        let kinds = ["heavy", "heavy", "rigid", "heavy", "medium", "rigid", "heavy", "medium", "heavy", "medium",
+                     "rigid", "medium", "heavy", "medium", "light", "medium", "light", "light", "selection"]
+        var at = 0.0
+        for (i, k) in kinds.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + at) { play(k) }
+            at += 0.035 + Double(i) * 0.004
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + at + 0.05) { play("success") }
+    }
 
     static func play(_ kind: String) {
         switch kind {
+        case "explosion": explosion()
+        case "rigid": rigid.impactOccurred(); rigid.prepare()
         case "selection": selection.selectionChanged(); selection.prepare()
         case "light": light.impactOccurred(); light.prepare()
         case "medium": medium.impactOccurred(); medium.prepare()
