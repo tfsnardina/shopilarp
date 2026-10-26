@@ -44,6 +44,12 @@ final class PullRefreshHost: UIScrollView {
         }
     }
 
+    /// Pages claires (Commandes / Produits) : spinner gris foncé ; accueil noir : spinner blanc.
+    func setLight(_ light: Bool) {
+        overrideUserInterfaceStyle = light ? .light : .dark
+        refresh.tintColor = light ? UIColor(white: 0.35, alpha: 1) : .white
+    }
+
     func beginLoading() {
         isLoading = true
         isHidden = false
