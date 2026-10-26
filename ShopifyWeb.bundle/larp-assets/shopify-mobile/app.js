@@ -1204,7 +1204,7 @@
   }
   function prodRow(p) {
     var on = pSel && pSel.indexOf(p) >= 0;
-    return '<button class="prow' + (pSel ? " selmode" : "") + (on ? " picked" : "") + '" data-prod="' + p.i + '">' + (pSel ? '<span class="pr-ck">' + ic("check") + "</span>" : "") + thumb(p, 44) + '<div class="pr-t"><b>' + esc(p.title) + "</b><span>" + invLine(p) + "</span></div>" + badge(p.status, p.status === "Active" ? "ok" : p.status === "Draft" ? "info" : "neu") + "</button>";
+    return '<button class="prow' + (pSel ? " selmode" : "") + (on ? " picked" : "") + '" data-prod="' + p.i + '">' + (pSel ? '<span class="pr-ck">' + ic("check") + "</span>" : "") + thumb(p, 44) + '<div class="pr-t"><b>' + esc(p.title) + "</b><span>" + invLine(p) + "</span></div>" + '<i class="pr-dot ' + (p.status === "Active" ? "on" : p.status === "Draft" ? "dr" : p.status === "Unlisted" ? "un" : "ar") + '" role="img" aria-label="' + esc(p.status) + '"></i></button>';
   }
 
   /* ── Menu: drawer + sections under the ≡ tab ───────────── */
@@ -1325,7 +1325,77 @@
     if (!pSel.length) return;
     if (name === "seldel") return confirmDelete();
     if (name === "selmore") return selMoreSheet();
+    if (name === "sel:all") return selToggleAll();
+    if (name.indexOf("sel:") === 0) return runBulk(name.slice(4));
   };
+  /* Actions en masse du menu « … » de la barre de sélection (Définir comme actif / brouillon / non répertorié, Archiver, balises, collections). */
+  var BULK = {
+    active: { st: "Active", run: "Updating products…", done: "Products updated" },
+    draft: { st: "Draft", run: "Updating products…", done: "Products updated" },
+    unlisted: { st: "Unlisted", run: "Updating products…", done: "Products updated" },
+    archive: { st: "Archived", run: "Archiving products…", done: "Products archived" },
+    tagadd: { run: "Updating tags…", done: "Tags updated" },
+    tagdel: { run: "Updating tags…", done: "Tags updated" },
+    coladd: { run: "Updating collections…", done: "Collections updated" },
+    coldel: { run: "Updating collections…", done: "Collections updated" },
+  };
+  function setStatus(list, st) {
+    var cfg = savedSettingsObj();
+    list.forEach(function (p) {
+      p.status = st;
+      if (Array.isArray(cfg.products)) cfg.products.forEach(function (c) { if (c && ((p.pid && c.id === p.pid) || (!p.pid && c.title === p.title))) c.status = st; });
+    });
+    writeSettings(cfg);
+    saveState();
+  }
+  function runBulk(kind) {
+    var b = BULK[kind]; if (!b || !pSel || !pSel.length || pBusy) return;
+    var list = pSel.slice(), bar = $("#selbar");
+    pBusy = true;
+    if (bar) bar.classList.add("busy");
+    syncSelBar();
+    hap(8);
+    toast(b.run, "spin", 0);
+    setTimeout(function () {
+      if (b.st) setStatus(list, b.st);
+      pBusy = false; pSel = null;
+      rendered.products = 0; renderProducts(); rendered.products = 1;
+      hap(14); toast(b.done, "ok");
+    }, 900);
+  }
+  function selToggleAll() {
+    var all = visibleProds(), every = all.length && all.every(function (p) { return pSel.indexOf(p) >= 0; });
+    if (every) pSel = pSel.filter(function (p) { return all.indexOf(p) < 0; });
+    else all.forEach(function (p) { if (pSel.indexOf(p) < 0) pSel.push(p); });
+    $$("#plist .prow").forEach(function (r) { var q = prodByI(+r.getAttribute("data-prod")); r.classList.toggle("picked", !!q && pSel.indexOf(q) >= 0); });
+    syncSelBar();
+  }
+  /* Appui long sur un produit : passe en mode sélection avec ce produit coché. */
+  var lpAt = 0;
+  (function () {
+    var timer = 0, row = null, sx = 0, sy = 0, fired = false;
+    function stop() { clearTimeout(timer); timer = 0; row = null; }
+    document.addEventListener("touchstart", function (e) {
+      stop(); fired = false;
+      if (e.touches.length !== 1 || pSel || pBusy || current !== "products" || stack.length) return;
+      var r = e.target.closest && e.target.closest("#plist .prow"); if (!r) return;
+      var t = e.touches[0]; sx = t.clientX; sy = t.clientY; row = r;
+      timer = setTimeout(function () {
+        var n = row ? +row.getAttribute("data-prod") : NaN; timer = 0;
+        if (isNaN(n) || pSel) return;
+        fired = true; lpAt = Date.now(); hap(12);
+        var sc = $("#s-products"), top = sc ? sc.scrollTop : 0;
+        enterSelect(); if (sc) sc.scrollTop = top;
+        toggleSel(n);
+      }, 420);
+    }, { passive: true });
+    document.addEventListener("touchmove", function (e) {
+      if (!timer) return;
+      var t = e.touches[0]; if (Math.abs(t.clientX - sx) > 8 || Math.abs(t.clientY - sy) > 8) stop();
+    }, { passive: true });
+    ["touchend", "touchcancel"].forEach(function (ev) { document.addEventListener(ev, function () { if (fired) lpAt = Date.now(); stop(); }, { passive: true }); });
+    document.addEventListener("contextmenu", function (e) { if (e.target.closest && e.target.closest("#plist .prow")) e.preventDefault(); });
+  })();
   var confirmCb = null;
   window.__larpConfirmResult = function (id, ok) {
     var cb = confirmCb; confirmCb = null;
@@ -1879,7 +1949,7 @@
     if (inv !== p.inv) { p.inv = inv; p.baseInv = inv; }
     p.vnames = vn.length ? vn : ["Default"]; p.vars = Math.max(1, vn.length || 1);
     p.type = n.type || "General"; p.vendor = n.vendor || S.name;
-    p.status = n.status === "Draft" || n.status === "Archived" ? n.status : "Active";
+    p.status = n.status === "Draft" || n.status === "Archived" || n.status === "Unlisted" ? n.status : "Active";
     if (typeof n.img === "string") p.img = n.img.indexOf("data:image/") === 0 ? n.img : "";
     prodExtras(p, { description: n.desc || "", category: n.category || "", tags: n.tags || [], collections: n.collections || null, physical: n.physical });
     if (p.pid) {
@@ -2888,6 +2958,7 @@
   function copyText(s) { try { navigator.clipboard.writeText(s); } catch (e) { } toast("Copied"); }
   var SOON = { growth: "Growth", discounts: "Discounts", content: "Content", markets: "Markets", onlinestore: "Online Store", pos: "Point of Sale", shop: "Shop", social: "Facebook & Instagram", apps: "Apps", settings: "Settings", help: "Help Center", finance: "Finance" };
   document.addEventListener("click", function (e) {
+    if (Date.now() - lpAt < 700) { e.preventDefault(); e.stopPropagation(); return; }
     var t = e.target.closest("button, [data-act], [data-order], [data-prod], [data-cust]");
     if (!t) return;
     if (t.hasAttribute("data-order") && !t.hasAttribute("data-act")) { hap(5); if (t.classList.contains("bn")) { t.classList.remove("on"); t.classList.add("out"); } closeSheets(); return openOrder(+t.getAttribute("data-order")); }
@@ -3393,6 +3464,19 @@
       for (var k in extra) o[k] = extra[k];
       return o;
     }
+    // Groupe de boutons dans une seule capsule : rectangle commun + position de chaque bouton (relative à la capsule).
+    function grp(id, els, pre, extra, lead) {
+      var all = lead ? [lead].concat(els) : els, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      all.forEach(function (el) { var r = el.getBoundingClientRect(); x0 = Math.min(x0, r.left); y0 = Math.min(y0, r.top); x1 = Math.max(x1, r.right); y1 = Math.max(y1, r.bottom); });
+      var o = { id: id, kind: "group", x: +x0.toFixed(1), y: +y0.toFixed(1), w: +(x1 - x0).toFixed(1), h: +(y1 - y0).toFixed(1), parts: [] };
+      els.forEach(function (el, n) {
+        var pid = pre + (el.getAttribute("data-act") || n); el.setAttribute("data-gid", pid);
+        var r = el.getBoundingClientRect();
+        o.parts.push({ id: pid, icon: iconOf(el), dot: el.classList.contains("dot"), x: +(r.left - x0).toFixed(1), y: +(r.top - y0).toFixed(1), w: +r.width.toFixed(1), h: +r.height.toFixed(1) });
+      });
+      for (var k in extra) o[k] = extra[k];
+      return o;
+    }
     function covered() {
       if (document.getElementById("splash") || document.getElementById("loading") || document.getElementById("welcome") || document.getElementById("login")) return true;
       if (app.querySelector(".sk-ov") || document.querySelector(".dr-bot")) return true;
@@ -3441,16 +3525,27 @@
       if (scr) {
         var chev = scr.querySelector(".gl-hd .gl-chev");
         if (chev) items.push(pinned(mk("h:title", "mini", chev, { icon: "chev-down" }), scr));
-        $$(".gl-hd .gl-btn", scr).forEach(function (b, n) {
+        // Boutons d'en-tête (+ et …) : une seule capsule de verre, comme sur Shopify.
+        var hbtns = $$(".gl-hd .gl-btn", scr), hround = hbtns.filter(function (b) { return !b.classList.contains("txt"); });
+        var grouped = hround.length >= 2;
+        if (grouped) items.push(pinned(grp("g:hdr", hround, "h:", { tone: "ink" }), scr));
+        hbtns.forEach(function (b, n) {
+          if (grouped && hround.indexOf(b) >= 0) return;
           var id = "h:" + (b.getAttribute("data-act") || n);
           if (b.classList.contains("txt")) items.push(pinned(mk(id, "txt", b, { title: b.textContent.trim() }), scr));
           else items.push(pinned(mk(id, "btn", b, { icon: iconOf(b) }), scr));
         });
-        var sf = scr.querySelector(".sfield input");
-        if (sf) items.push(pinned(mk("s:search", "search", sf.parentNode, { placeholder: sf.placeholder || "", text: sf.value || "" }), scr));
-        $$(".sbar .cb", scr).forEach(function (b, n) {
-          items.push(pinned(mk("s:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b), dot: b.classList.contains("dot") }), scr));
-        });
+        // Recherche + localisation / trier / filtrer : une seule capsule de verre.
+        var sf = scr.querySelector(".sfield input"), cbs = $$(".sbar .cb", scr);
+        if (sf && cbs.length) {
+          sf.parentNode.setAttribute("data-gid", "s:search");
+          items.push(pinned(grp("g:sbar", cbs, "s:", { tone: "gray", placeholder: sf.placeholder || "", text: sf.value || "" }, sf.parentNode), scr));
+        } else {
+          if (sf) items.push(pinned(mk("s:search", "search", sf.parentNode, { placeholder: sf.placeholder || "", text: sf.value || "" }), scr));
+          cbs.forEach(function (b, n) {
+            items.push(pinned(mk("s:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b), dot: b.classList.contains("dot") }), scr));
+          });
+        }
         var ch = scr.querySelector(".chips");
         if (ch) {
           var chips = $$(".chip", ch), sel = -1;
