@@ -643,6 +643,51 @@
     cards.push(["Capture more search shoppers", "Over the last 90 days, search converted at " + (MET.conv.v(rangeData("90d").tot) * 1.35).toFixed(2) + "% vs. " + (MET.conv.v(rangeData("90d").tot) * 0.55).toFixed(2) + "% from social, but it's a small slice of traffic and your top products have no SEO titles or descriptions.", "Add SEO to top products", "seo"]);
     return cards;
   }
+  /* ── Première vente : carte de félicitations + confettis ─────────────────── */
+  var FS = (function () { try { return JSON.parse(localStorage.getItem("sh-firstsale") || "null"); } catch (e) { return null; } })();
+  var fsConfettiPending = false;
+  function firstSaleCard(uf) {
+    if (!FS || !uf) return "";
+    return '<div class="fs" id="firstSale"><h3>Congratulations on your first sale!</h3>' +
+      '<p class="fs-b">You never forget your first ChaChing. Soak it all in and celebrate!</p>' +
+      '<p class="fs-p"><span>You’ve got a fan!</span><br><span>Your first order was made by</span> <span>' + esc(FS.c) + "</span> <span>in</span> <span>" + esc(FS.city) + "</span>.</p>" +
+      '<div class="fs-art" aria-hidden="true"><i class="s1">✦</i><i class="s2">✦</i><b>CHA<em>✶</em>CHING</b></div>' +
+      '<button class="fs-btn" data-act="fulfill">Fulfill your order</button></div>';
+  }
+  function confetti() {
+    var cv = document.createElement("canvas"), W = window.innerWidth, H = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:99999;pointer-events:none";
+    document.body.appendChild(cv);
+    var g = cv.getContext("2d"); g.scale(dpr, dpr);
+    var cols = ["#f7c948", "#ff5c8a", "#5cc8ff", "#7ee081", "#b48cff", "#ff9f45", "#ffffff"], ps = [];
+    for (var i = 0; i < 170; i++) {
+      var left = i % 2 === 0, a = (left ? -1 : 1) * (0.25 + Math.random() * 0.55);   // éventail vers le haut, depuis les deux coins du bas
+      var sp = 620 + Math.random() * 760;
+      ps.push({ x: left ? W * 0.08 : W * 0.92, y: H * 0.9, vx: (left ? 1 : -1) * Math.abs(Math.sin(a)) * sp * 0.6,
+        vy: -Math.cos(a) * sp, w: 6 + Math.random() * 7, h: 3 + Math.random() * 5, r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 16,
+        c: cols[Math.floor(Math.random() * cols.length)], ph: Math.random() * 6.28, d: Math.random() * 0.4 });
+    }
+    var t0 = performance.now(), last = t0;
+    function frame(now) {
+      var dt = Math.min(0.033, (now - last) / 1000); last = now;
+      var el = (now - t0) / 1000;
+      g.clearRect(0, 0, W, H);
+      var alive = 0;
+      ps.forEach(function (p) {
+        if (el < p.d) { alive++; return; }
+        p.vy += 1500 * dt; p.vx *= Math.pow(0.45, dt); p.vy *= Math.pow(0.9, dt);
+        p.x += p.vx * dt + Math.sin(el * 5 + p.ph) * 0.7; p.y += p.vy * dt; p.r += p.vr * dt;
+        if (p.y < H + 30) alive++;
+        g.save(); g.translate(p.x, p.y); g.rotate(p.r); g.scale(1, Math.cos(el * 7 + p.ph));
+        g.globalAlpha = Math.max(0, Math.min(1, 1 - (el - 2.6) / 1.2));
+        g.fillStyle = p.c; g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); g.restore();
+      });
+      if (alive && el < 4) requestAnimationFrame(frame); else if (cv.parentNode) cv.parentNode.removeChild(cv);
+    }
+    requestAnimationFrame(frame);
+    hap([14, 50, 14, 50, 10]);
+  }
   function renderHome() {
     var el = $("#s-home");
     var R = rangeData(homeRange);
@@ -670,6 +715,7 @@
       '<div class="hm-sheet">' +
       '<h2 class="greet"><span>' + greeting() + "</span> Here's your activity</h2>" +
       '<div class="acts">' + cards.join("") + "</div>" +
+      firstSaleCard(uf) +
       '<div class="pulse"><div class="pl-h"><i class="pl-dot"><i></i></i>Sidekick Pulse<span class="pl-n">1 of ' + pc.length + '</span></div><div class="pl-track" id="pltrack">' +
       pc.map(function (c) { return '<div class="pl-card"><h3>' + esc(c[0]) + "</h3><p>" + esc(c[1]) + '</p><button class="pl-btn" data-pulse="' + c[3] + '">' + esc(c[2]) + "</button></div>"; }).join("") +
       "</div></div>" +
@@ -691,6 +737,7 @@
     countIn();
     layoutStrip();
     bindPtr();
+    if (fsConfettiPending && FS && uf) { fsConfettiPending = false; setTimeout(confetti, 350); }
   }
   /* Metric switch (Total sales -> Orders -> ...): the chart slides sideways (old one out, new one in) and the
      tiles glide inside their own scroller so the chosen tile docks right beside the "Live" tile - which never
@@ -2741,7 +2788,13 @@
     o.c = Math.random() < 0.7 || !pool.length ? newCustomer() : pool[Math.floor(Math.random() * pool.length)];
     o.c.n += 1; o.c.spent += o.total;
     o.ch = weighted([["Online Store", 74], ["Shop", 10], ["Instagram", 5], ["TikTok", 5], ["Facebook", 3], ["Google & YouTube", 3]]);
+    var wasEmpty = !orders.length;
     orders.unshift(o);
+    if (wasEmpty && !FS) {
+      FS = { c: String(o.c.name || "Someone").split(" ")[0], city: o.c.city || "Austin" };
+      try { localStorage.setItem("sh-firstsale", JSON.stringify(FS)); } catch (e) { }
+      fsConfettiPending = !quiet; rendered.home = 0;
+    }
     // The numbers move with it.
     var h = L(o.ts).getUTCHours();
     D.s[T] += o.total; D.o[T] += 1; D.g[T] += o.sub; D.dc[T] += o.disc; D.sh[T] += o.ship; D.tx[T] += o.tax; D.u[T] += units(o);
@@ -2762,6 +2815,7 @@
       hap([12, 40, 12]);
     }
     bumpHome(o);
+    if (fsConfettiPending && current === "home" && !stack.length) renderHome();
     if (current === "orders" && !stack.length) {
       var list = $("#olist");
       if (list && orderMatches(o)) { renderOrders(); var row = $('[data-order="' + o.n + '"]', $("#s-orders")); if (row) row.classList.add("fresh"); }
@@ -3767,10 +3821,9 @@
     function rb(x) { var d = sc.clientHeight || 700; return (1 - 1 / (x * 0.55 / d + 1)) * d; }
     function apply(v) {
       var t = v < -0.05 ? "translate3d(0," + v.toFixed(2) + "px,0)" : "";
-      if (t) sc.style.setProperty("background", "#fff", "important"); else sc.style.removeProperty("background");
       kids().forEach(function (el) { el.style.transition = "none"; el.style.willChange = t ? "transform" : ""; el.style.transform = t; });
     }
-    function clean() { sc.style.removeProperty("background"); kids().forEach(function (el) { el.style.transition = ""; el.style.transform = ""; el.style.willChange = ""; }); }
+    function clean() { kids().forEach(function (el) { el.style.transition = ""; el.style.transform = ""; el.style.willChange = ""; }); }
     function step(ts) {
       var dt = Math.min(0.032, Math.max(0.001, (ts - last) / 1000)); last = ts;
       var K = 150, C = 2 * Math.sqrt(K) * 0.82;           // légèrement sous-amorti : revient vite, un seul petit dépassement
