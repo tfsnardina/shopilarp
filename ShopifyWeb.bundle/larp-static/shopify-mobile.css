@@ -1410,3 +1410,35 @@ html.checker-native .pg-b{overscroll-behavior-y:auto}
 /* Gros titre Commandes / Produits : en-tête FIXE (hors flux de défilement) pour qu'il ne descende jamais avec le rebond. */
 .gl-scr .gl-hd{position:fixed;top:0;left:0;right:0}
 .gl-scr .gl-page{padding-top:calc(var(--top) + 56px)}
+
+/* Accueil : fond blanc FIXE derrière le contenu, révélé par le rebond du bas (plus de fond blanc forcé sur toute la page,
+   qui carrait les coins arrondis de la feuille blanche et provoquait un saut). */
+#s-home{isolation:isolate}
+#s-home::after{content:"";position:fixed;left:0;right:0;bottom:0;height:45vh;background:#fff;z-index:-1;pointer-events:none}
+
+/* Carte « première vente » */
+.fs{position:relative;overflow:hidden;margin:16px var(--g) 0;padding:20px 20px 76px;border-radius:22px;color:#fff;background:radial-gradient(120% 90% at 20% 0%,#2a3a1c 0%,rgba(42,58,28,0) 60%),linear-gradient(180deg,#1a2612,#0f180c);box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.fs h3{margin:0;font-size:22px;line-height:26px;font-weight:700;letter-spacing:-.4px;max-width:92%}
+.fs p{margin:12px 0 0}
+.fs .fs-b{font-size:19px;line-height:24px;font-weight:650;letter-spacing:-.3px;color:rgba(255,255,255,.93)}
+.fs .fs-p{margin-top:20px;font-size:18px;line-height:25px;color:rgba(255,255,255,.88)}
+.fs-art{position:absolute;right:14px;bottom:20px;display:flex;align-items:center;justify-content:flex-end;pointer-events:none}
+.fs-art b{font-size:22px;font-weight:600;letter-spacing:1px;background:linear-gradient(180deg,#f3e2a6,#b99a46);-webkit-background-clip:text;background-clip:text;color:transparent}
+.fs-art em{font-style:normal;margin:0 2px;font-size:15px;color:#f1dc94}
+.fs-art i{position:absolute;font-style:normal;color:#f3e2a6;opacity:.9}
+.fs-art .s1{left:-36px;top:-14px;font-size:20px}.fs-art .s2{right:-6px;top:-26px;font-size:14px}
+.fs-btn{position:absolute;left:14px;bottom:14px;height:40px;padding:0 16px;border-radius:20px;color:#fff;font-size:17px;font-weight:600;background:rgba(12,12,12,.82);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.12)}
+.fs-btn:active{transform:scale(.97)}
+
+.fs-art{right:6px;bottom:8px}.fs-art svg{display:block;width:230px;height:auto}
+.fs-btn{bottom:14px}
+.fs-art svg{width:206px}.fs-art{right:4px}
+
+/* illustration CHA·CHING (image fournie) */
+img.fs-art{position:absolute;right:-6px;bottom:2px;left:auto;width:86%;height:auto;display:block;mix-blend-mode:lighten;pointer-events:none;-webkit-user-select:none;user-select:none}
+.fs{padding-bottom:128px}
+.fs{padding-bottom:152px;background:radial-gradient(120% 70% at 20% 0%,#2a3a1c 0%,rgba(42,58,28,0) 60%),linear-gradient(180deg,#16260d 0%,#0a2001 55%,#081e01 100%)}
+img.fs-art{width:84%;right:-4px;bottom:0;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 8%,#000 92%,transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 8%,#000 92%,transparent 100%)}
+.fs{padding-bottom:118px}
+img.fs-art{width:56%;right:2px;bottom:10px;-webkit-touch-callout:none;-webkit-user-drag:none;user-drag:none}
+.fs,.fs *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
