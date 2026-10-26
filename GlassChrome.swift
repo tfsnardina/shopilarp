@@ -338,6 +338,7 @@ final class GlassChips: GlassChromeItem {
     private var selected = -1
     private var frames: [CGRect] = []
     private var lead: CGFloat = 0
+    private var pendingMove = false
 
     private static let font = UIFont.systemFont(ofSize: 15, weight: .medium)
     private static let pad: CGFloat = 18
@@ -406,10 +407,19 @@ final class GlassChips: GlassChromeItem {
         pill.isHidden = false
         let target = frames[selected].offsetBy(dx: 0, dy: yOffset)
         if animated {
-            UIView.animate(
-                withDuration: 0.45, delay: 0, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.3,
-                options: [.beginFromCurrentState, .allowUserInteraction]
-            ) { self.pill.frame = target }
+            // apply() tourne dans performWithoutAnimation : on lance le glissement au tour suivant,
+            // sinon la pastille se téléporte. pendingMove empêche layoutSubviews de la placer avant.
+            pendingMove = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.pendingMove = false
+                guard self.selected >= 0, self.selected < self.frames.count else { return }
+                let end = self.frames[self.selected].offsetBy(dx: 0, dy: self.yOffset)
+                UIView.animate(
+                    withDuration: 0.55, delay: 0, usingSpringWithDamping: 0.82, initialSpringVelocity: 0.5,
+                    options: [.beginFromCurrentState, .allowUserInteraction]
+                ) { self.pill.frame = end }
+            }
         } else {
             pill.frame = target
         }
@@ -441,7 +451,7 @@ final class GlassChips: GlassChromeItem {
         }
         let contentW = (frames.last?.maxX ?? 0) + lead
         scroll.contentSize = CGSize(width: max(contentW, bounds.width), height: bounds.height)
-        if selected >= 0, selected < frames.count, pill.layer.animationKeys() == nil {
+        if !pendingMove, selected >= 0, selected < frames.count, pill.layer.animationKeys() == nil {
             pill.frame = frames[selected].offsetBy(dx: 0, dy: yOffset)
         }
     }
@@ -473,7 +483,7 @@ final class GlassGroupItem: GlassChromeItem, UITextFieldDelegate {
 
         searchIcon.image = UIImage(
             systemName: "magnifyingglass",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)
         )
         searchIcon.tintColor = UIColor(white: 0.45, alpha: 1)
         searchIcon.contentMode = .scaleAspectFit
@@ -533,7 +543,7 @@ final class GlassGroupItem: GlassChromeItem, UITextFieldDelegate {
                 if let name = glassSymbols[part.icon] {
                     config.image = UIImage(
                         systemName: name,
-                        withConfiguration: UIImage.SymbolConfiguration(pointSize: gray ? 19 : 21, weight: .medium)
+                        withConfiguration: UIImage.SymbolConfiguration(pointSize: gray ? 16 : 21, weight: .medium)
                     )
                 }
                 b.configuration = config
