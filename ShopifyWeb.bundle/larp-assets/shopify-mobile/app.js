@@ -656,7 +656,7 @@
     return "<span>in</span> <span>" + esc(countryName()) + "</span>";
   }
   function firstSaleCard(uf) {
-    if (!FS || FS.dismissed || !uf) return "";
+    if (!FS || !uf) return "";
     return '<div class="fs" id="firstSale"><h3>Congratulations on your first sale!</h3>' +
       '<p class="fs-b">You never forget your first ChaChing. Soak it all in and celebrate!</p>' +
       '<p class="fs-p"><span>You’ve got a fan!</span><br><span>Your first order was made by</span> <span>' + esc(FS.c) + "</span> " + fsWhere() + ".</p>" +
@@ -2196,9 +2196,9 @@
     host.appendChild(cv);
     var ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
     var pts = orders.slice(0, 40).map(function (o) { return CITY[o.city]; }).filter(Boolean);
-    var home = pts[0] || (S.country === "FR" ? [46.5, 2.5] : [39, -98]);
+    var home = pts[0] || [39, -98];
     var lon0 = -home[1] - 10, R = size / 2 - 6, cx = size / 2, cy = size / 2;
-    var dots = [], FR = false, Z = 1;   // toujours le globe (même pour la France)   // France: zoomed in on a dotted map of the country
+    var dots = [], FR = S.country === "FR", Z = FR ? 8.6 : 1;   // France: zoomed in on a dotted map of the country
     if (FR) for (var fla = 41; fla <= 51.4; fla += 0.35) for (var flo = -5.4; flo <= 9.8; flo += 0.5) if (inPoly(fla, flo, FR_OUT) || inPoly(fla, flo, CORSICA_OUT)) dots.push([fla, flo]);
     // Land dots come from a 2-degree land mask of Natural Earth's 110m land
     // (world-atlas), bit-packed: 180 columns from 180W, 90 rows from 90N.
@@ -3881,63 +3881,6 @@
         cur = 0; vel = -Math.min(2600, peakV * 0.85); peakV = 0; run();
       }
     }, { passive: true });
-  })();
-  /* Carte « première vente » : glisser vers la GAUCHE l'expulse (la carte part en volant, la place se referme)
-     avec une EXPLOSION de vibrations. Le choix est mémorisé : la carte ne revient pas. */
-  function hapExplosion() {
-    var seq = ["heavy", "heavy", "medium", "heavy", "medium", "heavy", "light", "medium", "heavy", "light", "medium", "light", "light", "selection", "selection", "success"];
-    var t = 0;
-    seq.forEach(function (k, i) { setTimeout(function () { hap(k); }, t); t += i < 6 ? 28 : 42 + i * 4; });
-  }
-  (function () {
-    var sc = document.getElementById("s-home"); if (!sc || sc._fsSwipe) return;
-    sc._fsSwipe = true;
-    var card = null, x0 = 0, y0 = 0, axis = null, dx = 0, t0 = 0, busy = false;
-    function dismiss() {
-      busy = true;
-      var el = card, h = el.offsetHeight, mt = parseFloat(getComputedStyle(el).marginTop) || 0;
-      hapExplosion();
-      el.style.transition = "transform .42s cubic-bezier(.5,0,.9,.4), opacity .36s ease-in";
-      el.style.transform = "translate3d(-130%," + (-14) + "px,0) rotate(-9deg) scale(.96)";
-      el.style.opacity = "0";
-      setTimeout(function () {
-        el.style.transition = "height .28s cubic-bezier(.3,.8,.3,1), margin .28s cubic-bezier(.3,.8,.3,1), padding .28s";
-        el.style.height = h + "px"; el.style.overflow = "hidden";
-        void el.offsetHeight;
-        el.style.height = "0px"; el.style.marginTop = "0px"; el.style.paddingTop = "0px"; el.style.paddingBottom = "0px";
-      }, 330);
-      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); busy = false; }, 650);
-      if (FS) { FS.dismissed = true; try { localStorage.setItem("sh-firstsale", JSON.stringify(FS)); } catch (e) { } }
-    }
-    sc.addEventListener("touchstart", function (e) {
-      if (busy || e.touches.length !== 1) { card = null; return; }
-      card = e.target.closest ? e.target.closest("#firstSale") : null;
-      if (!card) return;
-      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; axis = null; dx = 0; t0 = e.timeStamp || performance.now();
-      card.style.transition = "none";
-    }, { passive: true });
-    sc.addEventListener("touchmove", function (e) {
-      if (!card || busy) return;
-      var mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
-      if (axis === null) { if (!mx && !my) return; axis = Math.abs(mx) > Math.abs(my) * 1.1 ? "x" : "y"; }
-      if (axis !== "x") return;
-      if (e.cancelable) e.preventDefault();
-      dx = Math.min(18, mx);                                   // vers la gauche surtout ; légère résistance vers la droite
-      if (dx > 0) dx = dx * 0.3;
-      var p = Math.min(1, Math.abs(Math.min(0, dx)) / 220);
-      card.style.transform = "translate3d(" + dx + "px,0,0) rotate(" + (dx / 40).toFixed(2) + "deg)";
-      card.style.opacity = String(1 - p * 0.35);
-    }, { passive: false });
-    function end() {
-      if (!card || busy) { card = null; return; }
-      var v = Math.abs(dx) / Math.max(1, (performance.now() - t0) / 1000);
-      var go = axis === "x" && (dx < -110 || (dx < -50 && v > 500));
-      if (go) dismiss();
-      else { card.style.transition = "transform .35s cubic-bezier(.2,.9,.3,1.2), opacity .25s"; card.style.transform = ""; card.style.opacity = ""; }
-      card = null; axis = null;
-    }
-    sc.addEventListener("touchend", end);
-    sc.addEventListener("touchcancel", end);
   })();
   /* Hauteur du clavier -> --kb (relais natif via Swift, repli visualViewport sur le web) */
   (function () {
