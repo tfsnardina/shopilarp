@@ -2253,12 +2253,21 @@
   /* ── Live View ───────────────────────────────────────────── */
   function openLiveView() {
     var R = rangeData("today");
-    var nav = '<div class="pg-nav titled lv-nav"><button class="nb-c lv-x" data-back aria-label="Close">' + ic("x") + '</button><h1 class="pg-t">Live View</h1><span class="lv-sp"></span></div>';
+    var nav = '<div class="pg-nav titled lv-nav"><button class="nb-c lv-ph" data-back tabindex="-1" aria-hidden="true">' + ic("x") + '</button><h1 class="pg-t">Live View</h1><span class="lv-sp"></span></div>';
     var el = page('<div class="lvw"><div class="lv-top"><div class="lv-globe" id="lvglobe"></div><div class="lv-now"><span>Visitors right now</span><b id="lvN">' + count(live.visitors) + '</b></div></div>' +
       '<div class="lv-grid"><div><span>Total sales</span><b>' + money(R.tot.s) + "</b></div><div><span>Sessions</span><b>" + count(R.tot.se) + "</b></div><div><span>Orders</span><b>" + count(R.tot.o) + "</b></div><div><span>Page views</span><b>" + count(Math.round(R.tot.se * 3.4)) + "</b></div></div>" +
       '<div class="an-c"><div class="an-t">Customer behavior</div><div class="beh"><div><span>Active carts</span><b id="lvCarts">' + count(live.carts) + '</b></div><div><span>Checking out</span><b id="lvCheck">' + count(live.checkingOut) + '</b></div><div><span>Purchased</span><b id="lvBought">' + count(live.purchased) + "</b></div></div></div>" +
       '<div class="an-c"><div class="an-t">Sessions by location</div><div id="lvLoc">' + locRows() + "</div></div></div>", { navHtml: nav, cls: "lvpage", notabs: true });
     globe($("#lvglobe", el));
+    // La croix est dans une couche à part, immobile : la page glisse vers la gauche dessous, la croix (verre natif) ne bouge pas.
+    var fx = document.createElement("div"); fx.className = "lvfix";
+    fx.innerHTML = '<button class="nb-c lv-x" aria-label="Close">' + ic("x") + "</button>";
+    fx.querySelector("button").addEventListener("click", function () { pop(false); });
+    layers.appendChild(fx);
+    var fxT = setInterval(function () {
+      if (!el.isConnected) { clearInterval(fxT); fx.remove(); return; }
+      fx.classList.toggle("on", el.classList.contains("on"));
+    }, 40);
   }
   // Villes par défaut d'un pays (quand il n'y a encore ni commande ni client) : [ville, région, poids].
   var LOC_DEF = {
@@ -3745,6 +3754,8 @@
       var items = [];
       if (covered()) return { items: items, cover: true };
       var lays = Array.prototype.slice.call(layers.children);
+      var lvfix = lays.filter(function (n) { return n.classList.contains("lvfix"); })[0] || null;
+      lays = lays.filter(function (n) { return !n.classList.contains("lvfix"); });
       var top = lays.length ? lays[lays.length - 1] : null;
       var cut = Infinity, cutTop = Infinity, dim = 0, ord = null, ordLay = null, below = false;
       if (top) {
@@ -3753,8 +3764,8 @@
           var shi = lays[li].querySelector(".sh");
           if (!shi) {
             // Live View (page qui arrive de la droite) : seule la croix est un vrai bouton Liquid Glass natif.
-            var lvx = li === lays.length - 1 && lays[li].classList.contains("lvpage") ? lays[li].querySelector(".lv-x") : null;
-            if (lvx && lvx.getBoundingClientRect().width) return { items: [mk("lv:x", "btn", lvx, { icon: "x" })], cover: false };
+            var lvx = li === lays.length - 1 && lays[li].classList.contains("lvpage") ? (lvfix && lvfix.querySelector(".lv-x")) : null;
+            if (lvx && lvx.getBoundingClientRect().width > 0) return { items: [mk("lv:x", "btn", lvx, { icon: "x" })], cover: false };
             return { items: items, cover: true };
           }
           cut = Math.min(cut, shi.getBoundingClientRect().top);   // ce qui est sous une feuille est masqué
