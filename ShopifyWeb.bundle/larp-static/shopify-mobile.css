@@ -1454,7 +1454,7 @@ img.fs-art{width:56%;right:2px;bottom:10px;-webkit-touch-callout:none;-webkit-us
 /* Live View : même en-tête que les fiches commande / produit (barre fixe, croix à gauche, titre centré) */
 .page.lvpage .pg-nav.lv-nav{background:#fff}
 .page.lvpage .lv-sp{width:40px;height:40px;flex:none}
-.page.lvpage .lv-ph{visibility:hidden}
+html.native-glass-hdr:not(.glass-cover) .page.lvpage .lv-ph{visibility:hidden}
 .lvfix{display:none;position:absolute;left:16px;top:calc(var(--top) + 6px);width:40px;height:40px;z-index:5;pointer-events:none}
 .lvfix.on{display:block}
 .lvfix .lv-x{pointer-events:auto}
