@@ -3536,7 +3536,7 @@
           else items.push(pinned(mk(id, "btn", b, { icon: iconOf(b) }), scr));
         });
         // Recherche + localisation / trier / filtrer : une seule capsule de verre.
-        var sf = scr.querySelector(".sfield input"), cbs = $$(".sbar .cb", scr);
+        var sf = scr.querySelector(".sfield input"), cbs = $$(".sbar .cb", scr).filter(function (b) { return b.getAttribute("data-act") !== "locations"; });
         if (sf && cbs.length) {
           sf.parentNode.setAttribute("data-gid", "s:search");
           items.push(pinned(grp("g:sbar", cbs, "s:", { tone: "gray", placeholder: sf.placeholder || "", text: sf.value || "" }, sf.parentNode), scr));
