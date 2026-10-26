@@ -1406,3 +1406,7 @@ html.checker-native .scr:not(#s-home){overscroll-behavior-y:auto}
 html.checker-native .pg-b{overscroll-behavior-y:auto}
 /* Une page courte rebondit aussi (toujours défilable d'1 px) */
 .gl-scr .gl-page{min-height:calc(100% + 1px)}
+
+/* Gros titre Commandes / Produits : en-tête FIXE (hors flux de défilement) pour qu'il ne descende jamais avec le rebond. */
+.gl-scr .gl-hd{position:fixed;top:0;left:0;right:0}
+.gl-scr .gl-page{padding-top:calc(var(--top) + 56px)}
