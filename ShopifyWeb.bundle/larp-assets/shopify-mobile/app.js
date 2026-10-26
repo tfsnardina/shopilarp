@@ -2259,15 +2259,9 @@
       '<div class="an-c"><div class="an-t">Customer behavior</div><div class="beh"><div><span>Active carts</span><b id="lvCarts">' + count(live.carts) + '</b></div><div><span>Checking out</span><b id="lvCheck">' + count(live.checkingOut) + '</b></div><div><span>Purchased</span><b id="lvBought">' + count(live.purchased) + "</b></div></div></div>" +
       '<div class="an-c"><div class="an-t">Sessions by location</div><div id="lvLoc">' + locRows() + "</div></div></div>", { navHtml: nav, cls: "lvpage", notabs: true });
     globe($("#lvglobe", el));
-    // La croix est dans une couche à part, immobile : la page glisse vers la gauche dessous, la croix (verre natif) ne bouge pas.
-    var fx = document.createElement("div"); fx.className = "lvfix";
-    fx.innerHTML = '<button class="nb-c lv-x" aria-label="Close">' + ic("x") + "</button>";
-    fx.querySelector("button").addEventListener("click", function () { pop(false); });
-    layers.appendChild(fx);
-    var fxT = setInterval(function () {
-      if (!el.isConnected) { clearInterval(fxT); fx.remove(); return; }
-      fx.classList.toggle("on", el.classList.contains("on"));
-    }, 40);
+    // La croix fait partie de la page (elle glisse avec elle, comme sur les fiches commande / produit) :
+    // en iOS 26 le verre natif suit simplement cet emplacement (voir collect()), sinon c'est ce bouton web qui s'affiche.
+    // Son clic (data-back) est déjà branché par page().
   }
   // Villes par défaut d'un pays (quand il n'y a encore ni commande ni client) : [ville, région, poids].
   var LOC_DEF = {
@@ -3764,7 +3758,7 @@
           var shi = lays[li].querySelector(".sh");
           if (!shi) {
             // Live View (page qui arrive de la droite) : seule la croix est un vrai bouton Liquid Glass natif.
-            var lvx = li === lays.length - 1 && lays[li].classList.contains("lvpage") ? (lvfix && lvfix.querySelector(".lv-x")) : null;
+            var lvx = li === lays.length - 1 && lays[li].classList.contains("lvpage") ? lays[li].querySelector(".lv-ph") : null;
             if (lvx && lvx.getBoundingClientRect().width > 0) return { items: [mk("lv:x", "btn", lvx, { icon: "x" })], cover: false };
             return { items: items, cover: true };
           }
