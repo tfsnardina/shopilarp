@@ -1459,5 +1459,16 @@ img.fs-art{width:56%;right:2px;bottom:10px;-webkit-touch-callout:none;-webkit-us
 .page.lvpage .lv-nav .nb-c .ic{width:20px;height:20px}
 .page.lvpage .pg-b{padding:calc(var(--top) + 62px) 16px calc(var(--bot) + 28px)}
 .page.lvpage .lvw{display:block}
-.beh b.pop{animation:behPop .45s cubic-bezier(.34,1.56,.64,1)}
-@keyframes behPop{0%{transform:scale(1)}40%{transform:scale(1.28);color:#0094d5}100%{transform:scale(1)}}
+
+/* Live View : cartes arrondies comme « Ventes totales », chiffres qui ne bougent pas */
+.page.lvpage .an-c{background:#fff;border:1px solid var(--bd2);border-radius:16px;padding:14px;margin:0 0 12px;box-shadow:0 1px 2px rgba(0,0,0,.03);overflow:hidden}
+.page.lvpage .bar-r i{background:linear-gradient(90deg,#0094d5 var(--w),#e5f4fb var(--w))}
+.page.lvpage .lv-none{margin:6px 0 2px;font-size:14px;color:var(--tx2)}
+.page.lvpage .beh{align-items:stretch}
+.page.lvpage .beh>div{display:flex;flex-direction:column;justify-content:space-between;min-width:0}
+.page.lvpage .beh span{font-size:13.5px;line-height:17px}
+.page.lvpage .beh b,.page.lvpage .lv-grid b,.page.lvpage .lv-now b{font-variant-numeric:tabular-nums}
+.page.lvpage .beh b.flash{animation:behFlash .8s ease-out}
+@keyframes behFlash{0%{color:#0094d5}100%{color:var(--tx)}}
+/* croix : le vrai verre natif Apple prend le relais (le bouton web reste en relais invisible) */
+html.native-glass-hdr:not(.glass-cover) .page.lvpage .lv-x{visibility:hidden}
