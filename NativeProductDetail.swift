@@ -352,6 +352,8 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
     private let productIndex: Int
     private let productId: String
     private let canDelete: Bool
+    /// Mode « Ajouter un produit » : même page que la fiche, vide, avec « Enregistrer » toujours visible.
+    private let isCreate: Bool
 
     private var productTitle: String
     private var desc: String
@@ -402,7 +404,8 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         currency = ((info["sym"] as? String) ?? "€").trimmingCharacters(in: .whitespaces)
         productIndex = (info["idx"] as? NSNumber)?.intValue ?? -1
         productId = (info["id"] as? String) ?? ""
-        canDelete = (info["canDelete"] as? NSNumber)?.boolValue ?? false
+        isCreate = (info["create"] as? NSNumber)?.boolValue ?? false
+        canDelete = isCreate ? false : ((info["canDelete"] as? NSNumber)?.boolValue ?? false)
         productTitle = (info["title"] as? String) ?? ""
         desc = (info["desc"] as? String) ?? ""
         category = (info["category"] as? String) ?? ""
@@ -871,14 +874,16 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
     /// Boutons du haut : « partager | … » au repos, « Enregistrer » dès qu'il y a une modification.
     private func updateChrome() {
         let dirty = isDirty
-        let canSave = dirty && !productTitle.trimmingCharacters(in: .whitespaces).isEmpty
+        let canSave = !productTitle.trimmingCharacters(in: .whitespaces).isEmpty && (isCreate || dirty)
+        // En création il n'y a ni « partager » ni « … » : « Enregistrer » reste affiché (grisé tant que le titre est vide).
+        let showSave = isCreate || dirty
         saveButton.isEnabled = canSave
+        saveButton.isHidden = !showSave
         UIView.animate(withDuration: 0.2) {
-            self.actionPill.alpha = dirty ? 0 : 1
-            self.saveButton.alpha = dirty ? 1 : 0
+            self.actionPill.alpha = showSave ? 0 : 1
+            self.saveButton.alpha = showSave ? 1 : 0
         }
-        actionPill.isUserInteractionEnabled = !dirty
-        saveButton.isHidden = !dirty
+        actionPill.isUserInteractionEnabled = !showSave
     }
 
     private func priceEdited() {
@@ -1005,6 +1010,11 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         onSave?(payload())
         savedSnapshot = snapshot()
+        if isCreate {
+            // La page web affiche elle-même « Product saved » ; on revient simplement à la liste.
+            closeAnimated()
+            return
+        }
         updateChrome()
         showToast(dtr("Produit enregistré", "Product saved"))
     }
@@ -1046,8 +1056,9 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: dtr("Enregistrer", "Save"), style: .default) { [weak self] _ in
-            self?.save()
-            self?.closeAnimated()
+            guard let self else { return }
+            self.save()
+            if !self.isCreate { self.closeAnimated() }   // en création, save() ferme déjà la page
         })
         alert.addAction(UIAlertAction(title: dtr("Abandonner", "Discard"), style: .destructive) { [weak self] _ in
             self?.closeAnimated()
