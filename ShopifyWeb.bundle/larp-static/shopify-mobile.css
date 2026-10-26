@@ -1385,3 +1385,14 @@ html.native-glass-drawer .gl-selbar{visibility:hidden}
 
 /* Verre natif : le bouton emplacement est retiré de la barre de recherche Commandes */
 html.native-glass-hdr .gl-scr .sbar .cb[data-act="locations"]{display:none}
+
+/* Liste Commandes : même look que la capture (en-tête de jour sans bandeau, numéro et montant plus grands, séparateurs fins) */
+.gl-scr .olist .dgrp{height:auto;padding:16px var(--g) 4px;background:transparent;font-size:16px;font-weight:650;color:#6b6b6b;letter-spacing:0}
+.gl-scr .olist .orow{padding:12px var(--g) 12px}
+.gl-scr .olist .or1{font-size:21px;line-height:26px}
+.gl-scr .olist .or1 b:first-child{font-weight:700;letter-spacing:-.2px}
+.gl-scr .olist .or1 b:last-child{font-size:16px;font-weight:650;color:#111}
+.gl-scr .olist .or2{margin-top:2px;font-size:16px;line-height:22px;color:#6b6b6b}
+.gl-scr .olist .or2 span+span{margin-left:9px;padding-left:9px;border-left:1px solid #dcdcdc;line-height:14px}
+.gl-scr .olist .or4{font-size:14px;color:#6b6b6b}
+html.ios-bold .gl-scr .olist .dgrp{font-weight:700}
