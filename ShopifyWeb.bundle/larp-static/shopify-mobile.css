@@ -1382,3 +1382,6 @@ html.native-glass-drawer .gl-selbar{visibility:hidden}
 .pr-dot.un{background:#5b9bd5}
 .pr-dot.ar{background:#c9ccd0}
 .pr-t .neg{color:#d72c0d;font-weight:650}
+
+/* Verre natif : le bouton emplacement est retiré de la barre de recherche Commandes */
+html.native-glass-hdr .gl-scr .sbar .cb[data-act="locations"]{display:none}
