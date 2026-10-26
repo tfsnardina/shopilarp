@@ -1373,3 +1373,12 @@ html.native-glass-drawer .gl-selbar{visibility:hidden}
 .sh.fulfill{min-height:0}
 .sh.fulfill .ff{padding:0 16px calc(var(--bot) + 8px)}
 .sh.fulfill .btn-p{height:50px;border-radius:25px;font-weight:600;background:linear-gradient(180deg,rgba(66,66,68,.96),rgba(26,26,28,.98));box-shadow:inset 0 1px 0 rgba(255,255,255,.24),inset 0 0 0 .5px rgba(255,255,255,.1),0 8px 20px rgba(0,0,0,.2)}
+
+/* Produits : point de statut (au lieu du badge texte), stock à 0 en rouge, appui long sans menu iOS */
+.prow{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.pr-dot{flex:none;display:block;width:9px;height:9px;border-radius:50%;margin:0 2px 0 6px}
+.pr-dot.on{background:#2e9d57}
+.pr-dot.dr{background:#8c9196}
+.pr-dot.un{background:#5b9bd5}
+.pr-dot.ar{background:#c9ccd0}
+.pr-t .neg{color:#d72c0d;font-weight:650}
