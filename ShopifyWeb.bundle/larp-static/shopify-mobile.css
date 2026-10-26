@@ -1396,3 +1396,13 @@ html.native-glass-hdr .gl-scr .sbar .cb[data-act="locations"]{display:none}
 .gl-scr .olist .or2 span+span{margin-left:9px;padding-left:9px;border-left:1px solid #dcdcdc;line-height:14px}
 .gl-scr .olist .or4{font-size:14px;color:#6b6b6b}
 html.ios-bold .gl-scr .olist .dgrp{font-weight:700}
+
+/* Verre natif : la recherche se colle sous l'en-tête (plus de trou où la liste apparaît) */
+html.native-glass-hdr .gl-tools{top:calc(var(--top) + 56px)}
+html.native-glass-hdr .gl-body{padding-top:0}
+
+/* Rebond élastique aux extrémités (haut et bas) sur tous les écrans sauf l'accueil, qui a son tirer-pour-rafraîchir */
+html.checker-native .scr:not(#s-home){overscroll-behavior-y:auto}
+html.checker-native .pg-b{overscroll-behavior-y:auto}
+/* Une page courte rebondit aussi (toujours défilable d'1 px) */
+.gl-scr .gl-page{min-height:calc(100% + 1px)}
