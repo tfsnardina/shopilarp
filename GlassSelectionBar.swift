@@ -72,7 +72,9 @@ final class GlassSelectionBarView: UIView {
         moreConfig.background.cornerRadius = Self.inner / 2
         moreButton.configuration = moreConfig
         moreButton.accessibilityLabel = "More"
-        moreButton.addAction(UIAction { [weak self] _ in self?.fire("selmore") }, for: .touchUpInside)
+        // Vrai menu Apple (Liquid Glass) au-dessus du bouton : statut, archivage, balises, collections.
+        moreButton.showsMenuAsPrimaryAction = true
+        moreButton.menu = makeMoreMenu()
 
         glass.contentView.addSubview(countButton)
         glass.contentView.addSubview(deleteButton)
@@ -85,6 +87,46 @@ final class GlassSelectionBarView: UIView {
 
     private static var deleteTitle: String {
         (Locale.preferredLanguages.first ?? "en").hasPrefix("fr") ? "Supprimer" : "Delete"
+    }
+
+    private static var lang: String {
+        let l = Locale.preferredLanguages.first ?? "en"
+        for code in ["fr", "es", "de"] where l.hasPrefix(code) { return code }
+        return "en"
+    }
+
+    /// Libellés du menu « … » : en, fr, es, de.
+    private static func t(_ en: String, _ fr: String, _ es: String, _ de: String) -> String {
+        switch lang {
+        case "fr": return fr
+        case "es": return es
+        case "de": return de
+        default: return en
+        }
+    }
+
+    private func makeMoreMenu() -> UIMenu {
+        func item(_ title: String, _ action: String) -> UIAction {
+            UIAction(title: title) { [weak self] _ in self?.fire(action) }
+        }
+        let status = UIMenu(title: "", options: .displayInline, children: [
+            item(Self.t("Set as active", "Définir comme actif", "Establecer como activo", "Als aktiv festlegen"), "sel:active"),
+            item(Self.t("Set as draft", "Définir comme brouillon", "Establecer como borrador", "Als Entwurf festlegen"), "sel:draft"),
+            item(Self.t("Set as unlisted", "Définir comme non répertorié", "Establecer como no listado", "Als nicht gelistet festlegen"), "sel:unlisted"),
+            item(Self.t("Archive", "Archiver", "Archivar", "Archivieren"), "sel:archive"),
+        ])
+        let tags = UIMenu(title: "", options: .displayInline, children: [
+            item(Self.t("Add tags", "Ajouter des balises", "Añadir etiquetas", "Tags hinzufügen"), "sel:tagadd"),
+            item(Self.t("Remove tags", "Retirer des balises", "Quitar etiquetas", "Tags entfernen"), "sel:tagdel"),
+        ])
+        let collections = UIMenu(title: "", options: .displayInline, children: [
+            item(Self.t("Add to collections", "Ajouter aux collections", "Añadir a colecciones", "Zu Kollektionen hinzufügen"), "sel:coladd"),
+            item(Self.t("Remove from collections", "Retirer des collections", "Quitar de colecciones", "Aus Kollektionen entfernen"), "sel:coldel"),
+        ])
+        let all = UIMenu(title: "", options: .displayInline, children: [
+            item(Self.t("Select all / none", "Tout sélectionner / désélectionner", "Seleccionar todo / nada", "Alle / keine auswählen"), "sel:all"),
+        ])
+        return UIMenu(title: "", children: [status, tags, collections, all])
     }
 
     private func fire(_ action: String) {
