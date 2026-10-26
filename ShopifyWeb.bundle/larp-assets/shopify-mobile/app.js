@@ -162,6 +162,14 @@
     try { window.webkit.messageHandlers.larpHaptic.postMessage(kind); return; } catch (e) { }
     try { if (navigator.vibrate) navigator.vibrate(typeof a === "number" ? a : a || 8); } catch (e2) { }
   }
+  // EXPLOSION de vibration : sur iPhone c'est un vrai motif Core Haptics (choc + grondement + débris qui s'éteignent),
+  // ailleurs une longue séquence de vibrations dégressives.
+  function hapBoom() {
+    var native = false;
+    try { native = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpHaptic); } catch (e) { }
+    if (native) { try { window.webkit.messageHandlers.larpHaptic.postMessage("explosion"); return; } catch (e1) { } }
+    try { if (navigator.vibrate) navigator.vibrate([90, 15, 70, 15, 60, 20, 50, 20, 45, 25, 35, 30, 30, 35, 25, 45, 20, 60, 15, 80, 10]); } catch (e2) { }
+  }
   var toastT;
   function toast(msg, kind, ms) {
     toastEl.textContent = msg;
@@ -655,8 +663,88 @@
     }
     return "<span>in</span> <span>" + esc(countryName()) + "</span>";
   }
+  /* Swipe vers la gauche sur la carte « première vente » : elle est expulsée (rotation, fondu, étincelles), la place se
+     referme et le téléphone fait une explosion de vibration. Une fois balayée, elle ne revient plus. */
+  function bindFirstSale(root) {
+    var card = $("#firstSale", root); if (!card || card._sw) return;
+    card._sw = 1;
+    var pid = null, x0 = 0, y0 = 0, dx = 0, lock = null, t0 = 0, lastX = 0, lastT = 0, vx = 0, armed = false, ticks = 0, swallow = false, gone = false;
+    function W() { return card.offsetWidth || 360; }
+    function apply(x) {
+      var w = W(), p = Math.min(1, Math.abs(x) / w);
+      card.style.transform = "translateX(" + x + "px) rotate(" + (x / w * 14).toFixed(2) + "deg) scale(" + (1 - p * 0.04).toFixed(3) + ")";
+      card.style.opacity = String(1 - p * 0.45);
+    }
+    function sparks() {
+      if (!card.animate) return;
+      var r = card.getBoundingClientRect(), cols = ["#f3e2a6", "#b99a46", "#8ee07a", "#ffffff", "#5ec23a"];
+      for (var i = 0; i < 26; i++) {
+        var s = document.createElement("i");
+        var sz = 4 + Math.random() * 7;
+        s.style.cssText = "position:fixed;z-index:9999;pointer-events:none;border-radius:" + (Math.random() < 0.5 ? "50%" : "2px") + ";width:" + sz + "px;height:" + sz + "px;background:" + cols[i % cols.length] + ";left:" + (r.left + r.width * (0.55 + Math.random() * 0.4)) + "px;top:" + (r.top + r.height * (0.2 + Math.random() * 0.6)) + "px";
+        document.body.appendChild(s);
+        var ang = Math.PI + (Math.random() - 0.5) * 2.4, dist = 90 + Math.random() * 190, tx = Math.cos(ang) * dist, ty = Math.sin(ang) * dist + 60 + Math.random() * 80;
+        var an = s.animate([{ transform: "translate(0,0) scale(1) rotate(0)", opacity: 1 }, { transform: "translate(" + tx + "px," + ty + "px) scale(.2) rotate(" + (Math.random() * 540 - 270) + "deg)", opacity: 0 }], { duration: 650 + Math.random() * 450, easing: "cubic-bezier(.2,.7,.3,1)" });
+        an.onfinish = (function (el) { return function () { el.remove(); }; })(s);
+      }
+    }
+    function expel() {
+      gone = true;
+      hapBoom();
+      sparks();
+      var w = W(), h = card.offsetHeight;
+      card.style.pointerEvents = "none";
+      card.style.transition = "transform .6s cubic-bezier(.45,0,.85,.35), opacity .5s ease-in .08s";
+      card.style.transform = "translateX(" + (-w * 1.6) + "px) translateY(-26px) rotate(-18deg) scale(.94)";
+      card.style.opacity = "0";
+      setTimeout(function () {
+        card.style.height = h + "px"; card.style.overflow = "hidden"; card.getBoundingClientRect();
+        card.style.transition = "height .45s cubic-bezier(.3,.8,.2,1), margin .45s cubic-bezier(.3,.8,.2,1), padding .45s cubic-bezier(.3,.8,.2,1)";
+        card.style.height = "0px"; card.style.marginTop = "0px"; card.style.paddingTop = "0px"; card.style.paddingBottom = "0px";
+      }, 420);
+      setTimeout(function () { card.remove(); }, 920);
+      if (FS) { FS.gone = 1; try { localStorage.setItem("sh-firstsale", JSON.stringify(FS)); } catch (e) { } }
+    }
+    card.addEventListener("pointerdown", function (e) {
+      if (gone || pid !== null) return;
+      pid = e.pointerId; x0 = lastX = e.clientX; y0 = e.clientY; dx = 0; lock = null; t0 = lastT = performance.now(); vx = 0; armed = false; ticks = 0; swallow = false;
+    });
+    card.addEventListener("pointermove", function (e) {
+      if (e.pointerId !== pid || gone) return;
+      var mx = e.clientX - x0, my = e.clientY - y0;
+      if (lock === null) {
+        if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+        lock = Math.abs(mx) > Math.abs(my) * 1.15;
+        if (lock) { try { card.setPointerCapture(pid); } catch (er) { } card.style.transition = "none"; swallow = true; }
+      }
+      if (!lock) return;
+      dx = mx < 0 ? mx : mx * 0.12;
+      var now = performance.now(); if (now > lastT) vx = (e.clientX - lastX) / (now - lastT); lastX = e.clientX; lastT = now;
+      apply(dx);
+      // un petit tic de vibration tous les ~34 px, et un coup plus net quand c'est assez loin pour partir
+      var t = Math.floor(Math.abs(Math.min(0, dx)) / 34);
+      if (t > ticks) { ticks = t; hap(armed ? "medium" : "selection"); }
+      var limit = Math.min(120, W() * 0.32);
+      if (!armed && dx < -limit) { armed = true; hap("heavy"); card.classList.add("arm"); }
+      else if (armed && dx > -limit * 0.85) { armed = false; card.classList.remove("arm"); }
+    });
+    function end(e) {
+      if (e.pointerId !== pid) return;
+      pid = null;
+      if (!lock || gone) { lock = null; return; }
+      lock = null;
+      card.classList.remove("arm");
+      if (dx < -Math.min(120, W() * 0.32) || vx < -0.7) return expel();
+      card.style.transition = "transform .5s cubic-bezier(.34,1.56,.64,1), opacity .3s";
+      card.style.transform = ""; card.style.opacity = "";
+    }
+    card.addEventListener("pointerup", end);
+    card.addEventListener("pointercancel", end);
+    // un glissement ne doit pas déclencher le bouton « Fulfill your order »
+    card.addEventListener("click", function (e) { if (swallow) { swallow = false; e.preventDefault(); e.stopPropagation(); } }, true);
+  }
   function firstSaleCard(uf) {
-    if (!FS || !uf) return "";
+    if (!FS || FS.gone || !uf) return "";
     return '<div class="fs" id="firstSale"><h3>Congratulations on your first sale!</h3>' +
       '<p class="fs-b">You never forget your first ChaChing. Soak it all in and celebrate!</p>' +
       '<p class="fs-p"><span>You’ve got a fan!</span><br><span>Your first order was made by</span> <span>' + esc(FS.c) + "</span> " + fsWhere() + ".</p>" +
@@ -746,7 +834,8 @@
     countIn();
     layoutStrip();
     bindPtr();
-    if (fsConfettiPending && FS && uf) { fsConfettiPending = false; setTimeout(confetti, 350); }
+    bindFirstSale(el);
+    if (fsConfettiPending && FS && !FS.gone && uf) { fsConfettiPending = false; setTimeout(confetti, 350); }
   }
   /* Metric switch (Total sales -> Orders -> ...): the chart slides sideways (old one out, new one in) and the
      tiles glide inside their own scroller so the chosen tile docks right beside the "Live" tile - which never
@@ -2162,10 +2251,11 @@
   /* ── Live View ───────────────────────────────────────────── */
   function openLiveView() {
     var R = rangeData("today");
-    var el = sheet("Live View", '<div class="lvw"><div class="lv-top"><div class="lv-globe" id="lvglobe"></div><div class="lv-now"><span>Visitors right now</span><b id="lvN">' + count(live.visitors) + '</b></div></div>' +
+    var nav = '<div class="pg-nav lv-nav"><button class="nb-c lv-x" data-back aria-label="Close">' + ic("x") + '</button><h1 class="pg-t">Live View</h1><span class="lv-sp"></span></div>';
+    var el = page('<div class="lvw"><div class="lv-top"><div class="lv-globe" id="lvglobe"></div><div class="lv-now"><span>Visitors right now</span><b id="lvN">' + count(live.visitors) + '</b></div></div>' +
       '<div class="lv-grid"><div><span>Total sales</span><b>' + money(R.tot.s) + "</b></div><div><span>Sessions</span><b>" + count(R.tot.se) + "</b></div><div><span>Orders</span><b>" + count(R.tot.o) + "</b></div><div><span>Page views</span><b>" + count(Math.round(R.tot.se * 3.4)) + "</b></div></div>" +
-      '<div class="an-c"><div class="an-t">Customer behavior</div><div class="beh"><div><span>Active carts</span><b>' + count(live.carts) + "</b></div><div><span>Checking out</span><b>" + count(live.checkingOut) + "</b></div><div><span>Purchased</span><b>" + count(live.purchased) + "</b></div></div></div>" +
-      '<div class="an-c"><div class="an-t">Sessions by location</div>' + locRows() + "</div></div>", { navClose: true, cls: "notifs liveview" });
+      '<div class="an-c"><div class="an-t">Customer behavior</div><div class="beh"><div><span>Active carts</span><b id="lvCarts">' + count(live.carts) + '</b></div><div><span>Checking out</span><b id="lvCheck">' + count(live.checkingOut) + '</b></div><div><span>Purchased</span><b id="lvBought">' + count(live.purchased) + "</b></div></div></div>" +
+      '<div class="an-c"><div class="an-t">Sessions by location</div>' + locRows() + "</div></div>", { navHtml: nav, cls: "lvpage", notabs: true });
     globe($("#lvglobe", el));
   }
   function locRows() {
@@ -2178,17 +2268,6 @@
   var LAND_MASK = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/gP8DAAAAAAAAAAAAAAAAAAAAAAD8/////wcAAAAAAAAHAAAAAAAAAAAArP/8//8fAPADAAAA4AMAAAAAAAAA4ADMh////wAABgAACADwAAAAAAAAAADwUT8A/v8PAAAAABwA/n8AOAAAAAAA+LPvD8D/fwAAAAAwIPz//wMDAADAAwD5w/4H+P8HAAAcAIP7/////z8Afv4HB//P////////8+Fv+QAAAAAAgMAPAAAAAODDB+D//x8ALAAEAAAAAAAAIPz///+///uf//v/7////////////wfw/////xE88AEAAP7+////////////gP////8HeAAcAADw5////////////ADgAf//f4AvAAAAAH78////////v8QAAAyA//8/+AcAAIBB4/////////8ADwAAAPD//9//AQAAPBT/////////A3AAAAAA/v///T8AAGD3//////////8DAwAAAMD/////AwAA+P//////////PwAAAAAA+P///2MAAAD///////////8CAAAAAAD///8/CAAA4P//////////JwAAAAAA8P///wcAAAD+/+nz/////38AAAAAAAD///8HAAAA/tgPPP//////MQAAAAAA8P//PwAAAOBH9v/n/////wcBAAAAAAD///8BAAAAPgD7f/7///8xEAAAAAAA4P//DwAAAMB5Iv//////f8YBAAAAAAD+//8AAAAA+AcA//////8jDwAAAAAAgP//AwAAAOD/Afj/////fwgAAAAAAADw/x8AAAAA/n////////8HAAAAAAAAAP4HAwAAAPD////7////fwAAAAAAAACgHyAAAACA//9/f/////8DAAAAAAAAAPQBAAAAAPz///8v////PwAAAAAAAAAAHiAAAADA/////g////8EAAAAAAAAAOAjCAAAAP7//9//4D//AgAAAAAAAAAAPAMGAADA/////Qf84BcAAAAAAAAAAAA/AAAAAPz//78fgAf+QAAAAAAAAAAAgA8AAADg////+wA4gB8EAAAAAAAAAADAAAAAAP7///8BgAP4gQAAAAAAAAAAAAgPAADA////7wAwgAwIAAAAAAAAAAAA/w8AAPj///8HAAUIAAEAAAAAAAAAAID/AQAA////fwBAAAEQAAAAAAAAAAAA+P8AAODj//8DAAA0GAAAAAAAAAAAAID/HwAAAPj/HwAAgMMBAAAAAAAAAAAA/P8BAACA//8AAAA4HwAAAAAAAAAAAMD/fwAAAPz/BwAAAOMFAQAAAAAAAAAA/P8/AACA/z8AAABgbvABAAAAAAAAAOD//w8AAPD/AwAAAAQAfAIAAAAAAAAA/P//AQAA/z8AAACAA4APAAAAAAAAAMD//x8AAPD/AwAAAAAQsAEAAAAAAAAA+P//AAAA/j8AAAAAAAAAAAAAAAAAAAD//wcAAPD/QwAAAACAIwAAAAAAAAAA8P9/AAAA/z8GAAAAAD8GAAAAAAAAAAD8/wcAAPD/cQAAAAD4fwAAAAAAAAAAgP8/AAAA/w8HAAAAgP8PAAAAAAAAAAD4/wMAAOD/MAAAAAD//wEAAAAAAAAAgP8fAAAA/g8DAAAA+P8/AAAAAAAAAAD4PwAAAOB/MAAAAID//wMAAAAAAAAAwP8DAAAA/gcAAAAA+P9/AAAAAAAAAAD8HwAAAMA/AAAAAID//wcAAAAAAAAAwP8BAAAA+AEAAAAA8P9/AAAAAAAAAAD8DwAAAIAPAAAAAAAf/gMAAAAAAAAAwH8AAAAAAAAAAAAAEIA/AAAAAAAAAAD+AwAAAAAAAAAAAAAA8AEgAAAAAAAA4A8AAAAAAAAAAAAAAAAAAAYAAAAAAAB+AAAAAAAAAAAAAAAAgAAwAAAAAAAA4AMAAAAAAAAAAAAAAAAIgAEAAAAAAAAeAAAAAAAAAAAAAAAAAAAOAAAAAAAA8AEAAAAAAAAAAAAAAAAAAAAAAAAAAAAfAAAAAAAAAAAAAAAAAAAAAAAAAAAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAD8APj///8HAAAAAAAAAAA0AAAAAADA/f/h/////w8AAAAAAAAA4AcAAED5////z///////fwAAAAAAvAb+AADA//////////////8HAAD4/////wMAAP7/////////////HwCA+f////8BAID///////////////8AAPL/////BwAO////////////////HwAA/v/////vePj//////////////38AAOD/////////////////////////PwAAeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
   // A dotted globe that turns slowly, with visitor pings on recent cities.
   var CITY = { "Los Angeles": [34, -118], "New York": [40.7, -74], Brooklyn: [40.6, -73.9], Chicago: [41.9, -87.6], Houston: [29.8, -95.4], Dallas: [32.8, -96.8], Austin: [30.3, -97.7], Miami: [25.8, -80.2], Orlando: [28.5, -81.4], Atlanta: [33.7, -84.4], Phoenix: [33.4, -112], Seattle: [47.6, -122.3], "San Diego": [32.7, -117.2], "San Francisco": [37.8, -122.4], Denver: [39.7, -105], Boston: [42.4, -71], Nashville: [36.2, -86.8], Charlotte: [35.2, -80.8], "Las Vegas": [36.2, -115.1], Portland: [45.5, -122.7], Columbus: [40, -83], Philadelphia: [40, -75.2], Minneapolis: [45, -93.3], Tampa: [28, -82.5], "San Antonio": [29.4, -98.5], Detroit: [42.3, -83], Raleigh: [35.8, -78.6], "Salt Lake City": [40.8, -111.9], Newark: [40.7, -74.2], Sacramento: [38.6, -121.5], Toronto: [43.7, -79.4], Vancouver: [49.3, -123.1], Montreal: [45.5, -73.6], Calgary: [51, -114], Ottawa: [45.4, -75.7], Edmonton: [53.5, -113.5], Mississauga: [43.6, -79.6], Winnipeg: [49.9, -97.1], London: [51.5, -0.1], Manchester: [53.5, -2.2], Birmingham: [52.5, -1.9], Leeds: [53.8, -1.5], Glasgow: [55.9, -4.3], Bristol: [51.5, -2.6], Liverpool: [53.4, -3], Edinburgh: [56, -3.2], Sydney: [-33.9, 151.2], Melbourne: [-37.8, 145], Brisbane: [-27.5, 153], Perth: [-32, 115.9], Adelaide: [-34.9, 138.6], "Gold Coast": [-28, 153.4], Berlin: [52.5, 13.4], Munich: [48.1, 11.6], Hamburg: [53.6, 10], Cologne: [50.9, 7], Frankfurt: [50.1, 8.7], Paris: [48.9, 2.35], Lyon: [45.8, 4.8], Marseille: [43.3, 5.4], Toulouse: [43.6, 1.4], Nice: [43.7, 7.3], Nantes: [47.2, -1.55], Montpellier: [43.6, 3.9], Strasbourg: [48.6, 7.75], Bordeaux: [44.8, -0.6], Lille: [50.6, 3.05], Rennes: [48.1, -1.7], Grenoble: [45.2, 5.7], Dijon: [47.3, 5], Rouen: [49.45, 1.1], Toulon: [43.1, 5.9], Angers: [47.5, -0.55], Reims: [49.25, 4.05], Tours: [47.4, 0.7] };
-  // Metropolitan France + Corsica outline ([lat, lon]), used to draw a zoomed, dotted map of France in Live View.
-  var FR_OUT = [[51.05, 2.37], [50.95, 1.85], [50.7, 1.6], [50.2, 1.55], [49.93, 1.08], [49.5, 0.1], [49.4, -0.2], [49.3, -1.1], [49.7, -1.6], [49.2, -1.6], [48.65, -1.55], [48.65, -2], [48.8, -3.4], [48.7, -4.3], [48.4, -4.75], [48.05, -4.7], [47.85, -3.9], [47.7, -3.4], [47.5, -3.1], [47.5, -2.5], [47.25, -2.2], [47, -2.2], [46.4, -1.2], [46.15, -1.15], [45.55, -1.05], [44.65, -1.25], [43.6, -1.45], [43.35, -1.78], [42.8, -0.7], [42.8, 0.7], [42.85, 1.4], [42.45, 1.7], [42.5, 2], [42.43, 3.17], [42.7, 3.05], [43.1, 3.05], [43.4, 3.7], [43.4, 4.6], [43.3, 5.35], [43.1, 6], [43.4, 6.75], [43.65, 7], [43.78, 7.5], [44.1, 7.7], [44.4, 6.9], [44.85, 6.65], [45.1, 7.05], [45.5, 6.85], [46.2, 6.1], [46.45, 6], [47, 7], [47.55, 7.6], [48, 7.55], [48.6, 8.2], [49, 8.2], [49.2, 7], [49.5, 6.35], [49.55, 5.4], [49.9, 4.85], [50.15, 4.2], [50.3, 3.6], [50.7, 3.2], [50.85, 2.9]];
-  var CORSICA_OUT = [[43, 9.45], [42.65, 9.5], [41.9, 9.4], [41.4, 9.2], [41.4, 8.8], [41.9, 8.6], [42.5, 8.6], [42.95, 9.35]];
-  function inPoly(lat, lon, poly) {
-    var c = false;
-    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      var a = poly[i], b = poly[j];
-      if ((a[0] > lat) !== (b[0] > lat) && lon < ((b[1] - a[1]) * (lat - a[0])) / (b[0] - a[0]) + a[1]) c = !c;
-    }
-    return c;
-  }
   function globe(host) {
     var size = Math.min(host.clientWidth || 300, 320);
     var cv = document.createElement("canvas"), dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -2196,14 +2275,15 @@
     host.appendChild(cv);
     var ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
     var pts = orders.slice(0, 40).map(function (o) { return CITY[o.city]; }).filter(Boolean);
-    var home = pts[0] || [39, -98];
+    // Sans commande, le globe se tourne vers le pays de la boutique.
+    var HOME = { US: [39, -98], CA: [56, -96], GB: [54, -2], AU: [-25, 134], DE: [51, 10], FR: [46.6, 2.4], ES: [40, -3.7], IT: [42.5, 12.5], NL: [52.2, 5.3], BE: [50.6, 4.6], IE: [53.3, -8], CH: [46.8, 8.2], NZ: [-41, 174], JP: [36, 138] };
+    var home = pts[0] || HOME[S.country] || [39, -98];
     var lon0 = -home[1] - 10, R = size / 2 - 6, cx = size / 2, cy = size / 2;
-    var dots = [], FR = S.country === "FR", Z = FR ? 8.6 : 1;   // France: zoomed in on a dotted map of the country
-    if (FR) for (var fla = 41; fla <= 51.4; fla += 0.35) for (var flo = -5.4; flo <= 9.8; flo += 0.5) if (inPoly(fla, flo, FR_OUT) || inPoly(fla, flo, CORSICA_OUT)) dots.push([fla, flo]);
+    var dots = [];
     // Land dots come from a 2-degree land mask of Natural Earth's 110m land
     // (world-atlas), bit-packed: 180 columns from 180W, 90 rows from 90N.
     var bits = atob(LAND_MASK);
-    for (var r = 0; r < (FR ? 0 : 90); r++) {
+    for (var r = 0; r < 90; r++) {
       var la = 89 - r * 2;
       if (la < -58) continue;
       for (var cIdx = 0; cIdx < 180; cIdx++) {
@@ -2211,25 +2291,23 @@
         if (bits.charCodeAt(k >> 3) & (1 << (k & 7))) dots.push([la, -179 + cIdx * 2]);
       }
     }
-    var tilt = FR ? 0.81 : 0.32;
+    var tilt = 0.32;
     function proj(lat, lon, rot) {
       var p = (lat * Math.PI) / 180, l = ((lon + rot) * Math.PI) / 180;
       var x = Math.cos(p) * Math.sin(l), y = Math.sin(p), z = Math.cos(p) * Math.cos(l);
       var y2 = y * Math.cos(tilt) - z * Math.sin(tilt), z2 = y * Math.sin(tilt) + z * Math.cos(tilt);
-      return [cx + x * R * Z, cy - y2 * R * Z, z2];
+      return [cx + x * R, cy - y2 * R, z2];
     }
-    var rot = FR ? -2.5 : lon0, last = performance.now(), alive = true;
+    var rot = lon0, last = performance.now(), alive = true;
     function frame(now) {
       if (!host.isConnected) { alive = false; return; }
       var dt = now - last; last = now;
-      if (FR) rot = -2.5 + (reduce ? 0 : Math.sin(now / 3500) * 1.1);   // France stays in view, only a gentle sway
-      else if (!reduce) rot += dt * 0.004;
+      if (!reduce) rot += dt * 0.004;
       ctx.clearRect(0, 0, size, size);
       var g = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.1, cx, cy, R);
       g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#eef0f3");
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
-      if (FR) { ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip(); }
-      var ds = FR ? 3.2 : 1.8;
+      var ds = 1.8;
       for (var i = 0; i < dots.length; i++) {
         var q = proj(dots[i][0], dots[i][1], rot);
         if (q[2] <= 0) continue;
@@ -2251,7 +2329,6 @@
           ctx.fillStyle = "rgba(0,148,213," + (0.25 + a * 0.75).toFixed(2) + ")"; ctx.beginPath(); ctx.arc(c[0], c[1], 2.4 + a, 0, Math.PI * 2); ctx.fill();
         }
       }
-      if (FR) ctx.restore();
       if (alive) requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
@@ -2811,6 +2888,7 @@
     pend.sales += o.total / Math.pow(10, S.dec != null ? S.dec : 2); pend.orders += 1; pend.sess += addSe;
     HR.t[0][h] += o.total; HR.t[1][h] += 1; HR.t[2][h] += 1;
     live.purchased += 1;
+    if (!quiet) funnelPurchase();
     creditOrder(o);
     if (live.visitors < 2) live.visitors = 2 + Math.floor(Math.random() * 4);   // someone is on the store when an order lands
     o.items.forEach(function (x) { if (x.p && x.p.i >= 0) { x.p.inv = Math.max(0, x.p.inv - x.q); x.p.sold += x.q; } });
@@ -3008,10 +3086,66 @@
       wait = Math.min(pc.max, Math.max(pc.min, -Math.log(1 - Math.random()) * pc.mean));
       if (Math.random() < pc.burst) burstN = 2 + Math.floor(Math.random() * 2);
     }
+    for (var pb = 0; pb < burstN; pb++) funnelPrime(wait, pb);
     setTimeout(function () {
       if (!document.hidden) { for (var i = 0; i < burstN; i++) newOrder(); }
       scheduleOrder(false);
     }, wait * 1000);
+  }
+  /* ── Comportement des clients ─────────────────────────────
+     Un acheteur suit un vrai parcours : il visite, remplit un panier, passe en caisse (« Checking out ») puis la
+     commande tombe (« Purchased ») et il sort du tunnel. Avant chaque commande planifiée on amorce donc un acheteur
+     (panier -> paiement) quelques secondes plus tôt ; les autres visiteurs, eux, remplissent des paniers et en
+     abandonnent aussi, en proportion du trafic. */
+  var cartHold = 0;  // paniers amorcés qui vont passer en caisse : jamais abandonnés avant
+  var buyerQ = [];   // heures d'arrivée des acheteurs « en caisse » qui attendent leur commande
+  function showFunnel() {
+    [["lvCarts", live.carts], ["lvCheck", live.checkingOut], ["lvBought", live.purchased]].forEach(function (r) {
+      var n = document.getElementById(r[0]); if (!n) return;
+      var t = count(r[1]);
+      if (n.textContent !== t) { n.textContent = t; n.classList.remove("pop"); void n.offsetWidth; n.classList.add("pop"); }
+    });
+  }
+  function funnelPrime(wait, k) {
+    if (wait < 3.4) return;
+    // le panier se remplit ~5 s avant la commande, le paiement démarre ~2,5 s avant
+    var tCart = Math.max(0.2, wait - 5.2 - Math.random() * 2) + k * 0.35, tPay = Math.min(wait - 1.6, tCart + 1.6 + Math.random() * 1.6);
+    setTimeout(function () {
+      if (document.hidden) return;
+      if (live.visitors < 2) live.visitors = 2 + Math.floor(Math.random() * 3);
+      live.carts += 1; cartHold += 1; showFunnel();
+    }, tCart * 1000);
+    setTimeout(function () {
+      cartHold = Math.max(0, cartHold - 1);
+      if (document.hidden || live.carts < 1) return;
+      live.carts -= 1; live.checkingOut += 1; buyerQ.push(Date.now()); showFunnel();
+    }, tPay * 1000);
+  }
+  function funnelPurchase() {
+    if (buyerQ.length) buyerQ.shift();
+    if (live.checkingOut > 0) live.checkingOut -= 1;
+    else if (live.carts > 0) live.carts -= 1;
+    showFunnel();
+  }
+  function funnelTick() {
+    var v = live.visitors, boom = larpVibe() === "exploding";
+    var now = Date.now();
+    // acheteurs oubliés (onglet en arrière-plan...) : ils abandonnent au bout de 25 s
+    while (buyerQ.length && now - buyerQ[0] > 25000) { buyerQ.shift(); if (live.checkingOut > 0) live.checkingOut -= 1; }
+    var keep = buyerQ.length;
+    if (v < 1) { live.carts = cartHold ? live.carts : 0; live.checkingOut = Math.min(live.checkingOut, keep); showFunnel(); return; }
+    var wantCarts = Math.round(v * (boom ? 0.16 : 0.1)), wantPay = Math.max(keep, Math.round(wantCarts * (boom ? 0.4 : 0.3)));
+    var inc = boom ? 1 + Math.floor(Math.random() * 3) : 1;
+    // nouveaux paniers
+    if (live.carts + live.checkingOut < wantCarts + wantPay && Math.random() < (boom ? 0.8 : 0.45)) live.carts += inc;
+    // un panier passe en caisse
+    if (live.carts > 0 && live.checkingOut < wantPay && Math.random() < (boom ? 0.55 : 0.3)) { live.carts -= 1; live.checkingOut += 1; }
+    // abandon de panier / de paiement (jamais un acheteur amorcé)
+    if (live.checkingOut > keep && (live.checkingOut > wantPay || Math.random() < 0.12)) live.checkingOut -= 1;
+    else if (live.carts > Math.max(wantCarts, cartHold) && Math.random() < 0.5) live.carts -= 1;
+    else if (live.carts > cartHold && Math.random() < 0.06) live.carts -= 1;
+    live.carts = Math.max(0, live.carts); live.checkingOut = Math.max(keep, live.checkingOut);
+    showFunnel();
   }
   // Visitors right now drift a little (EXPLODING: they climb fast, every ~1.2 s).
   function showVisitors() {
@@ -3020,18 +3154,20 @@
   }
   setInterval(function () {
     var v = live.visitors;
-    if (v <= 0 && larpVibe() !== "exploding") return;
+    if (v <= 0 && larpVibe() !== "exploding") { funnelTick(); return; }
     if (larpVibe() === "exploding") {
       // 88% up (+3 to +3+6% of current), 12% small dip -> strong upward trend
       if (Math.random() < 0.88) live.visitors = v + 3 + Math.ceil(Math.random() * (3 + v * 0.06));
       else live.visitors = Math.max(1, v - Math.ceil(Math.random() * Math.max(2, v * 0.02)));
-      showVisitors();
+      showVisitors(); funnelTick();
       return;
     }
     var d = Math.random() < 0.5 ? -1 : 1;
-    if (Math.random() < 0.55) return;
-    live.visitors = Math.max(1, v + d * (v > 40 ? Math.ceil(Math.random() * v * 0.04) : 1));
-    showVisitors();
+    if (Math.random() >= 0.55) {
+      live.visitors = Math.max(1, v + d * (v > 40 ? Math.ceil(Math.random() * v * 0.04) : 1));
+      showVisitors();
+    }
+    funnelTick();
   }, 1200);
 
   /* ── Actions ─────────────────────────────────────────────── */
