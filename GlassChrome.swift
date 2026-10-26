@@ -126,6 +126,7 @@ class GlassChromeItem: UIView {
         switch kind {
         case "search": return GlassSearchField(kind: kind, id: id)
         case "chips": return GlassChips(kind: kind, id: id)
+        case "group": return GlassGroupItem(kind: kind, id: id)
         default: return GlassButtonItem(kind: kind, id: id)
         }
     }
@@ -442,6 +443,157 @@ final class GlassChips: GlassChromeItem {
         scroll.contentSize = CGSize(width: max(contentW, bounds.width), height: bounds.height)
         if selected >= 0, selected < frames.count, pill.layer.animationKeys() == nil {
             pill.frame = frames[selected].offsetBy(dx: 0, dy: yOffset)
+        }
+    }
+}
+/// Capsule de verre unique qui assemble plusieurs boutons (+ et …) ou un champ de recherche suivi de
+/// boutons (localisation / trier / filtrer), comme dans l'app Shopify. Les positions des boutons
+/// viennent de la page web (relative à la capsule) ; le texte du champ est relayé vers l'input web.
+@available(iOS 26.0, *)
+final class GlassGroupItem: GlassChromeItem, UITextFieldDelegate {
+    private struct Part {
+        let id: String
+        let icon: String
+        let frame: CGRect
+        let dot: Bool
+    }
+
+    private let glass = GlassChromeItem.glass(interactive: false)
+    private var buttons: [UIButton] = []
+    private var dots: [UIView] = []
+    private var parts: [Part] = []
+    private var partsKey = ""
+    private let searchIcon = UIImageView()
+    private let field = UITextField()
+    private var hasSearch = false
+
+    override init(kind: String, id: String) {
+        super.init(kind: kind, id: id)
+        addSubview(glass)
+
+        searchIcon.image = UIImage(
+            systemName: "magnifyingglass",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)
+        )
+        searchIcon.tintColor = UIColor(white: 0.45, alpha: 1)
+        searchIcon.contentMode = .scaleAspectFit
+        field.font = .systemFont(ofSize: 17)
+        field.textColor = GlassChromeItem.ink
+        field.tintColor = UIColor(red: 0.0, green: 0.36, blue: 0.84, alpha: 1)
+        field.returnKeyType = .search
+        field.clearButtonMode = .whileEditing
+        field.autocorrectionType = .no
+        field.autocapitalizationType = .none
+        field.delegate = self
+        field.addAction(UIAction { [weak self] _ in
+            guard let self else { return }
+            // Le champ web vit sous l'id « s:search » (même relais que le champ de recherche seul).
+            self.onText?("s:search", self.field.text ?? "")
+        }, for: .editingChanged)
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(focusField)))
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    @objc private func focusField() { if hasSearch { field.becomeFirstResponder() } }
+
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        return true
+    }
+
+    override func update(_ d: [String: Any]) {
+        let gray = (d["tone"] as? String) == "gray"
+        let tint = gray ? UIColor(white: 0.40, alpha: 1) : GlassChromeItem.ink
+
+        let raw = (d["parts"] as? [[String: Any]]) ?? []
+        let newParts: [Part] = raw.compactMap { p in
+            guard let id = p["id"] as? String else { return nil }
+            func num(_ k: String) -> CGFloat { CGFloat((p[k] as? NSNumber)?.doubleValue ?? 0) }
+            return Part(
+                id: id,
+                icon: (p["icon"] as? String) ?? "",
+                frame: CGRect(x: num("x"), y: num("y"), width: num("w"), height: num("h")),
+                dot: (p["dot"] as? Bool) == true
+            )
+        }
+        let key = newParts.map { "\($0.id)|\($0.icon)|\($0.dot)" }.joined(separator: ";") + (gray ? "#g" : "#i")
+        if key != partsKey {
+            partsKey = key
+            buttons.forEach { $0.removeFromSuperview() }
+            dots.forEach { $0.removeFromSuperview() }
+            buttons = []
+            dots = []
+            for part in newParts {
+                let b = UIButton(type: .system)
+                var config = UIButton.Configuration.plain()
+                config.baseForegroundColor = tint
+                config.contentInsets = .zero
+                if let name = glassSymbols[part.icon] {
+                    config.image = UIImage(
+                        systemName: name,
+                        withConfiguration: UIImage.SymbolConfiguration(pointSize: gray ? 19 : 21, weight: .medium)
+                    )
+                }
+                b.configuration = config
+                b.tintColor = tint
+                let pid = part.id
+                b.addAction(UIAction { [weak self] _ in
+                    Haptics.play("light")
+                    self?.onTap?(pid, 0)
+                }, for: .touchUpInside)
+                glass.contentView.addSubview(b)
+                buttons.append(b)
+
+                let dot = UIView()
+                dot.backgroundColor = UIColor(white: 0.29, alpha: 1)
+                dot.layer.borderColor = UIColor.white.cgColor
+                dot.layer.borderWidth = 2
+                dot.isHidden = !part.dot
+                dot.isUserInteractionEnabled = false
+                glass.contentView.addSubview(dot)
+                dots.append(dot)
+            }
+        }
+        parts = newParts
+
+        hasSearch = d["placeholder"] != nil
+        if hasSearch {
+            if searchIcon.superview == nil {
+                glass.contentView.addSubview(searchIcon)
+                glass.contentView.addSubview(field)
+            }
+            let ph = (d["placeholder"] as? String) ?? ""
+            if field.placeholder != ph {
+                field.attributedPlaceholder = NSAttributedString(
+                    string: ph,
+                    attributes: [.foregroundColor: UIColor(white: 0.55, alpha: 1), .font: UIFont.systemFont(ofSize: 17)]
+                )
+            }
+            let text = (d["text"] as? String) ?? ""
+            if !field.isFirstResponder, field.text != text { field.text = text }
+        } else {
+            searchIcon.removeFromSuperview()
+            field.removeFromSuperview()
+        }
+        setNeedsLayout()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        glass.frame = bounds
+        for (i, part) in parts.enumerated() where i < buttons.count {
+            buttons[i].frame = part.frame
+            let s: CGFloat = 11
+            dots[i].frame = CGRect(x: part.frame.maxX - s - 8, y: part.frame.minY + 6, width: s, height: s)
+            dots[i].layer.cornerRadius = s / 2
+        }
+        if hasSearch {
+            let h = bounds.height
+            searchIcon.frame = CGRect(x: 16, y: (h - 22) / 2, width: 22, height: 22)
+            let firstX = parts.map { $0.frame.minX }.min() ?? bounds.width
+            field.frame = CGRect(x: 44, y: 0, width: max(0, firstX - 44 - 4), height: h)
         }
     }
 }
