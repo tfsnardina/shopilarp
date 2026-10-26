@@ -1451,13 +1451,10 @@ img.fs-art{width:56%;right:2px;bottom:10px;-webkit-touch-callout:none;-webkit-us
 
 /* ── Live View : page qui arrive de la droite (comme une commande), croix en liquid glass, sans bandeau blanc ── */
 .page.lvpage{background:#f7f7f7}
-.page.lvpage .pg-nav.lv-nav{position:absolute;top:0;left:0;right:0;z-index:6;min-height:0;display:flex;align-items:center;gap:10px;padding:calc(var(--top) + 6px) 14px 24px;background:linear-gradient(180deg,#f7f7f7 0,rgba(247,247,247,.9) 52%,rgba(247,247,247,0));pointer-events:none}
-.page.lvpage .lv-nav .pg-t{flex:1;margin:0;font-size:17px;font-weight:650;text-align:center;color:#111;text-shadow:0 0 12px rgba(247,247,247,.9)}
-.page.lvpage .lv-sp{width:44px;height:44px;flex:none}
-.page.lvpage .lv-nav .nb-c,.page.lvpage .lv-nav .lv-x{pointer-events:auto;display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none;border-radius:50%;color:#111;background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(20px) saturate(190%);backdrop-filter:blur(20px) saturate(190%);box-shadow:inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(0,0,0,.04),inset 0 0 0 .5px rgba(0,0,0,.1),0 6px 18px rgba(0,0,0,.12);transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
-.page.lvpage .lv-nav .nb-c:active{transform:scale(.9)}
-.page.lvpage .lv-nav .nb-c .ic{width:20px;height:20px}
-.page.lvpage .pg-b{padding:calc(var(--top) + 62px) 16px calc(var(--bot) + 28px)}
+/* Live View : même en-tête que les fiches commande / produit (barre fixe, croix à gauche, titre centré) */
+.page.lvpage .pg-nav.lv-nav{background:#fff}
+.page.lvpage .lv-sp{width:40px;height:40px;flex:none}
+.page.lvpage .pg-b{background:#f7f7f7;padding:12px 16px calc(var(--bot) + 28px)}
 .page.lvpage .lvw{display:block}
 
 /* Live View : cartes arrondies comme « Ventes totales », chiffres qui ne bougent pas */
