@@ -1003,10 +1003,10 @@
     }
     /* Everything is driven by ONE requestAnimationFrame spring: the content follows the finger directly while
        dragging, and on release it glides (velocity preserved, no overshoot) to the hold position / back to 0. */
-    var cur = 0, vel = 0, tgt = 0, raf = 0, last = 0, onDone = null, loading = false;
+    var cur = 0, vel = 0, tgt = 0, raf = 0, last = 0, onDone = null, loading = false, quiet = false, touching = false, lastTop = 0, lastTs = 0, peakV = 0, peakTs = 0;
     function apply(s) {
       var els = bodyEls(), ptr = ptrEl(), t = s > 0.05 ? "translate3d(0," + s.toFixed(2) + "px,0)" : "";
-      if (nativePtr) ptrPost({ s: "pull", y: Math.max(0, s) });
+      if (nativePtr && !quiet) ptrPost({ s: "pull", y: Math.max(0, s) });
       els.forEach(function (el) {
         el.style.transition = "none";
         el.style.willChange = t ? "transform" : "";
@@ -1045,6 +1045,7 @@
     function reset() { x0 = y0 = null; pull = shift = 0; axis = null; }
     var lastT = 0;
     sc.addEventListener("touchstart", function (e) {
+      touching = true; quiet = false;
       if (busy || raf || e.touches.length !== 1 || sc.scrollTop > 0) { reset(); return; }
       x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; pull = shift = 0; axis = null;
       cur = vel = 0; loading = false; lastT = 0;
@@ -1085,8 +1086,22 @@
         home(function () { loading = false; busy = false; renderHome(); });
       }, 800);
     }
-    sc.addEventListener("touchend", end);
-    sc.addEventListener("touchcancel", function () { var had = cur; reset(); if (had) home(); });
+    sc.addEventListener("touchend", function () { touching = false; end(); });
+    sc.addEventListener("touchcancel", function () { touching = false; var had = cur; reset(); if (had) home(); });
+    /* Rebond en HAUT sur un lancer (sans toucher) : le contenu sous l'en-tête tape le haut puis revient au ressort,
+       sans spinner et sans toucher au refresh (quiet) ; un nouveau toucher reprend la main normalement. */
+    sc.addEventListener("scroll", function () {
+      var now = performance.now(), top = sc.scrollTop;
+      if (lastTs && now > lastTs) {
+        var v = (lastTop - top) / ((now - lastTs) / 1000);
+        if (v > peakV * 0.6 || now - peakTs > 120) { peakV = Math.max(v, 0); peakTs = now; }
+      }
+      lastTop = top; lastTs = now;
+      if (!touching && !raf && !busy && top <= 0 && peakV > 300 && now - peakTs < 150) {
+        quiet = true; cur = 0; vel = Math.min(2600, peakV * 0.85); peakV = 0; tgt = 0; onDone = function () { clearInline(); quiet = false; };
+        last = performance.now(); raf = requestAnimationFrame(step);
+      }
+    }, { passive: true });
   }
 
   /* ── Orders ──────────────────────────────────────────────── */
@@ -3662,7 +3677,7 @@
       sc._glPtr = true;
       var THRESH = 90, HOLD = 70, MAXPULL = 170;
       var x0 = null, y0 = null, axis = null, busy = false, shift = 0;
-      var cur = 0, vel = 0, tgt = 0, raf = 0, last = 0, onDone = null, lastT = 0;
+      var cur = 0, vel = 0, tgt = 0, raf = 0, last = 0, onDone = null, lastT = 0, quiet = false, touching = false, lastTop = 0, lastTs = 0, pkUp = 0, pkDn = 0, pkTs = 0;
       function active() { return current === name && !(typeof stack !== "undefined" && stack.length) && !(typeof pSel !== "undefined" && pSel && name === "products"); }
       function els() {
         var body = sc.querySelector(".gl-body"), out = [];
@@ -3670,8 +3685,8 @@
         return out;
       }
       function apply(v) {
-        var t = v > 0.05 ? "translate3d(0," + v.toFixed(2) + "px,0)" : "";
-        post({ s: "pull", y: Math.max(0, v) });
+        var t = Math.abs(v) > 0.05 ? "translate3d(0," + v.toFixed(2) + "px,0)" : "";
+        if (!quiet) post({ s: "pull", y: Math.max(0, v) });
         els().forEach(function (el) { el.style.transition = "none"; el.style.willChange = t ? "transform" : ""; el.style.transform = t; });
       }
       function clear() { els().forEach(function (el) { el.style.transition = ""; el.style.transform = ""; el.style.willChange = ""; }); }
@@ -3686,6 +3701,7 @@
       function home(done) { springTo(0, function () { clear(); if (done) done(); }); }
       function reset() { x0 = y0 = null; axis = null; shift = 0; }
       sc.addEventListener("touchstart", function (e) {
+        touching = true; quiet = false;
         if (busy || raf || e.touches.length !== 1 || sc.scrollTop > 0 || !active()) { reset(); return; }
         x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; axis = null; shift = 0; cur = vel = 0; lastT = 0;
         var anchor = sc.querySelector(".gl-tools") || sc.querySelector(".gl-hd");
@@ -3717,40 +3733,58 @@
           home(function () { busy = false; try { refreshAll(); } catch (e) { } });
         }, 800);
       }
-      sc.addEventListener("touchend", end);
-      sc.addEventListener("touchcancel", function () { var had = cur; reset(); if (had) home(); });
+      sc.addEventListener("touchend", function () { touching = false; end(); });
+      sc.addEventListener("touchcancel", function () { touching = false; var had = cur; reset(); if (had) home(); });
+      /* Rebond sur un lancer, en haut (vers le bas) et en bas (vers le haut) : la liste seule bouge, l'en-tête reste fixe. */
+      sc.addEventListener("scroll", function () {
+        var now = performance.now(), top = sc.scrollTop;
+        if (lastTs && now > lastTs) {
+          var v = (top - lastTop) / ((now - lastTs) / 1000);
+          if (Math.abs(v) > 300 && (now - pkTs > 120 || Math.abs(v) > Math.abs(pkUp))) { pkUp = v; pkTs = now; }
+        }
+        lastTop = top; lastTs = now;
+        if (touching || raf || busy || !active() || now - pkTs > 150) return;
+        var atTop = top <= 0 && pkUp < -300, atBot = top + sc.clientHeight >= sc.scrollHeight - 1 && pkUp > 300;
+        if (!atTop && !atBot) return;
+        quiet = true; cur = 0; tgt = 0;
+        vel = atTop ? Math.min(2600, -pkUp * 0.85) : -Math.min(2600, pkUp * 0.85); pkUp = 0;
+        onDone = function () { clear(); quiet = false; };
+        last = performance.now(); raf = requestAnimationFrame(step);
+      }, { passive: true });
     }
     bind("s-orders", "orders"); bind("s-products", "products");
   })();
-  /* Rebond en BAS de l'accueil : le rubber-band natif est désactivé sur cette page (il ferait bouger l'en-tête en haut),
-     donc on le recrée en bas : en tirant au-delà de la fin la page suit le doigt avec une résistance, et en arrivant
-     en bas sur un lancer la page « tape » puis revient en douceur (ressort). */
+  /* Rebond en BAS de l'accueil (le rubber-band natif est coupé sur cette page pour ne pas fausser le tirer-pour-rafraîchir).
+     Même physique qu'iOS : résistance « rubber-band » en tirant (f = (1 - 1/(x·0.55/d + 1))·d), à la fin du geste le
+     ressort repart avec la VITESSE DU DOIGT, et sur un lancer la page tape le bas avec la vitesse du défilement. */
   (function () {
     var sc = document.getElementById("s-home"); if (!sc || sc._btmBounce) return;
     sc._btmBounce = true;
-    var MAXB = 90, cur = 0, vel = 0, raf = 0, last = 0, dragging = false, anchor = null, y0 = null, x0 = null, axis = null;
-    var lastTop = 0, lastTs = 0, sv = 0;
+    var cur = 0, vel = 0, raf = 0, last = 0, touching = false, anchor = null, y0 = null, x0 = null, axis = null, lastT = 0;
+    var lastTop = 0, lastTs = 0, peakV = 0, peakTs = 0;
     function kids() { return Array.prototype.slice.call(sc.children); }
     function atBottom() { return sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1; }
+    function rb(x) { var d = sc.clientHeight || 700; return (1 - 1 / (x * 0.55 / d + 1)) * d; }
     function apply(v) {
       var t = v < -0.05 ? "translate3d(0," + v.toFixed(2) + "px,0)" : "";
       if (t) sc.style.setProperty("background", "#fff", "important"); else sc.style.removeProperty("background");
       kids().forEach(function (el) { el.style.transition = "none"; el.style.willChange = t ? "transform" : ""; el.style.transform = t; });
     }
+    function clean() { sc.style.removeProperty("background"); kids().forEach(function (el) { el.style.transition = ""; el.style.transform = ""; el.style.willChange = ""; }); }
     function step(ts) {
       var dt = Math.min(0.032, Math.max(0.001, (ts - last) / 1000)); last = ts;
-      var K = 190, C = 2 * Math.sqrt(K) * 0.9;
+      var K = 150, C = 2 * Math.sqrt(K) * 0.82;           // légèrement sous-amorti : revient vite, un seul petit dépassement
       vel += (K * (0 - cur) - C * vel) * dt; cur += vel * dt;
       if (cur > 0) { cur = 0; if (vel > 0) vel = 0; }
-      if (Math.abs(cur) < 0.2 && Math.abs(vel) < 3) { cur = 0; vel = 0; raf = 0; apply(0); kids().forEach(function (el) { el.style.transition = ""; el.style.transform = ""; el.style.willChange = ""; }); return; }
+      if (Math.abs(cur) < 0.15 && Math.abs(vel) < 4) { cur = 0; vel = 0; raf = 0; clean(); return; }
       apply(cur); raf = requestAnimationFrame(step);
     }
     function run() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(step); } }
     sc.addEventListener("touchstart", function (e) {
       if (e.touches.length !== 1 || !sc.classList.contains("on")) { y0 = null; return; }
       if (raf) { cancelAnimationFrame(raf); raf = 0; }
-      dragging = true; anchor = null; axis = null; vel = 0;
-      y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; cur = 0; apply(0);
+      touching = true; anchor = null; axis = null; vel = 0; lastT = 0; peakV = 0;
+      y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; cur = 0; clean();
     }, { passive: true });
     sc.addEventListener("touchmove", function (e) {
       if (y0 === null) return;
@@ -3764,19 +3798,24 @@
       if (anchor === null) anchor = y;
       var over = anchor - y;
       if (over <= 0) { anchor = y; if (cur) { cur = 0; apply(0); } return; }
-      cur = -MAXB * (1 - Math.exp(-over / 160));
+      var ns = -rb(over), now = e.timeStamp || performance.now();
+      if (lastT && now > lastT) vel = Math.max(-4000, Math.min(4000, (ns - cur) / ((now - lastT) / 1000)));
+      lastT = now; cur = ns;
       if (e.cancelable) e.preventDefault();
       apply(cur);
     }, { passive: false });
-    function release() { dragging = false; y0 = null; anchor = null; if (cur) { vel = 0; run(); } }
+    function release() { touching = false; y0 = null; anchor = null; if (cur) { if (vel < 0) vel = 0; run(); } }
     sc.addEventListener("touchend", release);
     sc.addEventListener("touchcancel", release);
     sc.addEventListener("scroll", function () {
       var now = performance.now(), top = sc.scrollTop;
-      if (lastTs && now > lastTs) { var v = (top - lastTop) / ((now - lastTs) / 1000); sv = sv * 0.5 + v * 0.5; }
+      if (lastTs && now > lastTs) {
+        var v = (top - lastTop) / ((now - lastTs) / 1000);
+        if (v > peakV * 0.6 || now - peakTs > 120) { peakV = Math.max(v, 0); peakTs = now; }
+      }
       lastTop = top; lastTs = now;
-      if (!dragging && sv > 350 && atBottom() && !cur) {
-        cur = 0; vel = -Math.min(1100, sv * 0.7); sv = 0; run();
+      if (!touching && !raf && atBottom() && peakV > 300 && now - peakTs < 150) {
+        cur = 0; vel = -Math.min(2600, peakV * 0.85); peakV = 0; run();
       }
     }, { passive: true });
   })();
