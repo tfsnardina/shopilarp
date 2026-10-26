@@ -117,6 +117,8 @@
     var dec = S.dec == null ? 2 : S.dec; // 0 for JPY/KRW
     var whole = opt.whole || (opt.auto && v >= 1000);
     var s = v.toLocaleString(S.loc || "en-US", { minimumFractionDigits: whole ? 0 : dec, maximumFractionDigits: whole ? 0 : dec });
+    // Euro : symbole après le montant (« 2,00 € »), sauf demande explicite (opt.pre) comme sur l'accueil Shopify (« €184,25 »).
+    if (S.cur === "EUR" && !opt.pre) return (neg ? "-" : "") + s + "\u00A0" + S.sym.trim();
     return (neg ? "-" : "") + S.sym + s;
   }
   function compact(v, isMoney) {
@@ -437,8 +439,8 @@
     if (!pv) return cv ? null : 0;
     return ((cv - pv) / Math.abs(pv)) * 100;
   }
-  function fmtMet(k, v, strip) {
-    return k === "money" ? (strip ? money(v, { auto: true }) : money(v)) : k === "pct" ? pctStr(v) : count(v);
+  function fmtMet(k, v, strip, pre) {
+    return k === "money" ? (strip ? money(v, { auto: true, pre: true }) : money(v, { pre: !!pre })) : k === "pct" ? pctStr(v) : count(v);
   }
   function chgHtml(c, cls) {
     if (c === null) return "";
@@ -905,7 +907,7 @@
       lbl = md(S.day0 + di * DAY + 12 * HOUR) + (R.step > 1 ? " – " + md(S.day0 + Math.min(T, di + R.step - 1) * DAY + 12 * HOUR) : "");
       plbl = md(S.day0 + pdi * DAY + 12 * HOUR);
     }
-    tip.innerHTML = '<div><i class="sw cur"></i><span>' + esc(lbl) + "</span><b>" + (cur == null ? "–" : fmtMet(M.k, cur)) + '</b></div><div><i class="sw prv"></i><span>' + esc(plbl) + "</span><b>" + (pv == null ? "–" : fmtMet(M.k, pv)) + "</b></div>";
+    tip.innerHTML = '<div><i class="sw cur"></i><span>' + esc(lbl) + "</span><b>" + (cur == null ? "–" : fmtMet(M.k, cur, false, true)) + '</b></div><div><i class="sw prv"></i><span>' + esc(plbl) + "</span><b>" + (pv == null ? "–" : fmtMet(M.k, pv, false, true)) + "</b></div>";
     var x = g.X(i), w = 210, host = $("#hchart");
     var left = Math.max(12, Math.min(host.clientWidth - w - 4, x - w / 2));
     tip.style.transform = "translateX(" + left + "px)";
@@ -3640,6 +3642,16 @@
       inp.value = text; inp.dispatchEvent(new Event("input", { bubbles: true }));
     };
     kick(1500);
+  })();
+  /* Rebond en haut : l'en-tête et la recherche restent en place (comme le verre natif), seule la liste rebondit. */
+  (function () {
+    document.addEventListener("scroll", function (e) {
+      var sc = e.target;
+      if (!sc || !sc.classList || !sc.classList.contains("gl-scr")) return;
+      var st = sc.scrollTop, y = st < 0 ? st : 0;
+      var els = sc.querySelectorAll(".gl-hd, .gl-tools");
+      for (var i = 0; i < els.length; i++) els[i].style.transform = y ? "translate3d(0," + y + "px,0)" : "";
+    }, { capture: true, passive: true });
   })();
   /* Hauteur du clavier -> --kb (relais natif via Swift, repli visualViewport sur le web) */
   (function () {
