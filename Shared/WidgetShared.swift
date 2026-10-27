@@ -17,6 +17,7 @@ struct ShopifyWidgetSnapshot: Codable {
     var sym: String = "$"
     var cur: String = "USD"
     var dec: Int = 2
+    var lang: String = ""       // langue choisie dans l'app (fr / en / es / de)
     var ts: Double = 0          // ms epoch de la dernière mise à jour
     var off: Double = 0         // décalage horaire de la boutique (ms)
     var dayEnd: Double = 0      // ms epoch de la fin du jour boutique
@@ -44,6 +45,7 @@ struct ShopifyWidgetSnapshot: Codable {
         sym = try c.decodeIfPresent(String.self, forKey: .sym) ?? "$"
         cur = try c.decodeIfPresent(String.self, forKey: .cur) ?? "USD"
         dec = try c.decodeIfPresent(Int.self, forKey: .dec) ?? 2
+        lang = try c.decodeIfPresent(String.self, forKey: .lang) ?? ""
         ts = try c.decodeIfPresent(Double.self, forKey: .ts) ?? 0
         off = try c.decodeIfPresent(Double.self, forKey: .off) ?? 0
         dayEnd = try c.decodeIfPresent(Double.self, forKey: .dayEnd) ?? 0
@@ -62,7 +64,7 @@ struct ShopifyWidgetSnapshot: Codable {
     }
 
     private enum Keys: String, CodingKey {
-        case store, sym, cur, dec, ts, off, dayEnd, s, o, se, net, ps, po, pse, pnet, hs, ho, he, plan
+        case store, sym, cur, lang, dec, ts, off, dayEnd, s, o, se, net, ps, po, pse, pnet, hs, ho, he, plan
     }
 }
 
@@ -97,17 +99,35 @@ enum ShopifyWidgetStore {
 
     static var defaults: UserDefaults? { UserDefaults(suiteName: groupID) }
 
+    /// Fichier dans le conteneur de l'App Group : lu à chaque fois depuis le disque (pas de cache UserDefaults périmé).
+    private static var fileURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID)?
+            .appendingPathComponent("shopify-widget-snapshot.json")
+    }
+
     @discardableResult
     static func save(json: String) -> Bool {
-        guard let d = defaults else { return false }
-        d.set(json, forKey: key)
-        return true
+        var ok = false
+        if let u = fileURL, (try? json.data(using: .utf8)?.write(to: u, options: .atomic)) != nil { ok = true }
+        if let d = defaults { d.set(json, forKey: key); d.synchronize(); ok = true }
+        return ok
+    }
+
+    private static func decode(_ raw: String?) -> ShopifyWidgetSnapshot? {
+        guard let raw = raw, let data = raw.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(ShopifyWidgetSnapshot.self, from: data)
     }
 
     static func load() -> ShopifyWidgetSnapshot? {
-        guard let raw = defaults?.string(forKey: key),
-              let data = raw.data(using: .utf8),
-              let snap = try? JSONDecoder().decode(ShopifyWidgetSnapshot.self, from: data) else { return nil }
-        return snap
+        var fromFile: ShopifyWidgetSnapshot?
+        if let u = fileURL, let d = try? Data(contentsOf: u) { fromFile = decode(String(data: d, encoding: .utf8)) }
+        let fromDefaults = decode(defaults?.string(forKey: key))
+        // On garde la plus récente des deux sources.
+        switch (fromFile, fromDefaults) {
+        case let (a?, b?): return a.ts >= b.ts ? a : b
+        case let (a?, nil): return a
+        case let (nil, b?): return b
+        default: return nil
+        }
     }
 }
