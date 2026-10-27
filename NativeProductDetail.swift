@@ -367,6 +367,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
     private var collections: [String]
     private var variants: String
     private var physical: Bool
+    private var fee: Double
     private var img: String
     private var imgImage: UIImage?
     private var savedSnapshot = ""
@@ -422,6 +423,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         collections = cols.isEmpty ? [dtr("Page d'accueil", "Home page")] : cols
         variants = (info["vars"] as? String) ?? ""
         physical = (info["physical"] as? NSNumber)?.boolValue ?? true
+        fee = max(0, (info["fee"] as? NSNumber)?.doubleValue ?? 0)
         let imgString = (info["img"] as? String) ?? ""
         img = imgString
         imgImage = PCImage.image(fromDataURL: imgString)
@@ -712,7 +714,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         content.addArrangedSubview(PCDetailCard(rows: [stockRow]))
 
         // Expédition · Type · Fournisseur · Collections · Balises · SEO.
-        let shippingRow = PCDRow(symbol: "box.truck", title: dtr("Expédition", "Shipping"), bold: true)
+        let shippingRow = PCDRow(symbol: "box.truck", title: dtr("Expédition et frais de service", "Shipping & service fee"), bold: true)
         shippingRow.onTap { [weak self] in self?.openShipping() }
         typeRow.onTap { [weak self] in self?.pickType() }
         vendorRow.onTap { [weak self] in self?.pickVendor() }
@@ -849,6 +851,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         parts.append(collections.joined(separator: "|"))
         parts.append(variants)
         parts.append(physical ? "1" : "0")
+        parts.append(String(fee))
         parts.append(String(img.count))
         parts.append(String(img.suffix(24)))
         return parts.joined(separator: "\u{1E}")
@@ -987,8 +990,9 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
     }
 
     private func openShipping() {
-        let sheet = PCShippingSheet(physical: physical)
+        let sheet = PCShippingSheet(physical: physical, fee: fee, currency: currency)
         sheet.onChange = { [weak self] v in self?.physical = v; self?.refresh() }
+        sheet.onFeeChange = { [weak self] v in self?.fee = v; self?.refresh() }
         present(sheet, animated: true)
     }
 
@@ -1008,6 +1012,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
             "collections": collections,
             "vars": variants,
             "physical": physical,
+            "fee": fee,
             "img": img,
         ]
     }
