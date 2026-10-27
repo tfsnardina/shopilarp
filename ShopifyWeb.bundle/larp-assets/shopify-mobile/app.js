@@ -218,6 +218,9 @@
     p.tags = Array.isArray(c.tags) ? c.tags.slice() : (p.tags || []);
     p.collections = Array.isArray(c.collections) ? c.collections.slice() : (p.collections || null);
     p.physical = c.physical === false ? false : (p.physical !== false);
+    // Service fee: added on top of the price for every unit sold (minor units, like price).
+    if (c.fee !== undefined && c.fee !== null) p.fee = Math.max(0, Math.round((Number(c.fee) || 0) * Math.pow(10, S.dec != null ? S.dec : 2)));
+    else p.fee = p.fee > 0 ? p.fee : 0;
   }
   function splitVariants(v) { return String(v || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 12); }
   // Products created in the app (or edited in Preferences) after the saved payload was built are added back,
@@ -1817,6 +1820,7 @@
     var taxSub = VAT ? T("Included") : o.reg + " " + (o.rate * 100).toFixed(o.rate * 1000 % 10 ? 3 : 2).replace(/0+$/, "").replace(/\.$/, "") + "%";
     var lines = [{ l: T("Subtotal"), s: T(n_ + " item" + (n_ === 1 ? "" : "s")), v: money(o.sub) }];
     if (o.disc) lines.push({ l: T("Discount"), s: o.code || T("Custom discount"), v: "-" + money(o.disc) });
+    if (o.fee) lines.push({ l: T("Service fee"), s: "", v: money(o.fee) });
     lines.push({ l: T("Shipping"), s: T(o.shipM), v: money(o.ship) });
     lines.push({ l: T("Taxes"), s: taxSub, v: money(o.tax) });
     var paid = [{ l: T(o.pay === "Authorized" ? "Authorized" : o.pay === "Payment pending" ? "Expected payment" : "Paid"), s: "", v: money(o.total) }];
@@ -1899,6 +1903,7 @@
     var paySec = '<div class="sec"><div class="sec-h">' + payBadge(o) + "</div>" +
       '<div class="kv"><div><span>Subtotal</span><span>' + n_ + " item" + (n_ === 1 ? "" : "s") + "</span><b>" + money(o.sub) + "</b></div>" +
       (o.disc ? "<div><span>Discount</span><span>" + esc(o.code || "Custom discount") + "</span><b>-" + money(o.disc) + "</b></div>" : "") +
+      (o.fee ? "<div><span>Service fee</span><span></span><b>" + money(o.fee) + "</b></div>" : "") +
       "<div><span>Shipping</span><span>" + esc(o.shipM) + "</span><b>" + money(o.ship) + "</b></div>" +
       (VAT ? "<div><span>Taxes</span><span>Included</span><b>" + money(o.tax) + "</b></div>" : "<div><span>Taxes</span><span>" + esc(o.reg) + " " + (o.rate * 100).toFixed(o.rate * 1000 % 10 ? 3 : 2).replace(/0+$/, "").replace(/\.$/, "") + "%</span><b>" + money(o.tax) + "</b></div>") +
       '<div class="tot"><span>Total</span><span></span><b>' + money(o.total) + "</b></div></div>" +
@@ -1979,7 +1984,7 @@
     return { mode: "edit", idx: p.i, id: p.pid || "", sym: S.sym, shop: S.name || "", canDelete: !!EMPTY,
       title: p.title, desc: p.desc || "", category: p.category || "", price: p.price / f, inv: p.inv,
       vendor: p.vendor || S.name || "", type: p.type && p.type !== "General" ? p.type : "", status: p.status || "Active",
-      tags: p.tags || [], collections: p.collections || null, vars: real ? p.vnames.join(", ") : "", physical: p.physical !== false, img: p.img || "" };
+      tags: p.tags || [], collections: p.collections || null, vars: real ? p.vnames.join(", ") : "", physical: p.physical !== false, fee: (p.fee || 0) / f, img: p.img || "" };
   }
   function openProduct(i) {
     var p = prods[i]; if (!p) return;
@@ -2032,12 +2037,12 @@
     var id = "p-" + Date.now(), share = Math.max(1, Math.round(100 / (idx + 1)));
     var p = { i: idx, pid: id, title: d.title, price: Math.round(d.price * f), compare: d.compare > d.price ? Math.round(d.compare * f) : 0, inv: d.inv, vars: Math.max(1, vn.length || 1), vnames: vn.length ? vn : ["Default"], type: d.type || "General", vendor: d.vendor || S.name, sku: d.sku || (code + "-" + (1000 + idx)), status: d.status, sold: 0, ts: nowMs(), hue: HUES[idx % HUES.length], img: d.img, share: share };
     p.baseInv = p.inv;
-    prodExtras(p, { description: d.desc || "", category: d.category || "", tags: d.tags || [], collections: d.collections || null, physical: d.physical });
+    prodExtras(p, { description: d.desc || "", category: d.category || "", tags: d.tags || [], collections: d.collections || null, physical: d.physical, fee: d.fee });
     prods.push(p);
     // Written into the saved settings too: Preferences lists it and Done keeps it.
     var cfg = savedSettingsObj();
     if (!Array.isArray(cfg.products)) cfg.products = [];
-    cfg.products.push({ id: id, title: p.title, price: d.price, compare: d.compare > d.price ? d.compare : 0, allocationPct: share, inventory: d.inv, variants: vn.join(", "), image: d.img, status: p.status, type: p.type, sku: p.sku, ts: p.ts, vendor: p.vendor, description: p.desc, category: p.category, tags: p.tags, collections: p.collections, physical: p.physical });
+    cfg.products.push({ id: id, title: p.title, price: d.price, compare: d.compare > d.price ? d.compare : 0, allocationPct: share, inventory: d.inv, variants: vn.join(", "), image: d.img, status: p.status, type: p.type, sku: p.sku, ts: p.ts, vendor: p.vendor, description: p.desc, category: p.category, tags: p.tags, collections: p.collections, physical: p.physical, fee: (p.fee || 0) / f });
     writeSettings(cfg);
     return p;
   }
@@ -2114,7 +2119,7 @@
   }
   window.__larpNativeProductSave = function (n) {
     createProduct({ title: n.title, price: n.price || 0, compare: 0, inv: n.inv || 0, sku: "", vars: n.vars || "", type: n.type || "", vendor: n.vendor || "", status: n.status === "Draft" ? "Draft" : "Active", img: typeof n.img === "string" ? n.img : "",
-      desc: n.desc || "", category: n.category || "", tags: n.tags || [], collections: n.collections || null, physical: n.physical });
+      desc: n.desc || "", category: n.category || "", tags: n.tags || [], collections: n.collections || null, physical: n.physical, fee: n.fee });
     pFilter = "All"; pQuery = ""; rendered.products = 0;
     if (current === "products") renderProducts();
     setTimeout(function () { toast("Product saved"); }, 320);
@@ -2132,7 +2137,7 @@
     p.type = n.type || "General"; p.vendor = n.vendor || S.name;
     p.status = n.status === "Draft" || n.status === "Archived" || n.status === "Unlisted" ? n.status : "Active";
     if (typeof n.img === "string") p.img = n.img.indexOf("data:image/") === 0 ? n.img : "";
-    prodExtras(p, { description: n.desc || "", category: n.category || "", tags: n.tags || [], collections: n.collections || null, physical: n.physical });
+    prodExtras(p, { description: n.desc || "", category: n.category || "", tags: n.tags || [], collections: n.collections || null, physical: n.physical, fee: n.fee });
     if (p.pid) {
       var cfg = savedSettingsObj(), hit = null;
       if (!Array.isArray(cfg.products)) cfg.products = [];
@@ -2140,7 +2145,7 @@
       if (!hit) { hit = { id: p.pid, ts: p.ts, allocationPct: p.share }; cfg.products.push(hit); }
       hit.title = p.title; hit.price = p.price / f; hit.compare = p.compare ? p.compare / f : 0; hit.inventory = p.baseInv;
       hit.variants = p.vnames[0] === "Default" ? "" : p.vnames.join(", "); hit.image = p.img; hit.status = p.status; hit.type = p.type; hit.sku = p.sku;
-      hit.vendor = p.vendor; hit.description = p.desc; hit.category = p.category; hit.tags = p.tags; hit.collections = p.collections; hit.physical = p.physical; hit.edited = true;
+      hit.vendor = p.vendor; hit.description = p.desc; hit.category = p.category; hit.tags = p.tags; hit.collections = p.collections; hit.physical = p.physical; hit.fee = (p.fee || 0) / f; hit.edited = true;
       writeSettings(cfg);
     }
     saveState();
@@ -2905,18 +2910,46 @@
     o.ful = "Unfulfilled"; o.pay = Math.random() < 0.05 ? "Authorized" : "Paid"; o.fat = 0; o.carrier = ""; o.trk = ""; o.refunded = 0; o.archived = false; o.note = "";
     return o;
   }
+  /* ── Fixed taxes, shipping and service fees ─────────────────
+     No more values copied from a random demo order: every order uses the same rules.
+     Optional overrides in the saved settings: taxRate (%), shippingFee and freeShippingOver (store currency). */
+  var TAX_BY_COUNTRY = { US: 0.0825, CA: 0.13, GB: 0.20, FR: 0.20, DE: 0.19, ES: 0.21, IT: 0.22, NL: 0.21, BE: 0.21, PT: 0.23, IE: 0.23, AT: 0.20, CH: 0.081, AU: 0.10, JP: 0.10 };
+  function cfgNum(k) { var v = CFG ? CFG[k] : undefined; if (v === undefined || v === null || v === "") return null; v = Number(v); return isNaN(v) || v < 0 ? null : v; }
+  function taxRate() {
+    var c = cfgNum("taxRate"); if (c !== null) return c / 100;
+    return TAX_BY_COUNTRY[S.country] != null ? TAX_BY_COUNTRY[S.country] : (VAT ? 0.20 : 0.08);
+  }
+  function shipPrice() {
+    var dec = S.dec != null ? S.dec : 2, f = Math.pow(10, dec), c = cfgNum("shippingFee");
+    return Math.round((c !== null ? c : (dec === 0 ? 500 : 4.99)) * f);
+  }
+  function freeShipFrom() {
+    var dec = S.dec != null ? S.dec : 2, f = Math.pow(10, dec), c = cfgNum("freeShippingOver");
+    return Math.round((c !== null ? c : (dec === 0 ? 8000 : 60)) * f);
+  }
+  /* sub, fee, digital -> { ship, shipM, tax, rate, total } (disc is always 0 on generated orders) */
+  function orderCharges(sub, fee, digital) {
+    var r = taxRate(), ship = 0, shipM = "Standard Shipping";
+    if (digital) { shipM = "E-product (email delivery)"; }
+    else if (sub >= freeShipFrom()) { shipM = "Free Shipping"; }
+    else { ship = shipPrice(); }
+    var base = sub + fee, tax, total;
+    if (VAT) { tax = Math.round((base + ship) * r / (1 + r)); total = base + ship; }   // tax already included in the prices
+    else { tax = Math.round(base * r); total = base + ship + tax; }
+    return { ship: ship, shipM: shipM, tax: tax, rate: r, total: total };
+  }
   function makeOrder(lines, ts, srcIdx) {
     var src = P.ord[srcIdx != null ? srcIdx : Math.floor(Math.random() * Math.min(P.ord.length, 60))];
     if (!src) return null;
     var o = mkOrder(src);
     if (lines && lines.length) {
-      var ratio = (src[4] - src[5]) > 0 ? src[9] / (src[4] - src[5]) : 0;
       o.items = lines.map(function (l) { return { p: l[0], q: l[1], price: l[0].price }; });
       o.sub = o.items.reduce(function (a, x) { return a + x.price * x.q; }, 0);
+      o.fee = o.items.reduce(function (a, x) { return a + ((x.p && x.p.fee) || 0) * x.q; }, 0);
       o.disc = 0; o.code = "";
-      o.tax = Math.round(o.sub * ratio);
-      if (isDigital(o)) { o.ship = 0; o.shipM = "E-product (email delivery)"; o.street = ""; }
-      o.total = o.sub + o.ship + o.tax;
+      var dig = isDigital(o), ch = orderCharges(o.sub, o.fee, dig);
+      o.ship = ch.ship; o.shipM = ch.shipM; o.tax = ch.tax; o.rate = ch.rate; o.total = ch.total;
+      if (dig) o.street = "";
     }
     return freshOrder(o, ts);
   }
@@ -2935,7 +2968,7 @@
     }
     // The numbers move with it.
     var h = L(o.ts).getUTCHours();
-    D.s[T] += o.total; D.o[T] += 1; D.g[T] += o.sub; D.dc[T] += o.disc; D.sh[T] += o.ship; D.tx[T] += o.tax; D.u[T] += units(o);
+    D.s[T] += o.total; D.o[T] += 1; D.g[T] += o.sub; D.dc[T] += o.disc; D.sh[T] += o.ship + (o.fee || 0); D.tx[T] += o.tax; D.u[T] += units(o);
     var addSe = 1 + Math.floor(Math.random() * 3); D.se[T] += addSe;
     pend.sales += o.total / Math.pow(10, S.dec != null ? S.dec : 2); pend.orders += 1; pend.sess += addSe;
     HR.t[0][h] += o.total; HR.t[1][h] += 1; HR.t[2][h] += 1;
