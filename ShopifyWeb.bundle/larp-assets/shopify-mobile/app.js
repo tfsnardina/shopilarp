@@ -1667,6 +1667,7 @@
     if (pSel && name !== "products") { pSel = null; pBusy = false; rendered.products = 0; postSel(); }
     if (!rendered[name] || !keep) { RENDER[name](); rendered[name] = 1; }
     current = name;
+    if (name === "home" && rendered.home) refreshHome(false);
     $$(".scr").forEach(function (s) { s.classList.toggle("on", s.id === "s-" + name); });
     $$("#tabbar .tb").forEach(function (t) { t.classList.toggle("on", t.getAttribute("data-tab") === name); });
     moveInd();
@@ -2998,6 +2999,7 @@
       if (list && orderMatches(o)) { renderOrders(); var row = $('[data-order="' + o.n + '"]', $("#s-orders")); if (row) row.classList.add("fresh"); }
     } else rendered.orders = 0;
     if (current === "products" && !stack.length) rendered.products = 0;
+    rendered.menu = 0;   // Analytics / customers / finance are rebuilt from the new numbers next time they open
   }
   function newOrder() {
     // No products in the store => nobody can buy anything: never fall back to the demo products.
@@ -3118,11 +3120,40 @@
       setTimeout(function () { mv.parentNode.parentNode.classList.remove("bump"); }, 700);
       countTo(mv, from, to, function (x) { return fmtMet(M.k, x, true); }, 1100);
     });
-    $$(".met[data-met]:not(.on) .mv").forEach(function (el) { var k = el.closest(".met").getAttribute("data-met"); el.textContent = fmtMet(MET[k].k, MET[k].v(R.tot), true); });
-    var host = $("#hchart");
-    if (host && host._g) drawChart(host, R, homeMet, { h: CH });
-    var acts = $(".act[data-act=fulfill] b"); if (acts) { var u = unfulfilled().length; acts.textContent = u > 50 ? "50+" : u; }
+    refreshHome(true);
   }
+  /* LIVE REFRESH of the Home screen. Everything that depends on the numbers (tiles, % badges, mini trend lines, the
+     chart, the action cards, Top products) is recomputed in place, so nothing needs "Edit store -> Save" to catch up.
+     skipOn = the selected tile's number is already animated by the caller. Called on every new order, every few
+     seconds by a timer (new hour = new point on the "Today" chart), when the app comes back to the foreground and
+     when the Home tab is opened again. */
+  var homeSig = "";
+  function refreshHome(skipOn) {
+    var el = $("#s-home");
+    if (!el || !el.innerHTML || !$("#hchart")) return;
+    var R = rangeData(homeRange);
+    // tiles: value, % change and the tiny trend line of every copy of every metric
+    $$(".met[data-met]", el).forEach(function (b) {
+      var k = b.getAttribute("data-met"), M = MET[k], cv = M.v(R.tot), pv = M.v(R.ptot), c = change(cv, pv), on = k === homeMet;
+      var bb = $("b", b), mv = $(".mv", b); if (!bb || !mv) return;
+      if (!(on && skipOn)) mv.textContent = fmtMet(M.k, cv, true);
+      var dir = c === null || Math.round(c) === 0 ? "fl" : c > 0 ? "up" : "dn";
+      var vals = R.cur.map(M.v), step = Math.max(1, Math.floor(vals.length / 8)), sp = [];
+      for (var i = 0; i < vals.length; i += step) sp.push(vals.slice(i, i + step).reduce(function (a, v) { return a + v; }, 0));
+      $$(".spk, em", bb).forEach(function (n) { n.remove(); });
+      bb.insertAdjacentHTML("beforeend", (on ? "" : sparkSvg(dir === "fl" ? [1, 1] : sp, dir)) + chgHtml(c));
+    });
+    // chart: not while the finger is scrubbing it or while a metric / range transition is running
+    var host = $("#hchart"), busy = host.classList.contains("scrub") || host.querySelector(".hc-old");
+    var sig = [homeRange, homeMet, curHour(), R.cur.length, R.cur.map(MET[homeMet].v).join(","), R.prev.length].join("|");
+    if (!busy && (sig !== homeSig || !host._g)) { homeSig = sig; drawChart(host, R, homeMet, { h: CH }); }
+    var acts = $(".act[data-act=fulfill] b"); if (acts) { var u = unfulfilled().length; acts.textContent = u > 50 ? "50+" : u; }
+    var tp = $(".card.tp"), h = topProductsCard();
+    if (tp && h && tp._h !== h) { tp.outerHTML = h; tp = $(".card.tp"); if (tp) { tp._h = h; if (window.I18N) { try { window.I18N.apply(tp); } catch (e) { } } } }
+  }
+  setInterval(function () { if (!document.hidden && current === "home" && !stack.length) refreshHome(false); }, 5000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) { homeSig = ""; refreshHome(false); } });
+  window.addEventListener("pageshow", function () { homeSig = ""; refreshHome(false); });
   function banner(o) {
     var b = document.createElement("button");
     b.className = "bn";
