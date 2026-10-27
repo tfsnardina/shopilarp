@@ -87,29 +87,53 @@ enum ShopifyWidgetStore {
         return Bundle.main.bundleIdentifier ?? "com.checker.shopifylarp"
     }
 
-    /// Groupe réellement accessible : « group.<bundle id de l'app> » (AltStore / Sideloadly réécrivent le
-    /// groupe ainsi), sinon le groupe d'origine. On garde le premier dont le conteneur existe.
-    static let groupID: String = {
-        let candidates = ["group." + appBundleID, defaultGroup]
-        for id in candidates where FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) != nil {
-            return id
+    /// Groupes déclarés dans le profil de provisioning embarqué (c'est le vrai nom utilisé après signature
+    /// par AltStore / Sideloadly / etc., qui réécrivent l'identifiant du groupe).
+    private static func provisionedGroups(in bundleURL: URL) -> [String] {
+        let u = bundleURL.appendingPathComponent("embedded.mobileprovision")
+        guard let data = try? Data(contentsOf: u),
+              let start = data.range(of: Data("<?xml".utf8)),
+              let end = data.range(of: Data("</plist>".utf8)), start.lowerBound < end.upperBound,
+              let obj = try? PropertyListSerialization.propertyList(from: data.subdata(in: start.lowerBound..<end.upperBound),
+                                                                    options: [], format: nil) as? [String: Any],
+              let ent = obj["Entitlements"] as? [String: Any],
+              let groups = ent["com.apple.security.application-groups"] as? [String] else { return [] }
+        return groups
+    }
+
+    /// Tous les groupes réellement accessibles. L'app écrit dans chacun, le widget lit le plus récent :
+    /// peu importe comment l'app a été signée, les deux finissent par partager au moins un groupe.
+    static let groupIDs: [String] = {
+        var candidates: [String] = []
+        let main = Bundle.main.bundleURL
+        candidates += provisionedGroups(in: main)
+        if main.pathExtension == "appex" {
+            candidates += provisionedGroups(in: main.deletingLastPathComponent().deletingLastPathComponent())
         }
-        return candidates[0]
+        candidates += ["group." + appBundleID, defaultGroup]
+        var seen = Set<String>()
+        let unique = candidates.filter { seen.insert($0).inserted }
+        let ok = unique.filter { FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: $0) != nil }
+        return ok.isEmpty ? [unique[0]] : ok
     }()
 
-    static var defaults: UserDefaults? { UserDefaults(suiteName: groupID) }
+    /// false = aucun App Group n'est accessible (l'outil de signature l'a retiré) : app et widget ne peuvent rien partager.
+    static var hasGroup: Bool {
+        groupIDs.contains { FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: $0) != nil }
+    }
 
-    /// Fichier dans le conteneur de l'App Group : lu à chaque fois depuis le disque (pas de cache UserDefaults périmé).
-    private static var fileURL: URL? {
-        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID)?
+    private static func fileURL(_ group: String) -> URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)?
             .appendingPathComponent("shopify-widget-snapshot.json")
     }
 
     @discardableResult
     static func save(json: String) -> Bool {
         var ok = false
-        if let u = fileURL, (try? json.data(using: .utf8)?.write(to: u, options: .atomic)) != nil { ok = true }
-        if let d = defaults { d.set(json, forKey: key); d.synchronize(); ok = true }
+        for g in groupIDs {
+            if let u = fileURL(g), let data = json.data(using: .utf8), (try? data.write(to: u, options: .atomic)) != nil { ok = true }
+            if let d = UserDefaults(suiteName: g) { d.set(json, forKey: key); d.synchronize(); ok = true }
+        }
         return ok
     }
 
@@ -119,15 +143,13 @@ enum ShopifyWidgetStore {
     }
 
     static func load() -> ShopifyWidgetSnapshot? {
-        var fromFile: ShopifyWidgetSnapshot?
-        if let u = fileURL, let d = try? Data(contentsOf: u) { fromFile = decode(String(data: d, encoding: .utf8)) }
-        let fromDefaults = decode(defaults?.string(forKey: key))
-        // On garde la plus récente des deux sources.
-        switch (fromFile, fromDefaults) {
-        case let (a?, b?): return a.ts >= b.ts ? a : b
-        case let (a?, nil): return a
-        case let (nil, b?): return b
-        default: return nil
+        var best: ShopifyWidgetSnapshot?
+        for g in groupIDs {
+            var found: [ShopifyWidgetSnapshot] = []
+            if let u = fileURL(g), let d = try? Data(contentsOf: u), let sn = decode(String(data: d, encoding: .utf8)) { found.append(sn) }
+            if let sn = decode(UserDefaults(suiteName: g)?.string(forKey: key)) { found.append(sn) }
+            for sn in found where best == nil || sn.ts > best!.ts { best = sn }
         }
+        return best
     }
 }
