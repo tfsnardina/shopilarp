@@ -5,6 +5,7 @@ export const SHOPIFY_VIBES = [
   { id: 'declining', title: 'Declining', desc: 'Sales trending down.' },
   { id: 'newstore', title: 'New store', desc: 'Tiny numbers, just launched.' },
   { id: 'highrisk', title: 'High risk', desc: 'Choppy sales, lots of pending.' },
+  { id: 'slow', title: 'Slow day', desc: 'Never more than 10 visitors, about one order every 30-40 minutes or less.' },
   { id: 'visitors', title: 'Visitors only', desc: 'People browse the store, but no order ever comes in.' },
   { id: 'dead', title: 'Dead quiet', desc: 'No visitors and no orders at all.' },
 ]
