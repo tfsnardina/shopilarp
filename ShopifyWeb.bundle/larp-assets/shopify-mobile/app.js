@@ -2979,7 +2979,7 @@
      iOS freezes the page in the background, so those orders are planned in advance: each one becomes a local
      notification (native side, with the cha-ching sound) AND a spec saved in the settings (__bg). When the app
      opens again, the orders whose time has passed are created for real with the same number and amount. */
-  var BG_PACE = { exploding: [45, 10, 150], growing: [600, 90, 1500], steady: [1500, 300, 3600], declining: [2400, 600, 5400], newstore: [3600, 900, 7200], highrisk: [700, 60, 3000] };   // [mean, min, max] seconds between orders
+  var BG_PACE = { exploding: [45, 10, 150], growing: [600, 90, 1500], steady: [1500, 300, 3600], declining: [2400, 600, 5400], newstore: [3600, 900, 7200], highrisk: [700, 60, 3000], slow: [2100, 1500, 5400] };   // [mean, min, max] seconds between orders
   var lastPlan = 0;
   function nativeBg(items) {
     try { window.webkit.messageHandlers.shopifySchedule.postMessage({ items: items }); return true; } catch (e) { return false; }
@@ -2991,7 +2991,7 @@
       var cfg = savedSettingsObj(), pool = prods.length ? sellable() : [];
       if (S.pops === false || !pool.length || noOrdersVibe()) { if (cfg.__bg) { delete cfg.__bg; writeSettings(cfg); } nativeBg([]); return; }
       var vibe = larpVibe(), pc = BG_PACE[vibe] || BG_PACE.growing;
-      var base = orders[0] ? orders[0].n : S.lastN, at = Date.now() + (vibe === "exploding" ? 12 + Math.random() * 20 : 25 + Math.random() * 50) * 1000;
+      var base = orders[0] ? orders[0].n : S.lastN, at = Date.now() + (vibe === "exploding" ? 12 + Math.random() * 20 : vibe === "slow" ? 300 + Math.random() * 900 : 25 + Math.random() * 50) * 1000;
       var specs = [], items = [];
       for (var i = 0; i < 60; i++) {
         var lines = userLines(pool), idx = Math.floor(Math.random() * Math.min(P.ord.length, 60));
@@ -3107,10 +3107,13 @@
       newstore: { mean: 75, min: 12, max: 180, burst: 0.05 },
       declining: { mean: 50, min: 10, max: 150, burst: 0.08 },
       steady: { mean: 32, min: 8, max: 100, burst: 0.12 },
-      growing: { mean: 20, min: 5, max: 70, burst: 0.18 }
+      growing: { mean: 20, min: 5, max: 70, burst: 0.18 },
+      slow: { mean: 2100, min: 1500, max: 5400, burst: 0 }     // ~1 order every 30-40 min, sometimes longer
     };
     var vibe = larpVibe(), wait, burstN = 1;
-    if (first) {
+    if (first && vibe === "slow") {
+      wait = 300 + Math.random() * 900;                   // slow day: the first order comes after 5-20 min
+    } else if (first) {
       wait = 4 + Math.random() * 4;                       // the first order shows up within seconds
     } else if (vibe === "highrisk") {
       // Choppy: flurries of fast orders, then quiet stretches.
@@ -3199,6 +3202,7 @@
       live.visitors = 0; live.carts = 0; live.checkingOut = 0; cartHold = 0; buyerQ.length = 0;
       showVisitors(); showFunnel(); return;
     }
+    if (larpVibe() === "slow" && v < 1) { live.visitors = v = 1 + Math.floor(Math.random() * 4); showVisitors(); }   // a few people on the store, never more than 10
     if (larpVibe() === "visitors" && v < 1) { live.visitors = v = 3 + Math.floor(Math.random() * 6); showVisitors(); }   // people are browsing from the start
     if (v <= 0 && larpVibe() !== "exploding") { funnelTick(); return; }
     if (larpVibe() === "exploding") {
@@ -3211,6 +3215,7 @@
     var d = Math.random() < 0.5 ? -1 : 1;
     if (Math.random() >= 0.55) {
       live.visitors = Math.max(1, v + d * (v > 40 ? Math.ceil(Math.random() * v * 0.04) : 1));
+      if (larpVibe() === "slow") live.visitors = Math.min(10, live.visitors);
       showVisitors();
     }
     funnelTick();
