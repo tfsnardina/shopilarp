@@ -23,6 +23,8 @@ enum WText {
         "netSales": ["fr": "Ventes nettes", "en": "Net sales", "es": "Ventas netas", "de": "Nettoumsatz"],
         "visitors": ["fr": "Visiteurs", "en": "Visitors", "es": "Visitantes", "de": "Besucher"],
         "updated": ["fr": "Actualisé : ", "en": "Updated: ", "es": "Actualizado: ", "de": "Aktualisiert: "],
+        "openApp": ["fr": "Ouvre l'app", "en": "Open the app", "es": "Abre la app", "de": "App öffnen"],
+        "noGroup": ["fr": "Pas d'App Group", "en": "No App Group", "es": "Sin App Group", "de": "Keine App Group"],
         "myStore": ["fr": "Ma boutique", "en": "My store", "es": "Mi tienda", "de": "Mein Shop"],
     ]
 
@@ -163,7 +165,7 @@ struct WidgetMetrics {
     static var empty: WidgetMetrics {
         WText.override = nil
         return WidgetMetrics(
-            store: WText.t("myStore"), updated: Date(),
+            store: WText.t(ShopifyWidgetStore.hasGroup ? "openApp" : "noGroup"), updated: Date(),
             sales: 0, visits: 0, aov: 0, conv: 0, orders: 0, net: 0, visitors: 0,
             dSales: 0, dVisits: 0, dAov: 0, dConv: 0, dOrders: 0, dNet: 0, dVisitors: 0,
             barsSales: (0..<24).map { _ in nil }, lineVisits: [], lineAov: [], lineConv: [],
