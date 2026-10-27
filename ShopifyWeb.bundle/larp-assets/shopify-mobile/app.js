@@ -22,6 +22,14 @@
   /* Store in France: the base data is American (cities, states, ZIP codes, +1 phones). Swap it, once, for French
      cities / regions / postcodes / streets / phones. Every US city always maps to the same French city, so a
      customer and their orders stay in the same place, and new orders (built from these templates) are French too. */
+  var FR_FIRST = ["Lucas", "Léa", "Hugo", "Emma", "Louis", "Chloé", "Gabriel", "Jade", "Arthur", "Louise", "Jules", "Alice", "Raphaël", "Inès", "Adam", "Camille", "Nathan", "Manon", "Théo", "Sarah", "Mathis", "Clara", "Maxime", "Julie", "Antoine", "Zoé", "Tom", "Anaïs", "Paul", "Océane", "Baptiste", "Margaux", "Clément", "Pauline", "Romain", "Laura", "Quentin", "Élodie", "Enzo", "Lola"];
+  var FR_LAST = ["Martin", "Bernard", "Dubois", "Thomas", "Robert", "Richard", "Petit", "Durand", "Leroy", "Moreau", "Simon", "Laurent", "Lefebvre", "Michel", "Garcia", "David", "Bertrand", "Roux", "Vincent", "Fournier", "Morel", "Girard", "André", "Mercier", "Dupont", "Lambert", "Bonnet", "François", "Martinez", "Legrand", "Garnier", "Faure", "Rousseau", "Blanc", "Guérin", "Muller", "Henry", "Roussel", "Perrin", "Morin", "Mathieu", "Gauthier", "Dumont", "Lopez", "Fontaine", "Chevalier", "Robin", "Masson"];
+  var FR_MAIL = ["gmail.com", "gmail.com", "gmail.com", "orange.fr", "free.fr", "hotmail.fr", "outlook.fr", "icloud.com", "laposte.net", "sfr.fr"];
+  function plain(t) { return String(t).normalize ? String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z]/g, "").toLowerCase() : String(t).toLowerCase(); }
+  function frEmail(f, l, h) {
+    var style = h % 3, base = style === 0 ? plain(f) + "." + plain(l) : style === 1 ? plain(f) + plain(l) : plain(f)[0] + "." + plain(l);
+    return base + (h % 4 ? String(10 + (h >>> 4) % 90) : "") + "@" + FR_MAIL[(h >>> 9) % FR_MAIL.length];
+  }
   (function localizeFR() {
     if (!S || S.country !== "FR") return;
     var CITIES = [
@@ -48,7 +56,12 @@
       var h = hash(p), d = pad(h % 100000000, 8);
       return "+33 " + (h % 3 ? "6" : "7") + " " + d.slice(0, 2) + " " + d.slice(2, 4) + " " + d.slice(4, 6) + " " + d.slice(6, 8);
     }
-    (P.cus || []).forEach(function (c) { var f = cityOf(c[3], c[4]); c[2] = phoneOf(c[2]); c[3] = f[0]; c[4] = f[1]; });
+    (P.cus || []).forEach(function (c) {
+      var f = cityOf(c[3], c[4]), nh = hash(c[0] + "|" + c[1]);
+      var fn = FR_FIRST[nh % FR_FIRST.length], ln = FR_LAST[(nh >>> 7) % FR_LAST.length];
+      c[0] = fn + " " + ln; c[1] = frEmail(fn, ln, nh >>> 3);
+      c[2] = phoneOf(c[2]); c[3] = f[0]; c[4] = f[1];
+    });
     (P.ord || []).forEach(function (o) {
       var f = cityOf(o[19], o[20]), h = hash(o[0] + "|" + o[19] + "|" + o[22]);
       o[19] = f[0]; o[20] = f[1]; o[21] = zipOf(f, h);
@@ -1273,7 +1286,8 @@
   }
   function orderRow(o) {
     var n = units(o);
-    var fulBy = o.ful === "Fulfilled" || o.pay === "Refunded" ? L10n(o.shipM) : L10n("Fulfill by:") + " " + mdyL(o.ts + (o.shipM === "Express Shipping" ? 1 : 3) * DAY) + " \u2022 " + L10n(shipShort(o.shipM));
+    var fulBy = isDigital(o) ? (o.ful === "Fulfilled" ? L10n("Delivered by email") : L10n("E-product (email delivery)"))
+      : o.ful === "Fulfilled" || o.pay === "Refunded" ? L10n(o.shipM) : L10n("Fulfill by:") + " " + mdyL(o.ts + (o.shipM === "Express Shipping" ? 1 : 3) * DAY) + " \u2022 " + L10n(shipShort(o.shipM));
     return '<button class="orow" data-order="' + o.n + '"><div class="or1"><b>#' + o.n + "</b><b>" + money(o.total) + " " + esc(S.cur || "") + "</b></div>" +
       '<div class="or2"><span>' + esc(o.c ? o.c.name : "No customer") + "</span><span>" + n + " item" + (n === 1 ? "" : "s") + "</span><span>" + hmPad(o.ts) + "</span></div>" +
       '<div class="or3">' + fulBadge(o) + payBadge(o) + (o.note ? ic("note", "on") : "") + "</div>" +
@@ -1799,7 +1813,7 @@
      description of the order; Swift draws it. Actions come back through __larpNativeOrderAct. */
   function defaultCarrier() { return S.country === "US" ? "USPS" : S.country === "CA" ? "Canada Post" : S.country === "GB" ? "Royal Mail" : S.country === "AU" ? "Australia Post" : "DHL Express"; }
   function nativeOrderInfo(o) {
-    var T = L10n, n_ = units(o), ful = o.ful === "Fulfilled", c = o.c, pos = o.ch === "Point of Sale";
+    var T = L10n, n_ = units(o), ful = o.ful === "Fulfilled", c = o.c, pos = o.ch === "Point of Sale", dig = isDigital(o);
     var taxSub = VAT ? T("Included") : o.reg + " " + (o.rate * 100).toFixed(o.rate * 1000 % 10 ? 3 : 2).replace(/0+$/, "").replace(/\.$/, "") + "%";
     var lines = [{ l: T("Subtotal"), s: T(n_ + " item" + (n_ === 1 ? "" : "s")), v: money(o.sub) }];
     if (o.disc) lines.push({ l: T("Discount"), s: o.code || T("Custom discount"), v: "-" + money(o.disc) });
@@ -1830,11 +1844,12 @@
       sub: T(relAt(o.ts)) + " \u2022 " + T(o.ch === "Online Store" ? "Online store" : o.ch),
       pay: T(o.pay), payKind: o.pay === "Payment pending" || o.pay === "Authorized" ? "warn" : "neu",
       ful: T(o.ful), fulKind: ful ? "ok" : "att",
-      shipSub: pos ? T("Picked up in store") : T("Ship to customer \u2022 " + o.city),
-      items: items, unitsCount: n_, fulfilled: ful, carrier: o.carrier || defaultCarrier(), trk: o.trk || "", defaultCarrier: defaultCarrier(),
+      shipSub: dig ? T("E-product \u2022 delivered by email") : pos ? T("Picked up in store") : T("Ship to customer \u2022 " + o.city),
+      digital: dig,
+      items: items, unitsCount: n_, fulfilled: ful, carrier: dig ? T("E-product") : (o.carrier || defaultCarrier()), trk: dig ? T("Delivered by email") : (o.trk || ""), defaultCarrier: defaultCarrier(),
       canCapture: o.pay === "Authorized", canMarkPaid: o.pay === "Payment pending",
       lines: lines, total: money(o.total), paid: paid,
-      addr: [o.c ? o.c.name : "", o.street, S.country === "FR" ? o.zip + " " + o.city : o.city + ", " + o.reg + " " + o.zip, countryName()].filter(Boolean),
+      addr: dig ? [] : [o.c ? o.c.name : "", o.street, S.country === "FR" ? o.zip + " " + o.city : o.city + ", " + o.reg + " " + o.zip, countryName()].filter(Boolean),
       email: c ? c.email : "", phone: c ? (c.phone || "") : "",
       customer: c ? { name: c.name, sub: T(count(c.n) + " order" + (c.n === 1 ? "" : "s")), idx: custs.indexOf(c), initials: initials(c.name) } : null,
       note: o.note || "", noEmptyNote: T("No notes from customer"),
@@ -1855,7 +1870,8 @@
       var carrier = m.carrier || defaultCarrier();
       o.ful = "Fulfilled"; o.fat = nowMs(); o.carrier = carrier;
       var v = String(m.trk || "").trim();
-      o.trk = v || (carrier === "USPS" ? "9400 1" + rnd(3) + " " + rnd(4) + " " + rnd(4) + " " + rnd(4) + " " + rnd(2) : rnd(12));
+      if (isDigital(o)) { o.carrier = "E-product"; o.trk = "Delivered by email"; }
+      else o.trk = v || (carrier === "USPS" ? "9400 1" + rnd(3) + " " + rnd(4) + " " + rnd(4) + " " + rnd(4) + " " + rnd(2) : rnd(12));
       hap(14); msg = "Items fulfilled";
     } else if (m.act === "capture") {
       o.pay = "Paid"; creditOrder(o); hap(14); msg = "Payment captured";
@@ -1875,9 +1891,9 @@
     var n_ = units(o);
     var ful = o.ful === "Fulfilled";
     var fulSec = '<div class="sec"><div class="sec-h">' + (ful ? badge("Fulfilled", "ok") : badge(o.ful, "att")) + '<span class="fl"></span>' + ic("more", "sm") + "</div>" +
-      '<div class="sec-sub">' + (o.ch === "Point of Sale" ? "Picked up in store" : "Ship to customer • " + esc(o.city)) + "</div>" +
+      '<div class="sec-sub">' + (isDigital(o) ? "E-product • delivered by email" : o.ch === "Point of Sale" ? "Picked up in store" : "Ship to customer • " + esc(o.city)) + "</div>" +
       lineItems(o) +
-      (ful ? '<div class="trk">' + ic("truck") + "<div><b>" + esc(o.carrier) + "</b><span>" + esc(o.trk) + '</span></div><button class="lnk" data-act="track">Track</button></div>'
+      (ful ? '<div class="trk">' + ic("truck") + "<div><b>" + esc(o.carrier) + "</b><span>" + esc(o.trk) + '</span></div>' + (isDigital(o) ? "" : '<button class="lnk" data-act="track">Track</button>') + "</div>"
         : '<button class="btn-p" data-fulfill="' + o.n + '">Fulfill items</button>') + "</div>";
     var refunded = o.refunded > 0;
     var paySec = '<div class="sec"><div class="sec-h">' + payBadge(o) + "</div>" +
@@ -1892,7 +1908,7 @@
     var c = o.c;
     var contact = '<div class="sec"><div class="sec-h"><h3>Contact information</h3><span class="fl"></span>' + ic("more", "sm") + "</div>" +
       '<div class="two"><button class="btn-o" data-act="email">' + ic("email") + 'Email details</button><button class="btn-o" data-act="phone">' + ic("phone") + "Phone details</button></div>" +
-      '<div class="addr"><div><span class="lbl">Address</span><p>' + addr(o) + '</p></div><button class="cp" data-copy="addr" aria-label="Copy">' + ic("clipboard") + "</button></div></div>";
+      (isDigital(o) ? "" : '<div class="addr"><div><span class="lbl">Address</span><p>' + addr(o) + '</p></div><button class="cp" data-copy="addr" aria-label="Copy">' + ic("clipboard") + "</button></div>") + "</div>";
     var cust = c ? '<div class="sec"><div class="sec-h"><h3>Customer</h3></div><button class="crow" data-cust="' + custs.indexOf(c) + '"><span class="cav">' + esc(initials(c.name)) + "</span><div><b>" + esc(c.name) + "</b><span>" + count(c.n) + " order" + (c.n === 1 ? "" : "s") + "</span></div>" + ic("chev-right", "chev") + "</button></div>" : "";
     var notes = '<div class="sec"><div class="sec-h"><h3>Notes</h3><span class="fl"></span>' + ic("edit", "sm") + "</div><p class=\"muted\">" + (o.note ? esc(o.note) : "No notes from customer") + "</p></div>";
     var conv = '<div class="sec"><div class="sec-h"><h3>Conversion summary</h3></div><div class="cs"><div>' + ic("cart") + "<span>This is their " + ordinal(c ? Math.max(1, c.n) : 1) + " order</span></div><div>" + ic("globe") + "<span>1st session was " + (o.ch === "Online Store" ? "from Google" : "from " + esc(o.ch)) + "</span></div><div>" + ic("clock") + "<span>" + (2 + (o.n % 4)) + " sessions over " + (1 + (o.n % 3)) + " day" + (o.n % 3 ? "s" : "") + "</span></div></div></div>";
@@ -1907,7 +1923,7 @@
   function ordinal(n) { var s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
   function timeline(o) {
     var ev = [];
-    if (o.fat) ev.push([relAt(o.fat), (o.carrier ? o.carrier + " " : "") + units(o) + " item" + (units(o) === 1 ? " was" : "s were") + " fulfilled"]);
+    if (o.fat) ev.push([relAt(o.fat), isDigital(o) ? "The e-product was delivered by email" : (o.carrier ? o.carrier + " " : "") + units(o) + " item" + (units(o) === 1 ? " was" : "s were") + " fulfilled"]);
     if (o.refunded) ev.push([relAt(o.ts + 3 * DAY), "A " + money(o.refunded) + " refund was processed"]);
     if (o.pay !== "Payment pending" && o.pay !== "Authorized") ev.push([relAt(o.ts + 2000), "A " + money(o.total) + " " + S.cur + " payment was processed on " + cardLabel(o) + "."]);
     if (o.pay === "Authorized") ev.push([relAt(o.ts + 2000), "A " + money(o.total) + " " + S.cur + " payment was authorized on " + cardLabel(o) + "."]);
@@ -1919,15 +1935,16 @@
     var o = findOrder(n); if (!o) return;
     var carrier = S.country === "US" ? "USPS" : S.country === "CA" ? "Canada Post" : S.country === "GB" ? "Royal Mail" : S.country === "AU" ? "Australia Post" : "DHL Express";
     var el = sheet("Fulfill items", '<div class="ff">' + lineItems(o) +
-      '<label class="fld"><span>Tracking number</span><input id="trk" inputmode="numeric" placeholder="Add tracking number" autocomplete="off"></label>' +
-      '<label class="fld"><span>Shipping carrier</span><div class="sel">' + esc(carrier) + ic("chev-down") + "</div></label>" +
+      (isDigital(o) ? "" : '<label class="fld"><span>Tracking number</span><input id="trk" inputmode="numeric" placeholder="Add tracking number" autocomplete="off"></label>' +
+      '<label class="fld"><span>Shipping carrier</span><div class="sel">' + esc(carrier) + ic("chev-down") + "</div></label>") +
       '<label class="tg"><input type="checkbox" checked><span></span>Send shipment details to your customer now</label>' +
       '<button class="btn-p" id="doFul">Fulfill items</button></div>', { cls: "fulfill" });
     $("#doFul", el).addEventListener("click", function () {
       var b = this; b.disabled = true; b.classList.add("busy");
       setTimeout(function () {
         o.ful = "Fulfilled"; o.fat = nowMs(); o.carrier = carrier;
-        var v = ($("#trk", el).value || "").trim();
+        var v = ($("#trk", el) ? $("#trk", el).value || "" : "").trim();
+        if (isDigital(o)) { o.carrier = "E-product"; o.trk = "Delivered by email"; } else
         o.trk = v || (carrier === "USPS" ? "9400 1" + rnd(3) + " " + rnd(4) + " " + rnd(4) + " " + rnd(4) + " " + rnd(2) : rnd(12));
         hap(14);
         pop(false);
@@ -2881,6 +2898,8 @@
     }
     return lines;
   }
+  /* An order is digital (e-product) when every product on it is flagged "not a physical product". */
+  function isDigital(o) { return !!(o && o.items && o.items.length && o.items.every(function (x) { return x.p && x.p.physical === false; })); }
   function freshOrder(o, ts) {
     o.ts = ts; o.n = orders[0] ? orders[0].n + 1 : S.lastN + 1;
     o.ful = "Unfulfilled"; o.pay = Math.random() < 0.05 ? "Authorized" : "Paid"; o.fat = 0; o.carrier = ""; o.trk = ""; o.refunded = 0; o.archived = false; o.note = "";
@@ -2896,6 +2915,7 @@
       o.sub = o.items.reduce(function (a, x) { return a + x.price * x.q; }, 0);
       o.disc = 0; o.code = "";
       o.tax = Math.round(o.sub * ratio);
+      if (isDigital(o)) { o.ship = 0; o.shipM = "E-product (email delivery)"; o.street = ""; }
       o.total = o.sub + o.ship + o.tax;
     }
     return freshOrder(o, ts);
@@ -3040,9 +3060,10 @@
   var FN = ["Ava", "Liam", "Mia", "Noah", "Zoe", "Ethan", "Chloe", "Lucas", "Isla", "Mason", "Aria", "Leo", "Nora", "Kai", "Ruby", "Owen", "Maya", "Eli"];
   var LN = ["Turner", "Brooks", "Reed", "Price", "Ward", "Hayes", "Ross", "Cole", "Gray", "James", "Bell", "Ortiz", "Diaz", "Long", "Patel", "Kim", "Nguyen", "Shah"];
   function newCustomer() {
-    var f = FN[Math.floor(Math.random() * FN.length)], l = LN[Math.floor(Math.random() * LN.length)];
+    var fr = S.country === "FR", F = fr ? FR_FIRST : FN, Ls = fr ? FR_LAST : LN;
+    var f = F[Math.floor(Math.random() * F.length)], l = Ls[Math.floor(Math.random() * Ls.length)];
     var src = custs[Math.floor(Math.random() * custs.length)] || { city: "Austin", region: "TX" };
-    var c = { name: f + " " + l, email: (f + "." + l).toLowerCase() + Math.floor(Math.random() * 90 + 10) + "@gmail.com", phone: "", city: src.city, region: src.region, ts: nowMs(), n: 0, spent: 0, sub: Math.random() < 0.6, tags: [] };
+    var c = { name: f + " " + l, email: fr ? frEmail(f, l, Math.floor(Math.random() * 1e6)) : (f + "." + l).toLowerCase() + Math.floor(Math.random() * 90 + 10) + "@gmail.com", phone: "", city: src.city, region: src.region, ts: nowMs(), n: 0, spent: 0, sub: Math.random() < 0.6, tags: [] };
     custs.unshift(c);
     S.custTotal = (S.custTotal || 0) + 1;
     pend.cust += 1;
