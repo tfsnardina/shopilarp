@@ -2348,7 +2348,10 @@
         var c = proj(pts[k][0], pts[k][1], rot);
         if (c[2] <= 0.05) continue;
         // The first few are this hour's orders (purple, ring burst); the rest are visitors (blue, fading in and out).
-        var isOrder = k < nOrd, ph = (tt * (isOrder ? 0.5 : 0.35) + k * 0.37) % 1;
+        var isOrder = k < nOrd;
+        if (larpVibe() === "dead") continue;                                   // nobody, nothing
+        if (!isOrder && k - nOrd >= Math.max(0, live.visitors)) continue;      // one blue dot per visitor, none at 0
+        var ph = (tt * (isOrder ? 0.5 : 0.35) + k * 0.37) % 1;
         if (isOrder) {
           ctx.strokeStyle = "rgba(128,81,255," + (0.7 * (1 - ph)).toFixed(2) + ")"; ctx.lineWidth = 1.6;
           ctx.beginPath(); ctx.arc(c[0], c[1], 3.5 + ph * 12, 0, Math.PI * 2); ctx.stroke();
@@ -3163,13 +3166,13 @@
   function funnelTick() {
     // Aucun produit en boutique : personne ne peut avoir de panier ni être en train de payer.
     if (!prods.length) { live.carts = 0; live.checkingOut = 0; cartHold = 0; buyerQ.length = 0; showFunnel(); return; }
-    var v = live.visitors, boom = larpVibe() === "exploding";
+    var v = live.visitors, boom = larpVibe() === "exploding", vo = larpVibe() === "visitors";
     var now = Date.now();
     // acheteurs oubliés (onglet en arrière-plan...) : ils abandonnent au bout de 25 s
     while (buyerQ.length && now - buyerQ[0] > 25000) { buyerQ.shift(); if (live.checkingOut > 0) live.checkingOut -= 1; }
     var keep = buyerQ.length;
     if (v < 1) { live.carts = cartHold ? live.carts : 0; live.checkingOut = Math.min(live.checkingOut, keep); showFunnel(); return; }
-    var wantCarts = Math.round(v * (boom ? 0.16 : 0.1)), wantPay = Math.max(keep, Math.round(wantCarts * (boom ? 0.4 : 0.3)));
+    var wantCarts = Math.max(vo ? 1 : 0, Math.round(v * (boom ? 0.16 : vo ? 0.3 : 0.1))), wantPay = Math.max(keep, vo ? Math.max(1, Math.round(wantCarts * 0.5)) : Math.round(wantCarts * (boom ? 0.4 : 0.3)));
     var inc = boom ? 1 + Math.floor(Math.random() * 3) : 1;
     // nouveaux paniers
     if (live.carts + live.checkingOut < wantCarts + wantPay && Math.random() < (boom ? 0.8 : 0.45)) live.carts += inc;
@@ -3180,15 +3183,15 @@
     else if (live.carts > Math.max(wantCarts, cartHold) && Math.random() < 0.5) live.carts -= 1;
     else if (live.carts > cartHold && Math.random() < 0.06) live.carts -= 1;
     live.carts = Math.max(0, live.carts); live.checkingOut = Math.max(keep, live.checkingOut);
-    if (larpVibe() === "visitors") live.checkingOut = 0;   // they browse and fill carts, but nobody pays
     showFunnel();
     var lc = document.getElementById("lvLoc");
     if (lc && (locTick = (locTick + 1) % 5) === 0) { var h = locRows(); if (lc._h !== h) { lc._h = h; lc.innerHTML = h; if (window.I18N) window.I18N.apply(lc); } }
   }
   // Visitors right now drift a little (EXPLODING: they climb fast, every ~1.2 s).
   function showVisitors() {
-    var a = $("#liveN"); if (a) { a.textContent = count(live.visitors); a.parentNode.classList.add("tick"); setTimeout(function () { a.parentNode.classList.remove("tick"); }, 400); }
-    var b = $("#lvN"); if (b) b.textContent = count(live.visitors);
+    var t = count(live.visitors);
+    var a = $("#liveN"); if (a && a.textContent !== t) { a.textContent = t; a.parentNode.classList.add("tick"); setTimeout(function () { a.parentNode.classList.remove("tick"); }, 400); }
+    var b = $("#lvN"); if (b && b.textContent !== t) b.textContent = t;
   }
   setInterval(function () {
     var v = live.visitors;
