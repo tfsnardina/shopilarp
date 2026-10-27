@@ -296,6 +296,7 @@
     ["Email details", "Détails de l'e-mail", "Detalles del correo", "E-Mail-Details"],
     ["Phone details", "Détails du téléphone", "Detalles del teléfono", "Telefondetails"],
     ["Shipping", "Expédition", "Envío", "Versand"],
+    ["Service fee", "Frais de service", "Tarifa de servicio", "Servicegebühr"],
     ["Shipping carrier", "Transporteur", "Transportista", "Versanddienstleister"],
     ["Tracking number", "Numéro de suivi", "Número de seguimiento", "Sendungsnummer"],
     ["Track", "Suivre", "Rastrear", "Verfolgen"],
