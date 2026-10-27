@@ -40,7 +40,7 @@ struct ShopifyProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ShopifyEntry>) -> Void) {
         let now = Date()
-        let next = now.addingTimeInterval(15 * 60)
+        let next = now.addingTimeInterval(60)   // on redemande un rechargement toutes les minutes
         guard let snap = ShopifyWidgetStore.load() else {
             completion(Timeline(entries: [ShopifyEntry(date: now, metrics: empty())], policy: .after(next)))
             return
@@ -48,7 +48,9 @@ struct ShopifyProvider: TimelineProvider {
         // Une entrée maintenant + une à chaque commande planifiée (app fermée) dans les 6 prochaines heures.
         let nowMs = now.timeIntervalSince1970 * 1000
         var dates: [Date] = [now]
-        for it in snap.plan where it.at > nowMs && it.at < nowMs + 6 * 3_600_000 && dates.count < 40 {
+        // + une entrée par minute pendant 60 min : l'heure « Actualisé » et les chiffres avancent même si iOS retarde le rechargement.
+        for i in 1...60 { dates.append(now.addingTimeInterval(Double(i) * 60)) }
+        for it in snap.plan where it.at > nowMs && it.at < nowMs + 6 * 3_600_000 && dates.count < 120 {
             dates.append(Date(timeIntervalSince1970: it.at / 1000))
         }
         if snap.dayEnd > nowMs && snap.dayEnd < nowMs + 6 * 3_600_000 {
