@@ -3049,10 +3049,11 @@
     lastPlan = Date.now();
     try {
       var cfg = savedSettingsObj(), pool = prods.length ? sellable() : [];
-      if (S.pops === false || !pool.length || noOrdersVibe()) { if (cfg.__bg) { delete cfg.__bg; writeSettings(cfg); } nativeBg([]); return; }
+      if (S.pops === false || !pool.length || noOrdersVibe()) { if (cfg.__bg) { delete cfg.__bg; writeSettings(cfg); } nativeBg([]); wPlan = []; pushWidget(true); return; }
       var vibe = larpVibe(), pc = BG_PACE[vibe] || BG_PACE.growing;
       var base = orders[0] ? orders[0].n : S.lastN, at = Date.now() + (vibe === "exploding" ? 12 + Math.random() * 20 : vibe === "slow" ? 300 + Math.random() * 900 : 25 + Math.random() * 50) * 1000;
       var specs = [], items = [];
+      wPlan = [];
       for (var i = 0; i < 60; i++) {
         var lines = userLines(pool), idx = Math.floor(Math.random() * Math.min(P.ord.length, 60));
         var o = makeOrder(lines, 0, idx); if (!o) break;
@@ -3060,10 +3061,12 @@
         o.ch = weighted([["Online Store", 74], ["Shop", 10], ["Instagram", 5], ["TikTok", 5], ["Facebook", 3], ["Google & YouTube", 3]]);
         specs.push({ at: Math.round(at), n: o.n, src: idx, lines: lines.map(function (l) { return [l[0].title, l[1]]; }), pay: o.pay, ch: o.ch });
         items.push({ at: Math.round(at), title: L10n("Order #" + o.n), body: L10n(pushBody(o)) });
+        wPlan.push({ at: Math.round(at), s: o.total, g: o.sub, d: o.disc, se: 2 });
         at += 1000 * Math.min(pc[2], Math.max(pc[1], -Math.log(1 - Math.random()) * pc[0]));
       }
       cfg.__bg = specs; writeSettings(cfg);
       nativeBg(items);
+      pushWidget(true);
     } catch (e) { }
   }
   function consumeBg(resumed) {
@@ -3073,6 +3076,7 @@
     writeSettings(cfg);
     nativeBg([]);                    // whatever has not fired yet is cancelled: the live page takes over again
     lastPlan = 0;
+    wPlan = [];
     var now = Date.now(), done = 0;
     q.filter(function (sp) { return sp.at <= now; }).sort(function (a, b) { return a.at - b.at; }).forEach(function (sp) {
       if (orders.some(function (x) { return x.n === sp.n; })) return;
@@ -3094,6 +3098,41 @@
       if (!stack.length && RENDER[current]) { RENDER[current](); rendered[current] = 1; }
     }
   }
+
+  /* ── iOS widgets (Counter / Insights) ────────────────────────
+     Today's numbers, computed with the very same functions as the home screen, are pushed to the native side
+     (message "larpWidget"), which stores them in the App Group and refreshes the widgets. wPlan = the orders
+     planned while the app is closed, so the widgets keep moving like the notifications do. */
+  var wPlan = [], wLast = "";
+  function widgetSnapshot() {
+    var R = rangeData("today"), t = R.tot, pt = R.ptot;
+    var g = sum(D.g, T, T), dc = sum(D.dc, T, T), rt = sum(D.rt, T, T);
+    var pf = D.s[T - 1] ? pt.s / D.s[T - 1] : 1;
+    var pg = sum(D.g, T - 1, T - 1) * pf, pdc = sum(D.dc, T - 1, T - 1) * pf, prt = sum(D.rt, T - 1, T - 1) * pf;
+    var hs = [], ho = [], he = [];
+    R.cur.forEach(function (x) { hs.push(Math.round(x.s)); ho.push(Math.round(x.o)); he.push(Math.round(x.se)); });
+    var off = Number(S.off) || 0, now = Date.now();
+    var dayStart = Math.floor((now + off) / DAY) * DAY - off;
+    return {
+      v: 1, store: S.name, sym: S.sym, cur: S.cur, dec: S.dec == null ? 2 : S.dec, ts: now, off: off, dayEnd: dayStart + DAY,
+      s: Math.round(t.s), o: Math.round(t.o), se: Math.round(t.se), net: Math.round(g - dc - rt),
+      ps: Math.round(pt.s), po: Math.round(pt.o), pse: Math.round(pt.se), pnet: Math.round(pg - pdc - prt),
+      hs: hs, ho: ho, he: he, plan: wPlan
+    };
+  }
+  function pushWidget(force) {
+    try {
+      var h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpWidget;
+      if (!h) return;
+      var snap = widgetSnapshot(), key = JSON.stringify(Object.assign({}, snap, { ts: 0 }));
+      if (!force && key === wLast) return;
+      wLast = key;
+      h.postMessage(JSON.stringify(snap));
+    } catch (e) { }
+  }
+  setInterval(pushWidget, 2500);
+  setTimeout(function () { pushWidget(true); }, 700);
+  document.addEventListener("visibilitychange", function () { if (document.hidden) pushWidget(true); });
   window.__larpPlanBg = planBg;
   window.__larpConsumeBg = function () { consumeBg(true); };
   document.addEventListener("visibilitychange", function () { if (document.hidden) planBg(); else consumeBg(true); });
