@@ -20,10 +20,20 @@ enum WidgetBridge {
         lastRaw = json
         guard ShopifyWidgetStore.save(json: json) else { return }
         let now = Date()
-        // Les rechargements demandés depuis l'app au premier plan ne sont pas limités, on évite juste le spam.
-        if now.timeIntervalSince(lastReload) >= 4 {
+        // Les rechargements demandés depuis l'app au premier plan ne sont pas limités, on évite juste le spam :
+        // si on est dans la fenêtre anti-spam, on programme un rechargement différé (jamais abandonné).
+        let wait = 2 - now.timeIntervalSince(lastReload)
+        if wait <= 0 {
             lastReload = now
             WidgetCenter.shared.reloadAllTimelines()
+        } else if !pending {
+            pending = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) {
+                pending = false
+                lastReload = Date()
+                WidgetCenter.shared.reloadAllTimelines()
+            }
         }
     }
+    private static var pending = false
 }
