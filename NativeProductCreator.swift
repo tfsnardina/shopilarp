@@ -657,11 +657,16 @@ final class PCTextSheet: PCSheetBase, UITextViewDelegate {
 final class PCShippingSheet: PCSheetBase {
     private let spinner = UIActivityIndicatorView(style: .medium)
     private var physical: Bool
+    private var fee: Double
+    private let currency: String
     var onChange: ((Bool) -> Void)?
+    var onFeeChange: ((Double) -> Void)?
 
-    init(physical: Bool) {
+    init(physical: Bool, fee: Double = 0, currency: String = "") {
         self.physical = physical
-        super.init(title: tr("Expédition", "Shipping"), detents: [.large()])
+        self.fee = fee
+        self.currency = currency.trimmingCharacters(in: .whitespaces)
+        super.init(title: tr("Expédition et frais", "Shipping & fees"), detents: [.large()])
     }
 
     @available(*, unavailable)
@@ -677,6 +682,9 @@ final class PCShippingSheet: PCSheetBase {
             spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
         spinner.startAnimating()
+        let tap = UITapGestureRecognizer(target: view, action: #selector(UIView.endEditing(_:)))
+        tap.cancelsTouchesInView = false
+        view.addGestureRecognizer(tap)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in self?.showContent() }
     }
 
@@ -701,12 +709,68 @@ final class PCShippingSheet: PCSheetBase {
         card.translatesAutoresizingMaskIntoConstraints = false
         card.alpha = 0
         view.addSubview(card)
+
+        // Frais de service : montant ajouté à chaque unité vendue de ce produit.
+        let feeLabel = UILabel()
+        feeLabel.text = tr("Frais de service", "Service fee")
+        feeLabel.font = .systemFont(ofSize: 16)
+        feeLabel.textColor = PCTheme.ink
+        feeLabel.setContentHuggingPriority(.required, for: .horizontal)
+        let feeField = UITextField()
+        feeField.font = .systemFont(ofSize: 16)
+        feeField.textColor = PCTheme.ink
+        feeField.textAlignment = .right
+        feeField.keyboardType = .decimalPad
+        feeField.placeholder = tr("0,00 \(currency)", "\(currency)0.00")
+        if fee > 0 {
+            let f = NumberFormatter()
+            f.numberStyle = .decimal
+            f.minimumFractionDigits = 2
+            f.maximumFractionDigits = 2
+            feeField.text = f.string(from: NSNumber(value: fee)) ?? "\(fee)"
+        }
+        feeField.addAction(UIAction { [weak self, weak feeField] _ in
+            guard let self else { return }
+            let raw = (feeField?.text ?? "").replacingOccurrences(of: ",", with: ".").filter { "0123456789.".contains($0) }
+            self.fee = max(0, Double(raw) ?? 0)
+            self.onFeeChange?(self.fee)
+        }, for: .editingChanged)
+        let cur = UILabel()
+        cur.text = currency
+        cur.font = .systemFont(ofSize: 16)
+        cur.textColor = PCTheme.sub
+        cur.setContentHuggingPriority(.required, for: .horizontal)
+        let feeRow = UIStackView(arrangedSubviews: [feeLabel, feeField, cur])
+        feeRow.alignment = .center
+        feeRow.spacing = 8
+        feeRow.isLayoutMarginsRelativeArrangement = true
+        feeRow.layoutMargins = UIEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
+        let feeCard = pcCard([feeRow])
+        feeCard.translatesAutoresizingMaskIntoConstraints = false
+        feeCard.alpha = 0
+        view.addSubview(feeCard)
+
+        let note = UILabel()
+        note.text = tr("Ajoutés au prix de chaque unité vendue et affichés sur la commande.", "Added to each unit sold and shown on the order.")
+        note.font = .systemFont(ofSize: 13)
+        note.textColor = PCTheme.sub
+        note.numberOfLines = 0
+        note.translatesAutoresizingMaskIntoConstraints = false
+        note.alpha = 0
+        view.addSubview(note)
+
         NSLayoutConstraint.activate([
             card.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 16),
             card.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             card.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            feeCard.topAnchor.constraint(equalTo: card.bottomAnchor, constant: 12),
+            feeCard.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            feeCard.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            note.topAnchor.constraint(equalTo: feeCard.bottomAnchor, constant: 8),
+            note.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 6),
+            note.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -6),
         ])
-        UIView.animate(withDuration: 0.25) { card.alpha = 1 }
+        UIView.animate(withDuration: 0.25) { card.alpha = 1; feeCard.alpha = 1; note.alpha = 1 }
     }
 }
 
@@ -730,6 +794,7 @@ final class ProductCreatorViewController: UIViewController {
     private var collections = [tr("Page d'accueil", "Home page")]
     private var variants = ""
     private var physical = true
+    private var fee: Double = 0
     private var img = ""
     private var imgImage: UIImage?
     private let photoPicker = PCPhotoPicker()
@@ -913,7 +978,7 @@ final class ProductCreatorViewController: UIViewController {
         content.addArrangedSubview(pcCard([stockRow]))
 
         // Expédition · Type · Fournisseur · Collections · Balises · SEO.
-        let shippingRow = PCRow(symbol: "shippingbox", title: tr("Expédition", "Shipping"))
+        let shippingRow = PCRow(symbol: "shippingbox", title: tr("Expédition et frais de service", "Shipping & service fee"))
         shippingRow.onTap { [weak self] in self?.openShipping() }
         typeRow.onTap { [weak self] in self?.pickType() }
         vendorRow.onTap { [weak self] in self?.pickVendor() }
@@ -1169,8 +1234,9 @@ final class ProductCreatorViewController: UIViewController {
     }
 
     private func openShipping() {
-        let sheet = PCShippingSheet(physical: physical)
+        let sheet = PCShippingSheet(physical: physical, fee: fee, currency: currency)
         sheet.onChange = { [weak self] v in self?.physical = v }
+        sheet.onFeeChange = { [weak self] v in self?.fee = v }
         present(sheet, animated: true)
     }
 
@@ -1192,6 +1258,7 @@ final class ProductCreatorViewController: UIViewController {
             "collections": collections,
             "vars": variants,
             "physical": physical,
+            "fee": fee,
             "img": img,
         ])
         dismiss(animated: true)
