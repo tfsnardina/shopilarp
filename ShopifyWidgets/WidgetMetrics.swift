@@ -3,10 +3,16 @@ import Foundation
 // MARK: - Textes (même langues que l'app : fr / en / es / de)
 
 enum WText {
+    /// Langue choisie dans l'app (envoyée dans le snapshot) ; à défaut, celle du téléphone.
+    static var override: String?
+
     static var lang: String {
+        if let o = override, !o.isEmpty { return o }
         let p = Locale.preferredLanguages.first ?? "en"
         return String(p.prefix(2)).lowercased()
     }
+
+    static var locale: Locale { override?.isEmpty == false ? Locale(identifier: lang) : Locale.current }
 
     private static let table: [String: [String: String]] = [
         "totalSales": ["fr": "Ventes totales", "en": "Total sales", "es": "Ventas totales", "de": "Gesamtumsatz"],
@@ -68,6 +74,7 @@ struct WidgetMetrics {
 
     /// Snapshot + commandes planifiées pendant que l'app est fermée (même logique que « consumeBg »).
     static func make(_ snap: ShopifyWidgetSnapshot, at date: Date) -> WidgetMetrics {
+        WText.override = snap.lang
         let now = date.timeIntervalSince1970 * 1000
         let day = 86_400_000.0
         var s = snap.s, o = snap.o, se = snap.se, net = snap.net
@@ -154,7 +161,8 @@ struct WidgetMetrics {
 
     // Boutique vide : tout à zéro (utilisé tant que l'app n'a rien envoyé au widget).
     static var empty: WidgetMetrics {
-        WidgetMetrics(
+        WText.override = nil
+        return WidgetMetrics(
             store: WText.t("myStore"), updated: Date(),
             sales: 0, visits: 0, aov: 0, conv: 0, orders: 0, net: 0, visitors: 0,
             dSales: 0, dVisits: 0, dAov: 0, dConv: 0, dOrders: 0, dNet: 0, dVisitors: 0,
@@ -187,7 +195,7 @@ enum WFormat {
 
     static func number(_ v: Double, decimals: Int, grouping: Bool = true) -> String {
         let nf = NumberFormatter()
-        nf.locale = Locale.current
+        nf.locale = WText.locale
         nf.numberStyle = .decimal
         nf.usesGroupingSeparator = grouping
         nf.minimumFractionDigits = decimals
@@ -209,7 +217,7 @@ enum WFormat {
     static func rate(_ v: Double) -> String {
         let decimals = (v >= 10 || v == 0) ? 1 : (v < 1 ? 2 : 1)
         var s = number(v, decimals: decimals)
-        let sep = Locale.current.decimalSeparator ?? "."
+        let sep = WText.locale.decimalSeparator ?? "."
         if s.hasSuffix(sep + "0") { s.removeLast(sep.count + 1) }
         return s + percentSuffix
     }
@@ -220,7 +228,7 @@ enum WFormat {
 
     static func time(_ date: Date) -> String {
         let f = DateFormatter()
-        f.locale = Locale.current
+        f.locale = WText.locale
         f.timeStyle = .short
         f.dateStyle = .none
         return f.string(from: date)
