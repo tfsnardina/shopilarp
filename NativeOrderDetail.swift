@@ -526,12 +526,15 @@ final class ODFulfillSheet: PCSheetBase {
     private let labels: [String: String]
     private let carrier: String
     private let items: [[String: Any]]
+    /// Produit numérique : pas de numéro de suivi ni de transporteur, tout part par e-mail.
+    private let digital: Bool
     var onFulfill: ((String, String) -> Void)?
 
-    init(labels: [String: String], carrier: String, items: [[String: Any]]) {
+    init(labels: [String: String], carrier: String, items: [[String: Any]], digital: Bool = false) {
         self.labels = labels
         self.carrier = carrier
         self.items = items
+        self.digital = digital
         super.init(title: labels["Fulfill items"] ?? "Fulfill items", detents: [.medium(), .large()])
     }
 
@@ -554,6 +557,7 @@ final class ODFulfillSheet: PCSheetBase {
         }
         if !rows.isEmpty { rows.append(ODSeparator()) }
 
+        if !digital {
         trackField.placeholder = labels["Add tracking number"] ?? "Add tracking number"
         trackField.font = .systemFont(ofSize: 16)
         trackField.textColor = PCTheme.ink
@@ -574,6 +578,7 @@ final class ODFulfillSheet: PCSheetBase {
         rows.append(ODSeparator())
         rows.append(ODKVRow(label: labels["Shipping carrier"] ?? "Shipping carrier", value: carrier))
         rows.append(ODSeparator())
+        }
 
         notify.isOn = true
         notify.onTintColor = PCTheme.ink
@@ -884,7 +889,8 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
         content.addArrangedSubview(titleWrap)
 
         buildCustomer()
-        buildAddress()
+        // Produit non physique : pas d'adresse de livraison sur la commande.
+        if !flag("digital") { buildAddress() }
         buildItems()
         buildPayment()
         buildNotes()
@@ -961,13 +967,15 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
 
         if flag("fulfilled") {
             rows.append(ODSeparator())
-            let truck = PCDRow(symbol: "box.truck", title: str("carrier"), bold: true, chevron: false)
+            let truck = PCDRow(symbol: flag("digital") ? "envelope" : "box.truck", title: str("carrier"), bold: true, chevron: false)
             truck.setSub(str("trk"))
             rows.append(truck)
-            rows.append(ODButtonRow(button: secondaryButton(lb("Track"), symbol: "location") { [weak self] in
-                guard let self else { return }
-                self.showToast(self.lb("Track"))
-            }))
+            if !flag("digital") {
+                rows.append(ODButtonRow(button: secondaryButton(lb("Track"), symbol: "location") { [weak self] in
+                    guard let self else { return }
+                    self.showToast(self.lb("Track"))
+                }))
+            }
         } else {
             rows.append(ODButtonRow(button: primaryButton(lb("Fulfill items"), disables: false) { [weak self] in self?.openFulfill() }))
         }
@@ -1049,7 +1057,7 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
 
     private func openFulfill() {
         view.endEditing(true)
-        let sheet = ODFulfillSheet(labels: labels(), carrier: str("defaultCarrier"), items: list("items"))
+        let sheet = ODFulfillSheet(labels: labels(), carrier: str("defaultCarrier"), items: list("items"), digital: flag("digital"))
         sheet.onFulfill = { [weak self] trk, carrier in
             self?.send(["act": "fulfill", "trk": trk, "carrier": carrier])
         }
