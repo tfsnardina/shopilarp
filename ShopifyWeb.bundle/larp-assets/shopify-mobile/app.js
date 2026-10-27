@@ -3,11 +3,16 @@
   "use strict";
   var P = JSON.parse(document.getElementById("payload").textContent || "{}");
   var S = P.st, D = P.d;
+  /* The payload is saved with S.now = the moment of the last "Save" in Preferences. Reopening the app later used
+     to restart the app clock from that old moment, so everything created afterwards (orders made while the app was
+     closed, live orders, the hourly chart) landed hours / an hour behind the real clock. Always start from the real
+     time now; the store offset below is then also computed for today's date (daylight saving time). */
+  if (S) S.now = Date.now();
   /* Store clock: the base data is on New York time (UTC-4). For a store in another country the clock used for the
      hourly chart ("Today" / "Yesterday") and the order times must be that country's, otherwise a store in France
      starts its day at 6 am and the "Today" chart has a single point (= no line) until 7 am. */
   (function storeClock() {
-    var TZ = { FR: "Europe/Paris", DE: "Europe/Berlin", ES: "Europe/Madrid", IT: "Europe/Rome", NL: "Europe/Amsterdam", BE: "Europe/Brussels", IE: "Europe/Dublin", GB: "Europe/London", CH: "Europe/Zurich", AU: "Australia/Sydney", JP: "Asia/Tokyo" };
+    var TZ = { US: "America/New_York", FR: "Europe/Paris", DE: "Europe/Berlin", ES: "Europe/Madrid", IT: "Europe/Rome", NL: "Europe/Amsterdam", BE: "Europe/Brussels", IE: "Europe/Dublin", GB: "Europe/London", CH: "Europe/Zurich", AU: "Australia/Sydney", JP: "Asia/Tokyo" };
     var tz = S && TZ[S.country];
     if (!tz || !window.Intl || !Intl.DateTimeFormat) return;
     try {
