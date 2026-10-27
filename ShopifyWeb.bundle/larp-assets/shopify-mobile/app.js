@@ -2940,7 +2940,7 @@
   }
   function newOrder() {
     // No products in the store => nobody can buy anything: never fall back to the demo products.
-    if (!prods.length) return;
+    if (!prods.length || noOrdersVibe()) return;
     var pool = sellable();
     if (!pool.length) return;            // everything is a draft or sold out: nothing to buy
     var lines = userLines(pool);
@@ -2986,7 +2986,7 @@
     lastPlan = Date.now();
     try {
       var cfg = savedSettingsObj(), pool = prods.length ? sellable() : [];
-      if (S.pops === false || !pool.length) { if (cfg.__bg) { delete cfg.__bg; writeSettings(cfg); } nativeBg([]); return; }
+      if (S.pops === false || !pool.length || noOrdersVibe()) { if (cfg.__bg) { delete cfg.__bg; writeSettings(cfg); } nativeBg([]); return; }
       var vibe = larpVibe(), pc = BG_PACE[vibe] || BG_PACE.growing;
       var base = orders[0] ? orders[0].n : S.lastN, at = Date.now() + (vibe === "exploding" ? 12 + Math.random() * 20 : 25 + Math.random() * 50) * 1000;
       var specs = [], items = [];
@@ -3080,7 +3080,10 @@
     if (!vibe) { try { vibe = (readCfgFresh() || {}).vibe; } catch (e) { } }
     return vibe;
   }
+  // "Visitors only" and "Dead quiet" vibes: the store never receives an order.
+  function noOrdersVibe() { var v = larpVibe(); return v === "visitors" || v === "dead"; }
   function scheduleOrder(first) {
+    if (noOrdersVibe()) { setTimeout(function () { scheduleOrder(first); }, 4000); return; }   // keep watching: the vibe can change while the app is open
     // EXPLODING = spam mode: an order every 0.6-3 s, often in bursts of 1-3.
     if (larpVibe() === "exploding") {
       var w = first ? 1 : 0.6 + Math.random() * 2.4;
@@ -3177,6 +3180,7 @@
     else if (live.carts > Math.max(wantCarts, cartHold) && Math.random() < 0.5) live.carts -= 1;
     else if (live.carts > cartHold && Math.random() < 0.06) live.carts -= 1;
     live.carts = Math.max(0, live.carts); live.checkingOut = Math.max(keep, live.checkingOut);
+    if (larpVibe() === "visitors") live.checkingOut = 0;   // they browse and fill carts, but nobody pays
     showFunnel();
     var lc = document.getElementById("lvLoc");
     if (lc && (locTick = (locTick + 1) % 5) === 0) { var h = locRows(); if (lc._h !== h) { lc._h = h; lc.innerHTML = h; if (window.I18N) window.I18N.apply(lc); } }
@@ -3188,6 +3192,11 @@
   }
   setInterval(function () {
     var v = live.visitors;
+    if (larpVibe() === "dead") {            // nobody on the store at all
+      live.visitors = 0; live.carts = 0; live.checkingOut = 0; cartHold = 0; buyerQ.length = 0;
+      showVisitors(); showFunnel(); return;
+    }
+    if (larpVibe() === "visitors" && v < 1) { live.visitors = v = 3 + Math.floor(Math.random() * 6); showVisitors(); }   // people are browsing from the start
     if (v <= 0 && larpVibe() !== "exploding") { funnelTick(); return; }
     if (larpVibe() === "exploding") {
       // 88% up (+3 to +3+6% of current), 12% small dip -> strong upward trend
