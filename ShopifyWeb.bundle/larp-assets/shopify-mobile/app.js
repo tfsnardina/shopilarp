@@ -3114,7 +3114,7 @@
     var off = Number(S.off) || 0, now = Date.now();
     var dayStart = Math.floor((now + off) / DAY) * DAY - off;
     return {
-      v: 1, store: S.name, sym: S.sym, cur: S.cur, dec: S.dec == null ? 2 : S.dec, ts: now, off: off, dayEnd: dayStart + DAY,
+      v: 1, store: S.name, sym: S.sym, cur: S.cur, lang: (window.I18N && window.I18N.lang) || "en", dec: S.dec == null ? 2 : S.dec, ts: now, off: off, dayEnd: dayStart + DAY,
       s: Math.round(t.s), o: Math.round(t.o), se: Math.round(t.se), net: Math.round(g - dc - rt),
       ps: Math.round(pt.s), po: Math.round(pt.o), pse: Math.round(pt.se), pnet: Math.round(pg - pdc - prt),
       hs: hs, ho: ho, he: he, plan: wPlan
