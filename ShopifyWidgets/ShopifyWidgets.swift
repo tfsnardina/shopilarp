@@ -11,11 +11,15 @@ struct ShopifyEntry: TimelineEntry {
 struct ShopifyProvider: TimelineProvider {
     var counter = false
 
+    // Maquette : uniquement pour la galerie de widgets (aperçu / placeholder).
     private func demo() -> WidgetMetrics {
         var m = WidgetMetrics.sample
         if counter { m.orders = 1256 }
         return m
     }
+
+    // Aucune donnée reçue de l'app : on affiche 0 (jamais les chiffres de démo).
+    private func empty() -> WidgetMetrics { WidgetMetrics.empty }
 
     func placeholder(in context: Context) -> ShopifyEntry {
         ShopifyEntry(date: Date(), metrics: demo())
@@ -30,7 +34,7 @@ struct ShopifyProvider: TimelineProvider {
         if let snap = ShopifyWidgetStore.load() {
             completion(ShopifyEntry(date: now, metrics: WidgetMetrics.make(snap, at: now)))
         } else {
-            completion(ShopifyEntry(date: now, metrics: demo()))
+            completion(ShopifyEntry(date: now, metrics: empty()))
         }
     }
 
@@ -38,7 +42,7 @@ struct ShopifyProvider: TimelineProvider {
         let now = Date()
         let next = now.addingTimeInterval(15 * 60)
         guard let snap = ShopifyWidgetStore.load() else {
-            completion(Timeline(entries: [ShopifyEntry(date: now, metrics: demo())], policy: .after(next)))
+            completion(Timeline(entries: [ShopifyEntry(date: now, metrics: empty())], policy: .after(next)))
             return
         }
         // Une entrée maintenant + une à chaque commande planifiée (app fermée) dans les 6 prochaines heures.
