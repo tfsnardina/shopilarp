@@ -166,6 +166,10 @@ enum WebViewContainer {
                 }
                 return
             }
+            if message.name == "larpWidget" {
+                WidgetBridge.update(body: message.body)
+                return
+            }
             if message.name == "larpTabbar", let dict = message.body as? [String: Any] {
                 let active = (dict["active"] as? String) ?? "home"
                 let hidden = (dict["hidden"] as? NSNumber)?.boolValue ?? false
@@ -432,6 +436,7 @@ final class WebHostViewController: UIViewController {
         let old = webView?.configuration.userContentController
         old?.removeScriptMessageHandler(forName: "shopifyOrder")
         old?.removeScriptMessageHandler(forName: "larpStore")
+        old?.removeScriptMessageHandler(forName: "larpWidget")
         old?.removeScriptMessageHandler(forName: "shopifySchedule")
         old?.removeScriptMessageHandler(forName: "larpStatusBar")
         old?.removeScriptMessageHandler(forName: "larpHaptic")
@@ -452,6 +457,7 @@ final class WebHostViewController: UIViewController {
         config.defaultWebpagePreferences.allowsContentJavaScript = true
         config.userContentController.add(coordinator, name: "shopifyOrder")
         config.userContentController.add(coordinator, name: "larpStore")
+        config.userContentController.add(coordinator, name: "larpWidget")
         config.userContentController.add(coordinator, name: "shopifySchedule")
         config.userContentController.add(coordinator, name: "larpStatusBar")
         config.userContentController.add(coordinator, name: "larpHaptic")
