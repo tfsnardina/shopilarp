@@ -8,6 +8,8 @@ const SHOPIFY_VIBES = [
   { id: 'declining', title: 'Declining', desc: 'Sales trending down. An order every ~50s.' },
   { id: 'newstore', title: 'New store', desc: 'Just launched. An order every ~75s.' },
   { id: 'highrisk', title: 'High risk', desc: 'Choppy: flurries, then quiet spells.' },
+  { id: 'visitors', title: 'Visitors only', desc: 'People browse the store, but no order ever comes in.' },
+  { id: 'dead', title: 'Dead quiet', desc: 'No visitors and no orders at all.' },
 ]
 
 const SHOPIFY_CURRENCIES = [
