@@ -152,6 +152,18 @@ struct WidgetMetrics {
         while c.count < n { c.append(0) }
     }
 
+    // Boutique vide : tout à zéro (utilisé tant que l'app n'a rien envoyé au widget).
+    static var empty: WidgetMetrics {
+        WidgetMetrics(
+            store: WText.t("myStore"), updated: Date(),
+            sales: 0, visits: 0, aov: 0, conv: 0, orders: 0, net: 0, visitors: 0,
+            dSales: 0, dVisits: 0, dAov: 0, dConv: 0, dOrders: 0, dNet: 0, dVisitors: 0,
+            barsSales: (0..<24).map { _ in nil }, lineVisits: [], lineAov: [], lineConv: [],
+            lineOrders: [], lineNet: [], lineVisitors: [],
+            sym: "$", dec: 2
+        )
+    }
+
     // Maquette utilisée dans la galerie de widgets (valeurs des captures Shopify).
     static var sample: WidgetMetrics {
         let hours: [Double] = [0, 0, 0, 0, 0, 0, 0, 6, 14, 22, 24, 20, 23, 28, 25, 19, 26, 30, 27, 22, 14, 8, 3, 0]
