@@ -24,6 +24,28 @@
       if (isFinite(off) && Math.abs(off) <= 14 * 3600000) S.off = off;
     } catch (e) { }
   })();
+  /* DAY ROLLOVER: the base data ends on the day it was generated (S.n days after day 0), so "today" used to stay
+     frozen on that date forever: totals kept piling up on one day, "Yesterday" was empty, and 7d / 30d / 90d
+     started from the wrong date. Day indexes are now calendar dates (day 0 = the base date, store local time):
+     the arrays are padded with empty days up to the real today, and the hourly rows are rolled over. */
+  (function rollToToday() {
+    if (!S || !P.d) return;
+    var DAYMS = 86400000, off = Number(S.off) || 0;
+    var dayBase = Math.floor(Number(S.day0) / DAYMS) * DAYMS;   // base date at 00:00 (wall clock read as UTC)
+    S.day0 = dayBase - off;                                     // instant of that local midnight, for the store clock
+    var n0 = Number(S.n) || 0;
+    S.n0 = n0;
+    var gap = Math.floor((Date.now() + off - dayBase) / DAYMS) - (n0 - 1);
+    if (gap > 0) {
+      Object.keys(P.d).forEach(function (k) { var a = P.d[k]; if (Array.isArray(a)) for (var i = 0; i < gap; i++) a.push(0); });
+      S.n = n0 + gap;
+      if (P.hr && P.hr.t && P.hr.y) {
+        var zero = function (rows) { return rows.map(function (r) { return Array.isArray(r) ? r.map(function () { return 0; }) : 0; }); };
+        if (gap === 1) P.hr.y = P.hr.t; else P.hr.y = zero(P.hr.y);
+        P.hr.t = zero(P.hr.t);
+      }
+    }
+  })();
   /* Store in France: the base data is American (cities, states, ZIP codes, +1 phones). Swap it, once, for French
      cities / regions / postcodes / streets / phones. Every US city always maps to the same French city, so a
      customer and their orders stay in the same place, and new orders (built from these templates) are French too. */
@@ -301,7 +323,7 @@
       var inv = {};
       prods.forEach(function (p) { inv[p.title] = [p.inv, p.baseInv, p.sold]; });
       var snap = {
-        v: STATE_V, D: D, hrT: HR.t, purchased: live.purchased, custTotal: S.custTotal, custs: cl, inv: inv,
+        v: STATE_V, D: D, hrT: HR.t, hrY: HR.y, hrDay: T, purchased: live.purchased, custTotal: S.custTotal, custs: cl, inv: inv,
         pay: { base: Number(CFG.payoutBalance) || 0, bal: S.payout || 0, tr: transfers, accts: payAccts, pp: payPal, sel: paySel },
         orders: list.map(function (o) {
           var c = Object.assign({}, o);
@@ -331,8 +353,23 @@
     if (!snap || (snap.v !== 1 && snap.v !== 2) || !Array.isArray(snap.orders)) return;
     if (!prods.length) return;   // no products => any saved order/customer comes from the old demo data: ignore it
     try {
-      Object.keys(snap.D || {}).forEach(function (k) { if (D[k] && snap.D[k] && D[k].length === snap.D[k].length) D[k] = snap.D[k]; });
-      if (snap.hrT) HR.t = snap.hrT;
+      // Day i is a calendar date, so a saved series simply fills the first days; the days since are already empty.
+      Object.keys(snap.D || {}).forEach(function (k) {
+        if (!D[k] || !Array.isArray(snap.D[k])) return;
+        for (var di = 0; di < D[k].length && di < snap.D[k].length; di++) D[k][di] = snap.D[k][di] || 0;
+      });
+      var zeroHr = function (rows) { return rows.map(function (r) { return Array.isArray(r) ? r.map(function () { return 0; }) : 0; }); };
+      if (snap.hrDay === undefined) {
+        // Saved by the old build (no day rollover): everything since the base date was piled onto one day. Put the
+        // saved orders back on their real day, and rebuild today's / yesterday's hourly rows from them.
+        if (snap.hrT && T === (S.n0 || S.n) - 1) HR.t = snap.hrT;
+      } else if (snap.hrDay === T) {
+        if (snap.hrT) HR.t = snap.hrT;
+        if (snap.hrY) HR.y = snap.hrY;
+      } else if (snap.hrDay === T - 1) {
+        if (snap.hrT) HR.y = snap.hrT;
+        HR.t = zeroHr(HR.t);
+      } else { HR.t = zeroHr(HR.t); HR.y = zeroHr(HR.y); }
       live.purchased = snap.purchased || 0;
       S.custTotal = snap.custTotal || 0;
       custs = (snap.custs || []).slice();
@@ -346,6 +383,19 @@
         o.items = c.items.map(function (x) { return { p: typeof x[0] === "number" ? (allProds[x[0]] || allProds[0]) : lookupProd(x[0], x[2]), q: x[1], price: x[2] }; });
         return o;
       });
+      if (snap.hrDay === undefined && T > (S.n0 || S.n) - 1) {
+        var legacy = (S.n0 || S.n) - 1;
+        HR.t = zeroHr(HR.t); HR.y = zeroHr(HR.y);
+        orders.forEach(function (o) {
+          var dd = dayIdx(o.ts), hh = L(o.ts).getUTCHours();
+          if (dd !== legacy && dd >= 0 && dd <= T) {
+            var mv = { s: o.total, o: 1, g: o.sub, dc: o.disc, sh: o.ship + (o.fee || 0), tx: o.tax, u: o.items.reduce(function (t, x) { return t + x.q; }, 0), se: 1 };
+            Object.keys(mv).forEach(function (k) { if (D[k]) { D[k][legacy] = Math.max(0, (D[k][legacy] || 0) - mv[k]); D[k][dd] = (D[k][dd] || 0) + mv[k]; } });
+          }
+          var H = dd === T ? HR.t : dd === T - 1 ? HR.y : null;
+          if (H) { H[0][hh] += o.total; H[1][hh] += 1; H[2][hh] += 1; }
+        });
+      }
       lastSnap = JSON.stringify(snap);
     } catch (e) { }
   })();
@@ -3130,6 +3180,26 @@
       h.postMessage(JSON.stringify(snap));
     } catch (e) { }
   }
+  /* Midnight while the app is open: a new day starts (empty today, today's hourly row becomes yesterday's). */
+  function checkNewDay() {
+    var cur = dayIdx(nowMs());
+    if (cur <= T) return;
+    var gap = cur - T;
+    Object.keys(D).forEach(function (k) { if (Array.isArray(D[k])) for (var i = 0; i < gap; i++) D[k].push(0); });
+    S.n += gap; N = S.n;
+    var zeroHr = function (rows) { return rows.map(function (r) { return Array.isArray(r) ? r.map(function () { return 0; }) : 0; }); };
+    HR.y = gap === 1 ? HR.t : zeroHr(HR.t);
+    HR.t = zeroHr(HR.t);
+    T = cur;
+    try {
+      saveState();
+      ["home", "orders", "products", "menu"].forEach(function (k) { rendered[k] = 0; });
+      if (typeof stack !== "undefined" && !stack.length && RENDER[current]) { RENDER[current](); rendered[current] = 1; }
+      pushWidget(true);
+    } catch (e) { }
+  }
+  setInterval(checkNewDay, 15000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) checkNewDay(); });
   setInterval(pushWidget, 2500);
   setTimeout(function () { pushWidget(true); }, 700);
   document.addEventListener("visibilitychange", function () { if (document.hidden) pushWidget(true); });
