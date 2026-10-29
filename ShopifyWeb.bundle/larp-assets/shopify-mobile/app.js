@@ -3104,6 +3104,8 @@
       var base = orders[0] ? orders[0].n : S.lastN, at = Date.now() + (vibe === "exploding" ? 12 + Math.random() * 20 : vibe === "slow" ? 300 + Math.random() * 900 : 25 + Math.random() * 50) * 1000;
       var specs = [], items = [];
       wPlan = [];
+      var dnList = vibe === "daynight" ? dnUpcoming(Date.now(), 60) : null;
+      if (dnList) { if (!dnList.length) { nativeBg([]); wPlan = []; return; } at = dnList[0]; }
       for (var i = 0; i < 60; i++) {
         var lines = userLines(pool), idx = Math.floor(Math.random() * Math.min(P.ord.length, 60));
         var o = makeOrder(lines, 0, idx); if (!o) break;
@@ -3112,7 +3114,8 @@
         specs.push({ at: Math.round(at), n: o.n, src: idx, lines: lines.map(function (l) { return [l[0].title, l[1]]; }), pay: o.pay, ch: o.ch });
         items.push({ at: Math.round(at), title: L10n("Order #" + o.n), body: L10n(pushBody(o)) });
         wPlan.push({ at: Math.round(at), s: o.total, g: o.sub, d: o.disc, se: 2 });
-        at += 1000 * Math.min(pc[2], Math.max(pc[1], -Math.log(1 - Math.random()) * pc[0]));
+        if (dnList) { if (i + 1 >= dnList.length) break; at = dnList[i + 1]; }
+        else at += 1000 * Math.min(pc[2], Math.max(pc[1], -Math.log(1 - Math.random()) * pc[0]));
       }
       cfg.__bg = specs; writeSettings(cfg);
       nativeBg(items);
@@ -3284,8 +3287,56 @@
   }
   // "Visitors only" and "Dead quiet" vibes: the store never receives an order.
   function noOrdersVibe() { var v = larpVibe(); return v === "visitors" || v === "dead"; }
+  /* ── Vibe « Day / Night » ──────────────────────────────────
+     Night (store local time, 0h -> 8h): almost nothing, 1 order at most for the whole night.
+     Day (8h -> midnight): 6 orders at most. Change the 4 numbers below to taste.
+     Each period gets a fixed schedule (seeded by the period's start), so it is the same after a restart and the
+     caps can never be exceeded. Orders whose time passed while the app was closed are simply skipped. */
+  var DN = { nightEnd: 8, nightMax: 1, dayMax: 6, dayMin: 4 };
+  function dnRng(seed) { var a = seed >>> 0; return function () { a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  function dnPeriod(ms) {
+    var off = Number(S.off) || 0, loc = ms + off, d0 = Math.floor(loc / 86400000) * 86400000, ne = d0 + DN.nightEnd * 3600000;
+    return loc < ne ? { start: d0 - off, end: ne - off, night: true } : { start: ne - off, end: d0 + 86400000 - off, night: false };
+  }
+  function dnTimes(per) {
+    var r = dnRng(Math.floor(per.start / 60000)), len = per.end - per.start, out = [], k;
+    if (per.night) k = Math.floor(r() * (DN.nightMax + 1));                 // 0 or 1 order all night
+    else k = DN.dayMax - Math.floor(r() * (DN.dayMax - DN.dayMin + 1));     // dayMin..dayMax orders
+    for (var i = 0; i < k; i++) out.push(per.start + 600000 + r() * (len - 1200000));
+    return out.sort(function (a, b) { return a - b; });
+  }
+  function dnNext(now) {      // next planned order time (ms), strictly in the future
+    var per = dnPeriod(now);
+    for (var i = 0; i < 6; i++) {
+      var t = dnTimes(per).filter(function (x) { return x > now; })[0];
+      if (t) return t;
+      per = dnPeriod(per.end + 1000);
+    }
+    return now + 3600000;
+  }
+  function dnUpcoming(now, max) {
+    var out = [], per = dnPeriod(now);
+    for (var i = 0; i < 12 && out.length < max; i++) {
+      dnTimes(per).forEach(function (x) { if (x > now && out.length < max) out.push(x); });
+      per = dnPeriod(per.end + 1000);
+    }
+    return out;
+  }
+  function dnRoom(ms) {       // cap check: never more than the period's maximum
+    var per = dnPeriod(ms), c = orders.filter(function (o) { return o.ts >= per.start && o.ts < per.end; }).length;
+    return c < (per.night ? DN.nightMax : DN.dayMax);
+  }
   function scheduleOrder(first) {
     if (noOrdersVibe()) { setTimeout(function () { scheduleOrder(first); }, 4000); return; }   // keep watching: the vibe can change while the app is open
+    if (larpVibe() === "daynight") {
+      var nx = dnNext(nowMs()), wait0 = Math.max(1, (nx - nowMs()) / 1000), step = Math.min(wait0, 60);
+      if (step === wait0) funnelPrime(wait0, 0);
+      setTimeout(function () {
+        if (larpVibe() === "daynight" && nowMs() >= nx - 1500 && !document.hidden && dnRoom(nx)) newOrder();
+        scheduleOrder(false);
+      }, step * 1000);
+      return;
+    }
     // EXPLODING = spam mode: an order every 0.6-3 s, often in bursts of 1-3.
     if (larpVibe() === "exploding") {
       var w = first ? 1 : 0.6 + Math.random() * 2.4;
@@ -3401,6 +3452,9 @@
       live.visitors = 0; live.carts = 0; live.checkingOut = 0; cartHold = 0; buyerQ.length = 0;
       showVisitors(); showFunnel(); return;
     }
+    var dn = larpVibe() === "daynight", dnNight = dn && dnPeriod(nowMs()).night, dnCap = dnNight ? 2 : 12;
+    if (dn && v < 1 && !dnNight) { live.visitors = v = 2 + Math.floor(Math.random() * 4); showVisitors(); }
+    if (dn && v > dnCap) { live.visitors = v = dnCap; showVisitors(); }
     if (larpVibe() === "slow" && v < 1) { live.visitors = v = 1 + Math.floor(Math.random() * 4); showVisitors(); }   // a few people on the store, never more than 10
     if (larpVibe() === "visitors" && v < 1) { live.visitors = v = 3 + Math.floor(Math.random() * 6); showVisitors(); }   // people are browsing from the start
     if (v <= 0 && larpVibe() !== "exploding") { funnelTick(); return; }
@@ -3415,6 +3469,7 @@
     if (Math.random() >= 0.55) {
       live.visitors = Math.max(1, v + d * (v > 40 ? Math.ceil(Math.random() * v * 0.04) : 1));
       if (larpVibe() === "slow") live.visitors = Math.min(10, live.visitors);
+      if (dn) live.visitors = Math.min(dnCap, live.visitors);
       showVisitors();
     }
     funnelTick();
