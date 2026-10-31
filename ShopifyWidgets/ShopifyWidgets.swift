@@ -94,5 +94,7 @@ struct ShopifyWidgetsBundle: WidgetBundle {
     var body: some Widget {
         ShopifyCounterWidget()
         ShopifyInsightsWidget()
+        ShopifyLockSalesWidget()
+        ShopifyLockGrossWidget()
     }
 }
