@@ -481,7 +481,7 @@
     aov: { t: "Average order value", k: "money", v: function (x) { return x.o ? x.s / x.o : 0; } },
   };
   var MET_ORDER = ["sales", "orders", "conv", "sessions", "aov"];
-  var RANGES = [["today", "Today"], ["yday", "Yesterday"], ["7d", "Last 7 days"], ["30d", "Last 30 days"], ["90d", "Last 90 days"], ["365d", "Last 365 days"]];
+  var RANGES = [["today", "Aujourd\u2019hui"], ["yday", "Hier"], ["7d", "7 derniers jours"], ["30d", "30 derniers jours"], ["90d", "90 derniers jours"], ["365d", "365 derniers jours"]];
   var curHour = function () { return L(nowMs()).getUTCHours(); };
   function rangeData(key) {
     // Returns totals and chart buckets for the range and its previous period.
@@ -1108,7 +1108,7 @@
     });
   }
   function rangeShort(k) { return { today: "Today", yday: "Yesterday", "7d": "7 days", "30d": "30 days", "90d": "90 days", "365d": "365 days" }[k] || k; }
-  function rangeLabel(k) { for (var i = 0; i < RANGES.length; i++) if (RANGES[i][0] === k) return RANGES[i][1]; return k; }
+  function rangeLabel(k) { if (window.__anCur && window.__anCur.k === k) return window.__anCur.lbl; for (var i = 0; i < RANGES.length; i++) if (RANGES[i][0] === k) return RANGES[i][1]; return k; }
   function showTip(i, g) {
     var tip = $("#tip");
     if (!tip) return;
@@ -2267,6 +2267,7 @@
 
   /* ── Analytics ───────────────────────────────────────────── */
   var anRange = "today";
+  var RANGE_FR = [["Aujourd\u2019hui","today"],["Hier","yday"],["30 dernières minutes","today"],["12 dernières heures","today"],["7 derniers jours","7d"],["30 derniers jours","30d"],["90 derniers jours","90d"],["365 derniers jours","365d"],["La semaine dernière","7d"],["Le mois dernier","30d"],["Le trimestre dernier","90d"],["12 derniers mois","365d"],["L\u2019année dernière","365d"]];
   function openAnalytics() { navigate("analytics"); }
   function drawAnalytics(el) {
     var R = rangeData(anRange);
@@ -2284,7 +2285,7 @@
     var small = function (title, val, cv, pv, key) { return '<div class="an-c sm"' + (key ? ' data-anm="' + key + '"' : "") + '><div class="an-t">' + esc(title) + '</div><div class="an-v"><b>' + val + "</b>" + chgHtml(change(cv, pv), "lt") + '</div><div class="an-sp"></div></div>'; };
     var big = function (k) { var M = MET[k]; var cv = M.v(t), pv = M.v(pt); return '<div class="an-c" data-anm="' + k + '" data-big="1"><div class="an-t">' + esc(M.t + " over time") + '</div><div class="an-v"><b>' + fmtMet(M.k, cv) + "</b>" + chgHtml(change(cv, pv), "lt") + '</div><div class="an-ch"></div><div class="an-lg"><span><i class="cur"></i>' + esc(curLbl) + '</span><span><i class="prv"></i>' + esc(prevLbl) + "</span></div></div>"; };
     var brkRow = function (lbl, v, pv, bold) { return '<div class="' + (bold ? "b" : "") + '"><span class="lk">' + lbl + "</span><b>" + money(v) + "</b>" + chgHtml(change(Math.abs(v), Math.abs(pv)), "lt") + "</div>"; };
-    $("#an", el).innerHTML = '<div class="an-hair"></div><div class="an-pl"><button class="anpl" data-act="anrange">' + ic("calendar") + "<span>" + esc(rangeLabel(anRange)) + "</span>" + ic("chev-down") + '</button><button class="anpl" data-act="ancompare">' + ic("calendar") + "<span>" + esc(prevLbl) + '</span></button><button class="anpl" data-act="ancur">' + ic("cash") + "<span>" + esc(S.cur + " " + S.sym.trim()) + "</span></button></div>" +
+    $("#an", el).innerHTML = '<div class="an-hair"></div><div class="an-pl"><button class="anpl" data-act="anrange">' + ic("calendar") + "<span>" + esc(rangeLabel(anRange)) + "</span>" + ic("chev-down") + '</button><button class="anpl" data-act="ancompare">' + ic("calsync") + "<span>" + esc(prevLbl) + '</span></button><button class="anpl" data-act="ancur">' + ic("curswap") + "<span>" + esc(S.cur + " " + S.sym.trim()) + "</span></button></div>" +
       small("Gross sales", money(gross), gross, pgross, "gross") +
       small("Returning customer rate", pctStr(oo ? (rc / oo) * 100 : 0), oo ? rc / oo : 0, poo ? prc / poo : 0, "rcr") +
       small("Orders fulfilled", count(fulfilled), fulfilled, pful, "ful") +
@@ -3519,8 +3520,8 @@
       case "capture": closeAll(); oFilter = "Unpaid"; oShown = 40; setTab("orders"); return;
       case "inventory": closeAll(); pFilter = "All"; setTab("products"); return;
       case "range": return rangeSheet();
-      case "anrange": return optSheet("Date range", RANGES.map(function (r) { return r[1]; }), rangeLabel(anRange), function (v) {
-        RANGES.forEach(function (r) { if (r[1] === v) anRange = r[0]; });
+      case "anrange": return optSheet("Plage de dates", RANGE_FR.map(function (r) { return r[0]; }), rangeLabel(anRange), function (v) {
+        RANGE_FR.forEach(function (r) { if (r[0] === v) { anRange = r[1]; window.__anCur = { k: r[1], lbl: v }; } });
         drawAnalytics($("#s-menu"));
       });
       case "anadd": return optSheet("New report", ["Custom report", "Saved report"], "", function () { toast("Reports are coming soon", "ok"); });
@@ -3532,7 +3533,7 @@
       case "seldel": return confirmDelete();
       case "selmore": return selMoreSheet();
       case "ancompare": return optSheet("Compare to", ["Previous period", "Previous year", "No comparison"], "Previous period", function () { });
-      case "ancur": return optSheet("Currency", [S.tag || S.cur + " " + S.sym.trim()], S.tag || S.cur + " " + S.sym.trim(), function () { });
+      case "ancur": return optSheet("Sélecteur de devise", [S.tag || S.cur + " " + S.sym.trim()], S.tag || S.cur + " " + S.sym.trim(), function () { });
       case "account": return acctPop();
       case "account-old": return sheet("", '<div class="acct"><span class="av lg">' + ic("person") + "</span><b>" + esc(S.name) + ' owner</b><span class="muted">' + esc(S.handle) + '.myshopify.com</span><div class="mgroup">' + [["Manage account", "person", ""], ["Notifications", "bell", ""], ["Preferences", "settings", "larp-prefs"], ["Log out", "exit", ""]].map(function (r) { var act = r[2] ? ' data-act="' + r[2] + '"' : ""; return '<button class="mrow"' + act + ">" + ic(r[1]) + "<span>" + r[0] + "</span>" + ic("chev-right", "chev") + "</button>"; }).join("") + "</div></div>");
       case "larp-prefs": closeSheets(); closeAll(); location.href = "./editor.html"; return;
@@ -4081,6 +4082,20 @@
           if (sf) items.push(pinned(mk("s:search", "search", sf.parentNode, { placeholder: sf.placeholder || "", text: sf.value || "" }), scr));
           cbs.forEach(function (b, n) {
             items.push(pinned(mk("s:" + (b.getAttribute("data-act") || n), "btn", b, { icon: iconOf(b), dot: b.classList.contains("dot") }), scr));
+          });
+        }
+        // Pastilles Analytics (période / comparaison / devise) : verre natif UIGlassEffect, relais web invisible.
+        var apl = scr.querySelector(".an-pl");
+        if (apl) {
+          var ar = apl.getBoundingClientRect();
+          $$(".anpl", apl).forEach(function (b, n) {
+            var r = b.getBoundingClientRect(); if (r.width < 2) return;
+            var ics = b.querySelectorAll(".ic"), ic0 = ics[0] ? /\bi-([\w-]+)/.exec(ics[0].className) : null, icN = ics.length > 1 ? /\bi-([\w-]+)/.exec(ics[ics.length - 1].className) : null;
+            var sp = b.querySelector("span");
+            var o = mk("p:" + (b.getAttribute("data-act") || n), "pill", b, { icon: ic0 ? ic0[1] : "", trail: icN ? icN[1] : "", title: sp ? sp.textContent.trim() : "" });
+            o.cl = +Math.max(0, ar.left - r.left).toFixed(1); o.cr = +Math.max(0, r.right - ar.right).toFixed(1);
+            if (o.cl >= o.w - 2 || o.cr >= o.w - 2) return;
+            items.push(pinned(o, scr));
           });
         }
         var ch = scr.querySelector(".chips");
