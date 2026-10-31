@@ -35,6 +35,9 @@ struct ShopifyWidgetSnapshot: Codable {
     var hs: [Double] = []
     var ho: [Double] = []
     var he: [Double] = []
+    // 7 jours (écran verrouillé) : ventes des 6 jours précédents (le plus ancien d'abord) + total des 7 jours d'avant
+    var dw: [Double] = []
+    var pw: Double = 0
     var plan: [WidgetPlanItem] = []
 
     init() {}
@@ -60,11 +63,13 @@ struct ShopifyWidgetSnapshot: Codable {
         hs = try c.decodeIfPresent([Double].self, forKey: .hs) ?? []
         ho = try c.decodeIfPresent([Double].self, forKey: .ho) ?? []
         he = try c.decodeIfPresent([Double].self, forKey: .he) ?? []
+        dw = try c.decodeIfPresent([Double].self, forKey: .dw) ?? []
+        pw = try c.decodeIfPresent(Double.self, forKey: .pw) ?? 0
         plan = try c.decodeIfPresent([WidgetPlanItem].self, forKey: .plan) ?? []
     }
 
     private enum Keys: String, CodingKey {
-        case store, sym, cur, lang, dec, ts, off, dayEnd, s, o, se, net, ps, po, pse, pnet, hs, ho, he, plan
+        case store, sym, cur, lang, dec, ts, off, dayEnd, s, o, se, net, ps, po, pse, pnet, hs, ho, he, dw, pw, plan
     }
 }
 
