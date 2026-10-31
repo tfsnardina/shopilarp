@@ -1473,3 +1473,21 @@ html.native-glass-hdr:not(.glass-cover) .page.lvpage .lv-ph{visibility:hidden}
 @keyframes behFlash{0%{color:#0094d5}100%{color:var(--tx)}}
 /* croix : le vrai verre natif Apple prend le relais (le bouton web reste en relais invisible) */
 html.native-glass-hdr:not(.glass-cover) .lvfix .lv-x{visibility:hidden}
+
+/* ── Analytics en Liquid Glass (même gabarit que Commandes / Produits) ── */
+#s-menu.gl-scr{background:#fff}
+.gl-body.an{padding:0 0 calc(150px + var(--bot));background:#fff}
+.gl-scr .an .chips{padding:8px var(--g) 6px}
+.gl-scr .an .an-c{margin:12px var(--g) 0;padding:18px 18px 16px;border-radius:26px;background:linear-gradient(180deg,rgba(250,250,252,.98),rgba(243,243,246,.9));-webkit-backdrop-filter:blur(16px) saturate(170%);backdrop-filter:blur(16px) saturate(170%);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 .5px rgba(0,0,0,.07),0 8px 24px rgba(0,0,0,.06);overflow:hidden}
+.gl-scr .an .an-t{font-size:16px}
+.gl-scr .an .an-v b{letter-spacing:-.3px}
+.gl-scr .an .an-c[data-big] .an-v b{font-size:26px;letter-spacing:-.6px}
+.gl-scr .an .an-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px var(--g) 0}
+.gl-scr .an .an-grid .an-c{margin:0;padding:15px 15px 14px;min-height:104px;border-radius:24px}
+.gl-scr .an .an-grid .an-t{font-size:14.5px;line-height:1.25}
+.gl-scr .an .an-grid .an-v{flex-wrap:wrap;gap:2px 8px}
+.gl-scr .an .an-grid .an-v b{font-size:22px;font-weight:700}
+.gl-scr .an .an-grid .an-sp{position:static;margin-top:8px;height:18px}
+.gl-scr .an .an-grid .an-sp:empty{display:none}
+.gl-scr .an .an-ch .gl{stroke:rgba(0,0,0,.08)}
+.gl-scr .an .lv-grid>div,.gl-scr .an .brk>div{background:transparent}
