@@ -1703,7 +1703,7 @@
     var head = function (title, actions) { return '<div class="tab-top"><header class="th-hd"><button class="tt" data-act="mvswitch">' + esc(title) + ic("chev-down") + '</button><span class="fl"></span>' + (actions || "") + "</header></div>"; };
     el.classList.remove("grey");
     el.classList.toggle("gl-scr", menuView === "analytics");   // page claire Liquid Glass, comme Commandes / Produits
-    if (menuView === "analytics") { el.innerHTML = '<div class="gl-page an-page">' + glHead("Analytics", "mvswitch", "") + '<div class="gl-body an" id="an"></div></div>'; drawAnalytics(el); return; }
+    if (menuView === "analytics") { el.innerHTML = '<div class="gl-page an-page">' + glHead("Analytics", "mvswitch", glBtn("anadd", "New report", "plus-circle") + glBtn("anmore", "More", "more")) + '<div class="gl-body an" id="an"></div></div>'; drawAnalytics(el); return; }
     if (menuView === "customers") { el.innerHTML = head("Customers", '<button class="hb" data-act="newcust" aria-label="Add customer">' + ic("plus-circle") + '</button><button class="hb" data-act="custmore" aria-label="More">' + ic("more") + "</button>") + '<div class="sheet-body">' + customersBody() + "</div>"; bindCustomers(el); return; }
     if (menuView === "finance") { el.innerHTML = head("Finance") + '<div class="sheet-body">' + financeBody() + "</div>"; return; }
     var t = MV[menuView] || "Menu";
@@ -2284,13 +2284,11 @@
     var small = function (title, val, cv, pv, key) { return '<div class="an-c sm"' + (key ? ' data-anm="' + key + '"' : "") + '><div class="an-t">' + esc(title) + '</div><div class="an-v"><b>' + val + "</b>" + chgHtml(change(cv, pv), "lt") + '</div><div class="an-sp"></div></div>'; };
     var big = function (k) { var M = MET[k]; var cv = M.v(t), pv = M.v(pt); return '<div class="an-c" data-anm="' + k + '" data-big="1"><div class="an-t">' + esc(M.t + " over time") + '</div><div class="an-v"><b>' + fmtMet(M.k, cv) + "</b>" + chgHtml(change(cv, pv), "lt") + '</div><div class="an-ch"></div><div class="an-lg"><span><i class="cur"></i>' + esc(curLbl) + '</span><span><i class="prv"></i>' + esc(prevLbl) + "</span></div></div>"; };
     var brkRow = function (lbl, v, pv, bold) { return '<div class="' + (bold ? "b" : "") + '"><span class="lk">' + lbl + "</span><b>" + money(v) + "</b>" + chgHtml(change(Math.abs(v), Math.abs(pv)), "lt") + "</div>"; };
-    $("#an", el).innerHTML = '<div class="gl-tools"><div class="chips"><button class="chip" data-act="anrange">' + esc(rangeLabel(anRange)) + '</button><button class="chip" data-act="ancompare">' + esc(prevLbl) + '</button><button class="chip" data-act="ancur">' + esc(S.cur + " " + S.sym.trim()) + "</button></div></div>" +
-      '<div class="an-grid">' +
+    $("#an", el).innerHTML = '<div class="an-hair"></div><div class="an-pl"><button class="anpl" data-act="anrange">' + ic("calendar") + "<span>" + esc(rangeLabel(anRange)) + "</span>" + ic("chev-down") + '</button><button class="anpl" data-act="ancompare">' + ic("calendar") + "<span>" + esc(prevLbl) + '</span></button><button class="anpl" data-act="ancur">' + ic("cash") + "<span>" + esc(S.cur + " " + S.sym.trim()) + "</span></button></div>" +
       small("Gross sales", money(gross), gross, pgross, "gross") +
-      small("Returning customer rate", pctStr(oo ? (rc / oo) * 100 : 0), oo ? rc / oo : 0, poo ? prc / poo : 0) +
-      small("Orders fulfilled", count(fulfilled), fulfilled, pful) +
+      small("Returning customer rate", pctStr(oo ? (rc / oo) * 100 : 0), oo ? rc / oo : 0, poo ? prc / poo : 0, "rcr") +
+      small("Orders fulfilled", count(fulfilled), fulfilled, pful, "ful") +
       small("Orders", count(oo), oo, poo, "orders") +
-      "</div>" +
       big("sales") +
       '<div class="an-c"><div class="an-t">Total sales breakdown</div><div class="brk">' +
       brkRow("Gross sales", gross, pgross) + brkRow("Discounts", -disc, -pdisc) + brkRow("Returns", -ret, -pret) + brkRow("Net sales", net, pnet, 1) +
@@ -2300,11 +2298,14 @@
       big("sessions") + big("conv") +
       '<div class="an-c"><div class="an-t">Sessions by device type</div>' + deviceDonut(t.se) + "</div>" +
       '<div class="an-c"><div class="an-t">Total sales by product</div>' + prods.slice().sort(function (a, b) { return b.sold - a.sold; }).map(function (p) { var u = Math.round(p.sold * (R.hourly ? 1 / 30 : (R.n * R.step) / 30)); return '<div class="bar-r"><span>' + esc(p.title) + "</span><b>" + money(u * p.price) + "</b></div>"; }).join("") + "</div>" +
+      '<div class="an-c"><div class="an-t">Sessions by location</div>' + locRows() + "</div>" +
+      '<div class="an-c"><div class="an-t">Conversion rate breakdown</div><div class="an-fun">' +
+      [["Sessions", t.se], ["Added to cart", Math.round(t.se * 0.092)], ["Reached checkout", Math.round(t.se * 0.054)], ["Completed checkout", oo]].map(function (f) { return "<div><span>" + f[0] + "</span><b>" + count(f[1]) + "</b><em>" + pctStr(t.se ? (f[1] / t.se) * 100 : 0) + "</em></div>"; }).join("") + "</div></div>" +
       '<div class="an-c lvc" data-act="liveview"><div class="an-t">Live View</div><div class="an-v"><b>' + count(live.visitors) + '</b><span class="muted">visitors right now</span></div></div>';
     $$(".an-c[data-anm]", el).forEach(function (c) {
       var k = c.getAttribute("data-anm");
       if (c.getAttribute("data-big")) { var host = $(".an-ch", c); requestAnimationFrame(function () { drawChart(host, R, k, { h: 170, anim: true }); }); }
-      else { var sp = $(".an-sp", c); var vals = R.cur.map(k === "gross" ? function (x) { return x.s; } : MET[k].v); sp.innerHTML = miniLine(vals); }
+      else { var sp = $(".an-sp", c); var vals = R.cur.map(k === "gross" ? function (x) { return x.s; } : (k === "rcr" || k === "ful") ? MET.orders.v : MET[k].v); sp.innerHTML = miniLine(vals); }
     });
   }
   function miniLine(vals) {
@@ -2312,7 +2313,7 @@
     if (n < 2) return "";
     var mx = Math.max.apply(null, vals.concat([1]));
     var pts = vals.map(function (v, i) { return [(i / (n - 1)) * w, h - 2 - (v / mx) * (h - 4)]; });
-    return '<svg width="' + w + '" height="' + h + '"><path d="' + smooth(pts) + '" fill="none" stroke="#0096de" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    return '<svg width="88" height="' + h + '" viewBox="0 0 ' + w + " " + h + '" preserveAspectRatio="none"><path d="' + smooth(pts) + '" fill="none" stroke="#0096de" stroke-width="1.8" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>';
   }
   function deviceDonut(se) {
     var parts = [["Mobile", 0.74, "#0096de"], ["Desktop", 0.23, "#7ec8f0"], ["Tablet", 0.03, "#c4e6f8"]], a = -Math.PI / 2, r = 46, c = 60, out = "";
@@ -3522,6 +3523,8 @@
         RANGES.forEach(function (r) { if (r[1] === v) anRange = r[0]; });
         drawAnalytics($("#s-menu"));
       });
+      case "anadd": return optSheet("New report", ["Custom report", "Saved report"], "", function () { toast("Reports are coming soon", "ok"); });
+      case "anmore": return optSheet("More actions", ["Refresh", "Export"], "", function (v) { if (v === "Refresh") drawAnalytics($("#s-menu")); else toast("Export is not available yet", "ok"); });
       case "stores": return storePop();
       case "mvswitch": return optSheet(MV[menuView] || "Menu", menuView === "analytics" ? ["Analytics", "Reports", "Live View"] : [MV[menuView] || "Menu"], MV[menuView], function (v) { if (v === "Live View") openLiveView(); else if (v === "Reports") toast("Reports"); });
       case "prodsmore": return actionsSheet();
