@@ -127,6 +127,7 @@ class GlassChromeItem: UIView {
         case "search": return GlassSearchField(kind: kind, id: id)
         case "chips": return GlassChips(kind: kind, id: id)
         case "group": return GlassGroupItem(kind: kind, id: id)
+        case "pill": return GlassPillItem(kind: kind, id: id)
         default: return GlassButtonItem(kind: kind, id: id)
         }
     }
@@ -177,6 +178,10 @@ private let glassSymbols: [String: String] = [
     "chev-down": "chevron.down",
     "chev-left": "chevron.left",
     "arrow-ur": "arrow.up.right",
+    "calendar": "calendar",
+    "calsync": "calendar.badge.clock",
+    "curswap": "dollarsign.arrow.circlepath",
+    "cash": "dollarsign.circle",
 ]
 
 /// Bouton rond (ou capsule avec texte) en verre.
@@ -256,6 +261,88 @@ final class GlassButtonItem: GlassChromeItem {
         let s: CGFloat = 11
         dot.frame = CGRect(x: bounds.width - s - 1, y: -1, width: s, height: s)
         dot.layer.cornerRadius = s / 2
+    }
+}
+
+/// Pastille Analytics (période / comparaison / devise) : capsule UIGlassEffect avec icône, texte et chevron optionnel.
+/// Le cadre vient de la page ; `cl` / `cr` = partie masquée à gauche / à droite quand la rangée défile.
+@available(iOS 26.0, *)
+final class GlassPillItem: GlassChromeItem {
+    private let glass = GlassChromeItem.glass()
+    private let button = UIButton(type: .system)
+    private var clipL: CGFloat = 0
+    private var clipR: CGFloat = 0
+    private var key = ""
+
+    override init(kind: String, id: String) {
+        super.init(kind: kind, id: id)
+        addSubview(glass)
+        glass.contentView.addSubview(button)
+        button.tintColor = GlassChromeItem.ink
+        button.addAction(UIAction { [weak self] _ in
+            guard let self else { return }
+            Haptics.play("light")
+            self.onTap?(self.itemId, 0)
+        }, for: .touchUpInside)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func update(_ d: [String: Any]) {
+        let icon = (d["icon"] as? String) ?? ""
+        let trail = (d["trail"] as? String) ?? ""
+        let title = (d["title"] as? String) ?? ""
+        clipL = CGFloat((d["cl"] as? NSNumber)?.doubleValue ?? 0)
+        clipR = CGFloat((d["cr"] as? NSNumber)?.doubleValue ?? 0)
+        let k = icon + "|" + trail + "|" + title
+        if k != key {
+            key = k
+            var config = UIButton.Configuration.plain()
+            config.baseForegroundColor = GlassChromeItem.ink
+            config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
+            var t = AttributedString(title)
+            t.font = UIFont.systemFont(ofSize: 17, weight: .medium)
+            config.attributedTitle = t
+            if let name = glassSymbols[icon] {
+                config.image = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .medium))
+                config.imagePadding = 8
+                config.imagePlacement = .leading
+            }
+            button.configuration = config
+            // Chevron à droite : vue accessoire dans le contenu du verre (le bouton ne gère qu'une image).
+            glass.contentView.subviews.filter { $0.tag == 77 }.forEach { $0.removeFromSuperview() }
+            if let name = glassSymbols[trail], trail != icon {
+                let iv = UIImageView(image: UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)))
+                iv.tintColor = GlassChromeItem.ink
+                iv.tag = 77
+                iv.isUserInteractionEnabled = false
+                glass.contentView.addSubview(iv)
+                var c = config
+                c.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 34)
+                button.configuration = c
+            }
+        }
+        setNeedsLayout()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        glass.frame = bounds
+        button.frame = glass.bounds
+        if let iv = glass.contentView.viewWithTag(77) {
+            iv.sizeToFit()
+            iv.center = CGPoint(x: bounds.width - 18, y: bounds.height / 2)
+        }
+        // Rangée qui défile : on rogne le verre à la zone visible de la rangée.
+        if clipL > 0.5 || clipR > 0.5 {
+            let m = CALayer()
+            m.backgroundColor = UIColor.black.cgColor
+            m.frame = CGRect(x: clipL, y: -4, width: max(0, bounds.width - clipL - clipR), height: bounds.height + 8)
+            layer.mask = m
+        } else {
+            layer.mask = nil
+        }
     }
 }
 
