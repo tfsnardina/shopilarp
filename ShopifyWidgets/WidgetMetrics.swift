@@ -25,6 +25,8 @@ enum WText {
         "updated": ["fr": "Actualisé : ", "en": "Updated: ", "es": "Actualizado: ", "de": "Aktualisiert: "],
         "openApp": ["fr": "Ouvre l'app", "en": "Open the app", "es": "Abre la app", "de": "App öffnen"],
         "noGroup": ["fr": "Pas d'App Group", "en": "No App Group", "es": "Sin App Group", "de": "Keine App Group"],
+        "sevenDays": ["fr": "7 j", "en": "7d", "es": "7 d", "de": "7 T"],
+        "grossVolume": ["fr": "Gross volume", "en": "Gross volume", "es": "Volumen bruto", "de": "Bruttovolumen"],
         "myStore": ["fr": "Ma boutique", "en": "My store", "es": "Mi tienda", "de": "Mein Shop"],
     ]
 
@@ -67,6 +69,11 @@ struct WidgetMetrics {
     var sym: String
     var dec: Int
 
+    // Écran verrouillé : ventes des 7 derniers jours (aujourd'hui en dernier), total et variation vs les 7 jours d'avant
+    var weekSales: [Double] = []
+    var weekTotal: Double = 0
+    var weekChange: Double? = nil
+
     static let visitorRatio = 0.9828   // visiteurs uniques / visites (rapport des maquettes Shopify)
 
     private static func change(_ cv: Double, _ pv: Double) -> Double? {
@@ -83,6 +90,8 @@ struct WidgetMetrics {
         var hs = snap.hs, ho = snap.ho, he = snap.he
         var ps = snap.ps, po = snap.po, pse = snap.pse, pnet = snap.pnet
         var compare = true
+        var prior = snap.dw          // ventes des 6 jours précédents
+        if prior.count < 6 { prior = Array(repeating: 0, count: 6 - prior.count) + prior }
 
         var items = snap.plan.filter { $0.at > snap.ts && $0.at <= now }
         if snap.dayEnd > 0 && now >= snap.dayEnd {
@@ -90,6 +99,10 @@ struct WidgetMetrics {
             let start = snap.dayEnd + floor((now - snap.dayEnd) / day) * day
             s = 0; o = 0; se = 0; net = 0; hs = []; ho = []; he = []
             ps = 0; po = 0; pse = 0; pnet = 0; compare = false
+            // Les jours glissent : le jour de l'app devient « hier », puis les éventuels jours entièrement passés.
+            let doneDay = snap.s + snap.plan.filter { $0.at > snap.ts && $0.at < snap.dayEnd }.reduce(0) { $0 + $1.s }
+            let k = Int(floor((now - snap.dayEnd) / day)) + 1
+            prior = Array((prior + [doneDay] + Array(repeating: 0, count: max(0, k - 1))).suffix(6))
             items = snap.plan.filter { $0.at >= start && $0.at <= now }
             for it in items { add(it, start: start, snap: snap, &s, &o, &se, &net, &hs, &ho, &he) }
             let hour = Int(floor(((now + snap.off).truncatingRemainder(dividingBy: day)) / 3_600_000))
@@ -123,7 +136,7 @@ struct WidgetMetrics {
         var bars: [Double?] = []
         for h in 0..<24 { bars.append(h < hs.count ? hs[h] : nil) }
 
-        return WidgetMetrics(
+        var m = WidgetMetrics(
             store: snap.store.isEmpty ? WText.t("myStore") : snap.store,
             updated: date,
             sales: s, visits: visits, aov: aov, conv: conv, orders: o, net: net, visitors: visitors,
@@ -143,6 +156,10 @@ struct WidgetMetrics {
             lineVisitors: he.map { ($0 * visitorRatio).rounded() },
             sym: snap.sym, dec: snap.dec
         )
+        m.weekSales = prior + [s]
+        m.weekTotal = m.weekSales.reduce(0, +)
+        m.weekChange = snap.pw == 0 ? (m.weekTotal > 0 ? 100 : 0) : (m.weekTotal - snap.pw) / abs(snap.pw) * 100
+        return m
     }
 
     private static func add(_ it: WidgetPlanItem, start: Double, snap: ShopifyWidgetSnapshot,
@@ -178,7 +195,7 @@ struct WidgetMetrics {
     static var sample: WidgetMetrics {
         let hours: [Double] = [0, 0, 0, 0, 0, 0, 0, 6, 14, 22, 24, 20, 23, 28, 25, 19, 26, 30, 27, 22, 14, 8, 3, 0]
         let line: [Double] = [3, 5, 4, 6, 9, 7, 11, 8, 12, 10, 14, 9, 13, 16, 12, 18, 15, 11, 14, 10]
-        return WidgetMetrics(
+        var m = WidgetMetrics(
             store: WText.t("myStore"), updated: Date(),
             sales: 263_850, visits: 8_954, aov: 4_350, conv: 2.5, orders: 87, net: 243_000, visitors: 8_800,
             dSales: 6, dVisits: -1, dAov: 9, dConv: 4, dOrders: -3, dNet: 1, dVisitors: -1,
@@ -187,6 +204,10 @@ struct WidgetMetrics {
             lineOrders: line.map { $0 + 2 }, lineNet: line.reversed().map { $0 + 1 }, lineVisitors: line.map { $0 * 0.9 },
             sym: "$", dec: 2
         )
+        m.weekSales = [0, 0, 0, 0, 0, 140_000, 12_000]
+        m.weekTotal = 510_600
+        m.weekChange = 100
+        return m
     }
 }
 
@@ -211,6 +232,34 @@ enum WFormat {
         let symbol = sym.trimmingCharacters(in: .whitespaces)
         let text = suffixLangs.contains(WText.lang) ? body + "\u{00A0}" + symbol : symbol + body
         return (neg ? "-" : "") + text
+    }
+
+    /// « €5,106 » : symbole devant, séparateur de milliers « , », sans décimales (comme le widget Shopify).
+    static func moneyPlain(_ cents: Double, sym: String) -> String {
+        let nf = NumberFormatter()
+        nf.locale = Locale(identifier: "en_US")
+        nf.numberStyle = .decimal
+        nf.minimumFractionDigits = 0
+        nf.maximumFractionDigits = 0
+        let body = nf.string(from: NSNumber(value: (abs(cents) / 100).rounded())) ?? "0"
+        return (cents < 0 ? "-" : "") + sym.trimmingCharacters(in: .whitespaces) + body
+    }
+
+    /// « 1,4K € » : montant compact (K / M), symbole derrière en fr/de/es…, devant en en.
+    static func moneyCompact(_ cents: Double, sym: String) -> String {
+        let v = abs(cents) / 100
+        func one(_ x: Double) -> String {
+            var s = number(x, decimals: 1)
+            let sep = WText.locale.decimalSeparator ?? "."
+            if s.hasSuffix(sep + "0") { s.removeLast(sep.count + 1) }
+            return s
+        }
+        let body: String
+        if v >= 1_000_000 { body = one(v / 1_000_000) + "M" }
+        else if v >= 1_000 { body = one(v / 1_000) + "K" }
+        else { body = number(v.rounded(), decimals: 0) }
+        let symbol = sym.trimmingCharacters(in: .whitespaces)
+        return suffixLangs.contains(WText.lang) ? body + "\u{00A0}" + symbol : symbol + body
     }
 
     static func count(_ v: Double) -> String { number(v.rounded(), decimals: 0) }
