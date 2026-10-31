@@ -42,11 +42,16 @@ struct LockBars: View {
                 }
                 .frame(width: w, height: h, alignment: .bottomLeading)
 
+                // Un jour à 0 reste un simple point de la ligne ; un jour avec des ventes = une barre posée exactement sur un point.
                 ForEach(Array(values.enumerated()), id: \.offset) { i, v in
-                    let bh = max(2.2, (h - 2) * CGFloat(max(v, 0) / hi))
-                    Capsule()
-                        .frame(width: 2.6, height: bh)
-                        .position(x: w * (CGFloat(i) + 0.5) / CGFloat(max(values.count, 1)), y: h - bh / 2)
+                    if v > 0 {
+                        let bh = max(4, (h - 2) * CGFloat(v / hi))
+                        let target = w * (CGFloat(i) + 0.5) / CGFloat(max(values.count, 1))
+                        let j = min(max((target - 1.1) / step, 0).rounded(), CGFloat(dots - 1))
+                        Capsule()
+                            .frame(width: 2.2, height: bh)
+                            .position(x: j * step + 1.1, y: h - bh / 2)
+                    }
                 }
             }
         }
