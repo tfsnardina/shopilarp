@@ -3166,11 +3166,14 @@
     R.cur.forEach(function (x) { hs.push(Math.round(x.s)); ho.push(Math.round(x.o)); he.push(Math.round(x.se)); });
     var off = Number(S.off) || 0, now = Date.now();
     var dayStart = Math.floor((now + off) / DAY) * DAY - off;
+    var dw = [], pw = 0, wi;     // 6 previous days (oldest first) + the 7 days before them, for the lock screen widgets
+    for (wi = 6; wi >= 1; wi--) dw.push(Math.round(D.s[T - wi] || 0));
+    for (wi = 7; wi <= 13; wi++) pw += D.s[T - wi] || 0;
     return {
       v: 1, store: S.name, sym: S.sym, cur: S.cur, lang: (window.I18N && window.I18N.lang) || "en", dec: S.dec == null ? 2 : S.dec, ts: now, off: off, dayEnd: dayStart + DAY,
       s: Math.round(t.s), o: Math.round(t.o), se: Math.round(t.se), net: Math.round(g - dc - rt),
       ps: Math.round(pt.s), po: Math.round(pt.o), pse: Math.round(pt.se), pnet: Math.round(pg - pdc - prt),
-      hs: hs, ho: ho, he: he, plan: wPlan
+      hs: hs, ho: ho, he: he, dw: dw, pw: Math.round(pw), plan: wPlan
     };
   }
   function pushWidget(force) {
