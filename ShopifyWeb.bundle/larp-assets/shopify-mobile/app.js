@@ -1701,8 +1701,9 @@
   function renderMenu() {
     var el = $("#s-menu");
     var head = function (title, actions) { return '<div class="tab-top"><header class="th-hd"><button class="tt" data-act="mvswitch">' + esc(title) + ic("chev-down") + '</button><span class="fl"></span>' + (actions || "") + "</header></div>"; };
-    el.classList.toggle("grey", menuView === "analytics");
-    if (menuView === "analytics") { el.innerHTML = head("Analytics") + '<div class="sheet-body an" id="an"></div>'; drawAnalytics(el); return; }
+    el.classList.remove("grey");
+    el.classList.toggle("gl-scr", menuView === "analytics");   // page claire Liquid Glass, comme Commandes / Produits
+    if (menuView === "analytics") { el.innerHTML = '<div class="gl-page an-page">' + glHead("Analytics", "mvswitch", "") + '<div class="gl-body an" id="an"></div></div>'; drawAnalytics(el); return; }
     if (menuView === "customers") { el.innerHTML = head("Customers", '<button class="hb" data-act="newcust" aria-label="Add customer">' + ic("plus-circle") + '</button><button class="hb" data-act="custmore" aria-label="More">' + ic("more") + "</button>") + '<div class="sheet-body">' + customersBody() + "</div>"; bindCustomers(el); return; }
     if (menuView === "finance") { el.innerHTML = head("Finance") + '<div class="sheet-body">' + financeBody() + "</div>"; return; }
     var t = MV[menuView] || "Menu";
@@ -2283,11 +2284,13 @@
     var small = function (title, val, cv, pv, key) { return '<div class="an-c sm"' + (key ? ' data-anm="' + key + '"' : "") + '><div class="an-t">' + esc(title) + '</div><div class="an-v"><b>' + val + "</b>" + chgHtml(change(cv, pv), "lt") + '</div><div class="an-sp"></div></div>'; };
     var big = function (k) { var M = MET[k]; var cv = M.v(t), pv = M.v(pt); return '<div class="an-c" data-anm="' + k + '" data-big="1"><div class="an-t">' + esc(M.t + " over time") + '</div><div class="an-v"><b>' + fmtMet(M.k, cv) + "</b>" + chgHtml(change(cv, pv), "lt") + '</div><div class="an-ch"></div><div class="an-lg"><span><i class="cur"></i>' + esc(curLbl) + '</span><span><i class="prv"></i>' + esc(prevLbl) + "</span></div></div>"; };
     var brkRow = function (lbl, v, pv, bold) { return '<div class="' + (bold ? "b" : "") + '"><span class="lk">' + lbl + "</span><b>" + money(v) + "</b>" + chgHtml(change(Math.abs(v), Math.abs(pv)), "lt") + "</div>"; };
-    $("#an", el).innerHTML = '<div class="an-pills"><button class="anp" data-act="anrange">' + ic("calendar") + "<span>" + esc(rangeLabel(anRange)) + '</span></button><button class="anp" data-act="ancompare">' + ic("sort") + "<span>" + esc(prevLbl) + '</span></button><button class="anp" data-act="ancur">' + ic("cash") + "<span>" + esc(S.cur + " " + S.sym.trim()) + "</span></button></div>" +
+    $("#an", el).innerHTML = '<div class="gl-tools"><div class="chips"><button class="chip" data-act="anrange">' + esc(rangeLabel(anRange)) + '</button><button class="chip" data-act="ancompare">' + esc(prevLbl) + '</button><button class="chip" data-act="ancur">' + esc(S.cur + " " + S.sym.trim()) + "</button></div></div>" +
+      '<div class="an-grid">' +
       small("Gross sales", money(gross), gross, pgross, "gross") +
       small("Returning customer rate", pctStr(oo ? (rc / oo) * 100 : 0), oo ? rc / oo : 0, poo ? prc / poo : 0) +
       small("Orders fulfilled", count(fulfilled), fulfilled, pful) +
       small("Orders", count(oo), oo, poo, "orders") +
+      "</div>" +
       big("sales") +
       '<div class="an-c"><div class="an-t">Total sales breakdown</div><div class="brk">' +
       brkRow("Gross sales", gross, pgross) + brkRow("Discounts", -disc, -pdisc) + brkRow("Returns", -ret, -pret) + brkRow("Net sales", net, pnet, 1) +
