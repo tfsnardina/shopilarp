@@ -2333,7 +2333,43 @@
   }
 
   /* ── Live View ───────────────────────────────────────────── */
+  /* iOS 26 : la Vue en direct est une page native (Swift) ; le web lui envoie les données puis pousse les chiffres au fil de l'eau. */
+  var nativeLiveOn = false, nativeLiveT = 0, nativeLiveW = 0;
+  window.__larpNativeLiveClosed = function () { nativeLiveOn = false; };
+  function nativeLiveInfo(first) {
+    var T = L10n, R = rangeData("today"), g = liveGlobeData();
+    var info = {
+      mode: first ? "live" : "liveUpdate",
+      title: T("Live View"),
+      visitors: Math.max(0, Math.round(live.visitors)), visitorsLabel: T("Visitors right now"),
+      stats: [
+        { l: T("Total sales"), v: money(R.tot.s) }, { l: T("Sessions"), v: count(R.tot.se) },
+        { l: T("Orders"), v: count(R.tot.o) }, { l: T("Page views"), v: count(Math.round(R.tot.se * 3.4)) }
+      ],
+      behaviorTitle: T("Customer behavior"),
+      behavior: [
+        { l: T("Active carts"), v: count(live.carts) }, { l: T("Checking out"), v: count(live.checkingOut) }, { l: T("Purchased"), v: count(live.purchased) }
+      ],
+      locTitle: T("Sessions by location"), noSessions: T("No sessions yet"), locs: locData(),
+      globe: { pts: g.pts, nOrd: g.nOrd, home: g.home, dead: larpVibe() === "dead" }
+    };
+    if (first) info.mask = LAND_MASK;
+    return info;
+  }
+  function nativeLivePush() {
+    if (!nativeLiveOn) return;
+    var gap = Date.now() - nativeLiveT;
+    if (gap < 700) { if (!nativeLiveW) nativeLiveW = setTimeout(function () { nativeLiveW = 0; nativeLivePush(); }, 720 - gap); return; }
+    nativeLiveT = Date.now();
+    if (!nativeOrderPost(nativeLiveInfo(false))) nativeLiveOn = false;
+  }
   function openLiveView() {
+    if (window.__LARP_NATIVE_PRODUCT__ && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpProduct) {
+      if (nativeLiveOn) return;
+      nativeLiveOn = true; nativeLiveT = Date.now();
+      if (nativeOrderPost(nativeLiveInfo(true))) return;
+      nativeLiveOn = false;
+    }
     var R = rangeData("today");
     var nav = '<div class="pg-nav titled lv-nav"><button class="nb-c lv-ph" data-back tabindex="-1" aria-hidden="true">' + ic("x") + '</button><h1 class="pg-t">Live View</h1><span class="lv-sp"></span></div>';
     var el = page('<div class="lvw"><div class="lv-top"><div class="lv-globe" id="lvglobe"></div><div class="lv-now"><span>Visitors right now</span><b id="lvN">' + count(live.visitors) + '</b></div></div>' +
@@ -2364,31 +2400,39 @@
     var keys = Object.keys(m).sort(function (a, b) { return m[b] - m[a]; }).slice(0, 8);
     return keys.map(function (k) { return { k: k, city: city[k], w: m[k] }; });
   }
-  function locRows() {
-    if (live.visitors < 1 && !orders.length) return '<p class="lv-none">No sessions yet</p>';
+  function locData() {
+    if (live.visitors < 1 && !orders.length) return [];
     var L = liveLocs().slice(0, 5);
-    if (!L.length) return '<div class="bar-r"><span>' + esc(countryName()) + '</span><i style="--w:100%"></i><b>100%</b></div>';
+    if (!L.length) return [{ name: countryName(), pct: 100 }];
     var tot = L.reduce(function (a, x) { return a + x.w; }, 0) || 1, left = 100;
     return L.map(function (x, i) {
       var pc = i === L.length - 1 ? left : Math.round((x.w / tot) * 100); left -= pc;
-      return '<div class="bar-r"><span>' + esc(x.k) + '</span><i style="--w:' + pc + '%"></i><b>' + pc + "%</b></div>";
-    }).join("");
+      return { name: x.k, pct: pc };
+    });
+  }
+  function locRows() {
+    var D = locData();
+    if (!D.length) return '<p class="lv-none">No sessions yet</p>';
+    return D.map(function (x) { return '<div class="bar-r"><span>' + esc(x.name) + '</span><i style="--w:' + x.pct + '%"></i><b>' + x.pct + "%</b></div>"; }).join("");
   }
   var LAND_MASK = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/gP8DAAAAAAAAAAAAAAAAAAAAAAD8/////wcAAAAAAAAHAAAAAAAAAAAArP/8//8fAPADAAAA4AMAAAAAAAAA4ADMh////wAABgAACADwAAAAAAAAAADwUT8A/v8PAAAAABwA/n8AOAAAAAAA+LPvD8D/fwAAAAAwIPz//wMDAADAAwD5w/4H+P8HAAAcAIP7/////z8Afv4HB//P////////8+Fv+QAAAAAAgMAPAAAAAODDB+D//x8ALAAEAAAAAAAAIPz///+///uf//v/7////////////wfw/////xE88AEAAP7+////////////gP////8HeAAcAADw5////////////ADgAf//f4AvAAAAAH78////////v8QAAAyA//8/+AcAAIBB4/////////8ADwAAAPD//9//AQAAPBT/////////A3AAAAAA/v///T8AAGD3//////////8DAwAAAMD/////AwAA+P//////////PwAAAAAA+P///2MAAAD///////////8CAAAAAAD///8/CAAA4P//////////JwAAAAAA8P///wcAAAD+/+nz/////38AAAAAAAD///8HAAAA/tgPPP//////MQAAAAAA8P//PwAAAOBH9v/n/////wcBAAAAAAD///8BAAAAPgD7f/7///8xEAAAAAAA4P//DwAAAMB5Iv//////f8YBAAAAAAD+//8AAAAA+AcA//////8jDwAAAAAAgP//AwAAAOD/Afj/////fwgAAAAAAADw/x8AAAAA/n////////8HAAAAAAAAAP4HAwAAAPD////7////fwAAAAAAAACgHyAAAACA//9/f/////8DAAAAAAAAAPQBAAAAAPz///8v////PwAAAAAAAAAAHiAAAADA/////g////8EAAAAAAAAAOAjCAAAAP7//9//4D//AgAAAAAAAAAAPAMGAADA/////Qf84BcAAAAAAAAAAAA/AAAAAPz//78fgAf+QAAAAAAAAAAAgA8AAADg////+wA4gB8EAAAAAAAAAADAAAAAAP7///8BgAP4gQAAAAAAAAAAAAgPAADA////7wAwgAwIAAAAAAAAAAAA/w8AAPj///8HAAUIAAEAAAAAAAAAAID/AQAA////fwBAAAEQAAAAAAAAAAAA+P8AAODj//8DAAA0GAAAAAAAAAAAAID/HwAAAPj/HwAAgMMBAAAAAAAAAAAA/P8BAACA//8AAAA4HwAAAAAAAAAAAMD/fwAAAPz/BwAAAOMFAQAAAAAAAAAA/P8/AACA/z8AAABgbvABAAAAAAAAAOD//w8AAPD/AwAAAAQAfAIAAAAAAAAA/P//AQAA/z8AAACAA4APAAAAAAAAAMD//x8AAPD/AwAAAAAQsAEAAAAAAAAA+P//AAAA/j8AAAAAAAAAAAAAAAAAAAD//wcAAPD/QwAAAACAIwAAAAAAAAAA8P9/AAAA/z8GAAAAAD8GAAAAAAAAAAD8/wcAAPD/cQAAAAD4fwAAAAAAAAAAgP8/AAAA/w8HAAAAgP8PAAAAAAAAAAD4/wMAAOD/MAAAAAD//wEAAAAAAAAAgP8fAAAA/g8DAAAA+P8/AAAAAAAAAAD4PwAAAOB/MAAAAID//wMAAAAAAAAAwP8DAAAA/gcAAAAA+P9/AAAAAAAAAAD8HwAAAMA/AAAAAID//wcAAAAAAAAAwP8BAAAA+AEAAAAA8P9/AAAAAAAAAAD8DwAAAIAPAAAAAAAf/gMAAAAAAAAAwH8AAAAAAAAAAAAAEIA/AAAAAAAAAAD+AwAAAAAAAAAAAAAA8AEgAAAAAAAA4A8AAAAAAAAAAAAAAAAAAAYAAAAAAAB+AAAAAAAAAAAAAAAAgAAwAAAAAAAA4AMAAAAAAAAAAAAAAAAIgAEAAAAAAAAeAAAAAAAAAAAAAAAAAAAOAAAAAAAA8AEAAAAAAAAAAAAAAAAAAAAAAAAAAAAfAAAAAAAAAAAAAAAAAAAAAAAAAAAA8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAD8APj///8HAAAAAAAAAAA0AAAAAADA/f/h/////w8AAAAAAAAA4AcAAED5////z///////fwAAAAAAvAb+AADA//////////////8HAAD4/////wMAAP7/////////////HwCA+f////8BAID///////////////8AAPL/////BwAO////////////////HwAA/v/////vePj//////////////38AAOD/////////////////////////PwAAeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
   // A dotted globe that turns slowly, with visitor pings on recent cities.
   var CITY = { "Los Angeles": [34, -118], "New York": [40.7, -74], Brooklyn: [40.6, -73.9], Chicago: [41.9, -87.6], Houston: [29.8, -95.4], Dallas: [32.8, -96.8], Austin: [30.3, -97.7], Miami: [25.8, -80.2], Orlando: [28.5, -81.4], Atlanta: [33.7, -84.4], Phoenix: [33.4, -112], Seattle: [47.6, -122.3], "San Diego": [32.7, -117.2], "San Francisco": [37.8, -122.4], Denver: [39.7, -105], Boston: [42.4, -71], Nashville: [36.2, -86.8], Charlotte: [35.2, -80.8], "Las Vegas": [36.2, -115.1], Portland: [45.5, -122.7], Columbus: [40, -83], Philadelphia: [40, -75.2], Minneapolis: [45, -93.3], Tampa: [28, -82.5], "San Antonio": [29.4, -98.5], Detroit: [42.3, -83], Raleigh: [35.8, -78.6], "Salt Lake City": [40.8, -111.9], Newark: [40.7, -74.2], Sacramento: [38.6, -121.5], Toronto: [43.7, -79.4], Vancouver: [49.3, -123.1], Montreal: [45.5, -73.6], Calgary: [51, -114], Ottawa: [45.4, -75.7], Edmonton: [53.5, -113.5], Mississauga: [43.6, -79.6], Winnipeg: [49.9, -97.1], London: [51.5, -0.1], Manchester: [53.5, -2.2], Birmingham: [52.5, -1.9], Leeds: [53.8, -1.5], Glasgow: [55.9, -4.3], Bristol: [51.5, -2.6], Liverpool: [53.4, -3], Edinburgh: [56, -3.2], Sydney: [-33.9, 151.2], Melbourne: [-37.8, 145], Brisbane: [-27.5, 153], Perth: [-32, 115.9], Adelaide: [-34.9, 138.6], "Gold Coast": [-28, 153.4], Berlin: [52.5, 13.4], Munich: [48.1, 11.6], Hamburg: [53.6, 10], Cologne: [50.9, 7], Frankfurt: [50.1, 8.7], Paris: [48.9, 2.35], Lyon: [45.8, 4.8], Marseille: [43.3, 5.4], Toulouse: [43.6, 1.4], Nice: [43.7, 7.3], Nantes: [47.2, -1.55], Montpellier: [43.6, 3.9], Strasbourg: [48.6, 7.75], Bordeaux: [44.8, -0.6], Lille: [50.6, 3.05], Rennes: [48.1, -1.7], Grenoble: [45.2, 5.7], Dijon: [47.3, 5], Rouen: [49.45, 1.1], Toulon: [43.1, 5.9], Angers: [47.5, -0.55], Reims: [49.25, 4.05], Tours: [47.4, 0.7] };
+  function liveGlobeData() {
+    var pts = orders.slice(0, 40).map(function (o) { return CITY[o.city]; }).filter(Boolean);
+    var nOrd = Math.min(4, pts.length);   // les premiers points sont les commandes (violet), les autres des visiteurs (bleu)
+    liveLocs().forEach(function (l) { var c = CITY[l.city]; if (c && pts.indexOf(c) < 0) pts.push(c); });
+    // Sans commande, le globe se tourne vers le pays de la boutique.
+    var HOME = { US: [39, -98], CA: [56, -96], GB: [54, -2], AU: [-25, 134], DE: [51, 10], FR: [46.6, 2.4], ES: [40, -3.7], IT: [42.5, 12.5], NL: [52.2, 5.3], BE: [50.6, 4.6], IE: [53.3, -8], CH: [46.8, 8.2], NZ: [-41, 174], JP: [36, 138] };
+    return { pts: pts, nOrd: nOrd, home: pts[0] || HOME[S.country] || [39, -98] };
+  }
   function globe(host) {
     var size = Math.min(host.clientWidth || 300, 320);
     var cv = document.createElement("canvas"), dpr = Math.min(3, window.devicePixelRatio || 1);
     cv.width = size * dpr; cv.height = size * dpr; cv.style.width = size + "px"; cv.style.height = size + "px";
     host.appendChild(cv);
     var ctx = cv.getContext("2d"); ctx.scale(dpr, dpr);
-    var pts = orders.slice(0, 40).map(function (o) { return CITY[o.city]; }).filter(Boolean);
-    var nOrd = Math.min(4, pts.length);   // les premiers points sont les commandes (violet), les autres des visiteurs (bleu)
-    liveLocs().forEach(function (l) { var c = CITY[l.city]; if (c && pts.indexOf(c) < 0) pts.push(c); });
-    // Sans commande, le globe se tourne vers le pays de la boutique.
-    var HOME = { US: [39, -98], CA: [56, -96], GB: [54, -2], AU: [-25, 134], DE: [51, 10], FR: [46.6, 2.4], ES: [40, -3.7], IT: [42.5, 12.5], NL: [52.2, 5.3], BE: [50.6, 4.6], IE: [53.3, -8], CH: [46.8, 8.2], NZ: [-41, 174], JP: [36, 138] };
-    var home = pts[0] || HOME[S.country] || [39, -98];
+    var gd = liveGlobeData(), pts = gd.pts, nOrd = gd.nOrd, home = gd.home;
     var lon0 = -home[1] - 10, R = size / 2 - 6, cx = size / 2, cy = size / 2;
     var dots = [];
     // Land dots come from a 2-degree land mask of Natural Earth's 110m land
@@ -3401,6 +3445,7 @@
       var t = count(r[1]);
       if (n.textContent !== t) { n.textContent = t; n.classList.remove("flash"); void n.offsetWidth; n.classList.add("flash"); }
     });
+    nativeLivePush();
   }
   function funnelPrime(wait, k) {
     if (wait < 3.4 || !prods.length) return;
@@ -3452,6 +3497,7 @@
     var t = count(live.visitors);
     var a = $("#liveN"); if (a && a.textContent !== t) { a.textContent = t; a.parentNode.classList.add("tick"); setTimeout(function () { a.parentNode.classList.remove("tick"); }, 400); }
     var b = $("#lvN"); if (b && b.textContent !== t) b.textContent = t;
+    nativeLivePush();
   }
   setInterval(function () {
     var v = live.visitors;
