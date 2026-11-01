@@ -221,6 +221,10 @@ enum WebViewContainer {
                         self?.host?.presentOrderDetail(info: dict)
                     } else if mode == "orderUpdate" {
                         self?.host?.updateOrderDetail(info: dict)
+                    } else if mode == "live" {
+                        self?.host?.presentLiveView(info: dict)
+                    } else if mode == "liveUpdate" {
+                        self?.host?.updateLiveView(info: dict)
                     } else {
                         self?.host?.presentProductCreator(
                             currency: (dict["sym"] as? String) ?? "€",
@@ -336,6 +340,7 @@ final class WebHostViewController: UIViewController {
     private var homeIndicatorBottom: CGFloat = 34
     private var glassTabBar: UIView?
     private var productDetail: UIViewController?
+    private var liveActive = false
     private var glassTabBarBottom: NSLayoutConstraint?
     private var glassDrawerBar: UIView?
     private var glassChrome: UIView?
@@ -592,6 +597,52 @@ final class WebHostViewController: UIViewController {
         #endif
     }
 
+    // MARK: - Vue en direct native (globe, visiteurs, comportement des clients)
+
+    /// Ouvre la Vue en direct native, au même endroit et de la même façon que la page commande ; la barre d'onglets
+    /// se masque tant qu'elle est ouverte (comme sur la page web). La page web pousse ensuite les chiffres (updateLiveView).
+    func presentLiveView(info: [String: Any]) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), productDetail == nil, presentedViewController == nil else {
+            runJS("window.__larpNativeLiveClosed && window.__larpNativeLiveClosed()")
+            return
+        }
+        let live = LiveViewController(info: info)
+        live.onWillClose = { [weak self] in self?.showTabBarAfterLive() }
+        live.onClose = { [weak self] in self?.removeProductDetail() }
+        addChild(live)
+        live.view.frame = view.bounds
+        live.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        if let anchor = glassChrome ?? webView {
+            view.insertSubview(live.view, aboveSubview: anchor)
+        } else {
+            view.addSubview(live.view)
+        }
+        live.didMove(toParent: self)
+        productDetail = live
+        liveActive = true
+        if let bar = glassTabBar as? GlassTabBarView { bar.setShown(false, animated: true) }
+        live.slideIn()
+        #else
+        runJS("window.__larpNativeLiveClosed && window.__larpNativeLiveClosed()")
+        #endif
+    }
+
+    /// Chiffres en direct envoyés par la page web.
+    func updateLiveView(info: [String: Any]) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), let live = productDetail as? LiveViewController else { return }
+        live.update(info: info)
+        #endif
+    }
+
+    private func showTabBarAfterLive() {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), liveActive, let bar = glassTabBar as? GlassTabBarView else { return }
+        bar.setShown(true, animated: true)
+        #endif
+    }
+
     /// Retire la fiche produit (sans animation) : changement d'onglet, rechargement…
     func removeProductDetail() {
         guard let detail = productDetail else { return }
@@ -600,6 +651,18 @@ final class WebHostViewController: UIViewController {
         detail.view.removeFromSuperview()
         detail.removeFromParent()
         productDetail = nil
+        if liveActive {
+            liveActive = false
+            showTabBarAfterLiveForced()
+            runJS("window.__larpNativeLiveClosed && window.__larpNativeLiveClosed()")
+        }
+    }
+
+    private func showTabBarAfterLiveForced() {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), let bar = glassTabBar as? GlassTabBarView else { return }
+        bar.setShown(true, animated: false)
+        #endif
     }
 
     private func sendProductEvent(_ function: String, _ payload: [String: Any]) {
