@@ -66,6 +66,7 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
 
     private var dots: [Dot] = []
     private var pings: [Dot] = []
+    private var pingCell: [Int] = []          // hexagone du globe le plus proche de chaque point
     private var orderCount = 0
     private var visitors = 0
     private var dead = false
@@ -186,6 +187,15 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
             guard p.count >= 2, let la = (p[0] as? NSNumber)?.doubleValue, let lo = (p[1] as? NSNumber)?.doubleValue else { return nil }
             return LVGlobeView.dot(lat: la, lon: lo)
         }
+        pingCell = pings.map { p in
+            var best = -1
+            var bestDot = -2.0
+            for (i, d) in dots.enumerated() {
+                let s = d.sinP * p.sinP + d.cosP * p.cosP * (d.cosL * p.cosL + d.sinL * p.sinL)
+                if s > bestDot { bestDot = s; best = i }
+            }
+            return best
+        }
         orderCount = (globe["nOrd"] as? NSNumber)?.intValue ?? 0
         dead = (globe["dead"] as? NSNumber)?.boolValue ?? false
         self.visitors = visitors
@@ -202,7 +212,7 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
 
     private var viewRadius: Double {
         let size = Double(min(bounds.width, bounds.height))
-        return max(size / 2 - 18, 40)
+        return max(size * 0.4, 40)
     }
 
     @objc private func onPan(_ g: UIPanGestureRecognizer) {
@@ -339,16 +349,20 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
         let R = viewRadius * zoom, cx = w / 2, cy = h / 2
         let space = CGColorSpaceCreateDeviceRGB()
 
-        // Halo : vert en haut à gauche, bleu en bas à droite (visible surtout globe entier)
-        let glowR0 = R * 0.9, glowR1 = R * 1.22
-        for (dx, dy, r, g, b) in [(-0.10, -0.08, 0.30, 0.90, 0.72), (0.10, 0.10, 0.25, 0.62, 1.0)] as [(Double, Double, Double, Double, Double)] {
-            let c = [
-                UIColor(red: r, green: g, blue: b, alpha: 0.34).cgColor,
-                UIColor(red: r, green: g, blue: b, alpha: 0).cgColor,
-            ] as CFArray
-            if let grad = CGGradient(colorsSpace: space, colors: c, locations: [0, 1]) {
-                let o = CGPoint(x: cx + dx * R, y: cy + dy * R)
-                ctx.drawRadialGradient(grad, startCenter: o, startRadius: CGFloat(glowR0), endCenter: o, endRadius: CGFloat(glowR1), options: [])
+        // Halo : vert en haut à gauche, bleu en bas à droite. Il s'efface avant d'atteindre le bord de la vue
+        // (sinon on voit un rectangle) et disparaît dès qu'on zoome.
+        let glowFade = min(1, max(0, 1 - (zoom - 1) / 0.3))
+        if glowFade > 0.01 {
+            let glowR0 = R * 0.92, glowR1 = R * 1.18
+            for (dx, dy, r, g, b) in [(-0.08, -0.06, 0.30, 0.90, 0.72), (0.08, 0.08, 0.25, 0.62, 1.0)] as [(Double, Double, Double, Double, Double)] {
+                let c = [
+                    UIColor(red: r, green: g, blue: b, alpha: 0.30 * glowFade).cgColor,
+                    UIColor(red: r, green: g, blue: b, alpha: 0).cgColor,
+                ] as CFArray
+                if let grad = CGGradient(colorsSpace: space, colors: c, locations: [0, 1]) {
+                    let o = CGPoint(x: cx + dx * R, y: cy + dy * R)
+                    ctx.drawRadialGradient(grad, startCenter: o, startRadius: CGFloat(glowR0), endCenter: o, endRadius: CGFloat(glowR1), options: [])
+                }
             }
         }
 
@@ -374,38 +388,40 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
         let l0 = centerLon * .pi / 180
         let sinL0 = sin(l0), cosL0 = cos(l0)
         let sinP0 = sin(centerLat), cosP0 = cos(centerLat)
-        func project(_ d: Dot) -> (x: Double, y: Double, z: Double) {
+        func project(_ d: Dot) -> (x: Double, y: Double, z: Double, sinD: Double, cosD: Double) {
             let sinD = d.sinL * cosL0 - d.cosL * sinL0
             let cosD = d.cosL * cosL0 + d.sinL * sinL0
             let x = d.cosP * sinD
             let y = cosP0 * d.sinP - sinP0 * d.cosP * cosD
             let z = sinP0 * d.sinP + cosP0 * d.cosP * cosD
-            return (cx + x * R, cy - y * R, z)
+            return (cx + x * R, cy - y * R, z, sinD, cosD)
         }
 
-        // Terres : hexagones turquoise, aplatis près du bord, regroupés par éclairage (5 tons) pour peu d'appels de dessin.
-        let cell = LVGlobeView.spacing * .pi / 180 * R
-        let hexR = cell / 3.0.squareRoot() * 0.9
+        // Hexagone « vrai » : ses 6 sommets suivent la sphère (axes est / nord du point projetés à l'écran),
+        // donc il se déforme exactement comme la surface et les voisins se touchent proprement.
+        let hexAng = LVGlobeView.spacing * .pi / 180 / 3.0.squareRoot()
+        let hexPx = hexAng * R
+        func addHex(_ path: CGMutablePath, _ d: Dot, _ q: (x: Double, y: Double, z: Double, sinD: Double, cosD: Double), _ scale: Double) {
+            let ex = q.cosD, ey = -q.sinD * sinP0
+            let nx = -d.sinP * q.sinD, ny = -(d.cosP * cosP0 + d.sinP * sinP0 * q.cosD)
+            let r = hexPx * scale
+            for (k, v) in LVGlobeView.hexUnit.enumerated() {
+                let px = q.x + r * (v.0 * ex + v.1 * nx)
+                let py = q.y + r * (v.0 * ey + v.1 * ny)
+                if k == 0 { path.move(to: CGPoint(x: px, y: py)) } else { path.addLine(to: CGPoint(x: px, y: py)) }
+            }
+            path.closeSubpath()
+        }
+
+        // Terres : hexagones turquoise regroupés par éclairage (5 tons) pour peu d'appels de dessin.
         let buckets = 5
         let paths = (0..<buckets).map { _ in CGMutablePath() }
-        let margin = hexR + 2
+        let margin = hexPx + 2
         for d in dots {
             let q = project(d)
             if q.z <= 0.02 { continue }
             if q.x < -margin || q.x > w + margin || q.y < -margin || q.y > h + margin { continue }
-            let squash = max(q.z, 0.22)
-            let rx = q.x - cx, ry = q.y - cy
-            let len = (rx * rx + ry * ry).squareRoot()
-            let ux = len > 0.001 ? rx / len : 0, uy = len > 0.001 ? ry / len : 0
-            let path = paths[min(buckets - 1, Int(q.z * Double(buckets)))]
-            for (k, v) in LVGlobeView.hexUnit.enumerated() {
-                let ox = v.0 * hexR, oy = v.1 * hexR
-                let along = ox * ux + oy * uy
-                let px = q.x + ox - (1 - squash) * along * ux
-                let py = q.y + oy - (1 - squash) * along * uy
-                if k == 0 { path.move(to: CGPoint(x: px, y: py)) } else { path.addLine(to: CGPoint(x: px, y: py)) }
-            }
-            path.closeSubpath()
+            addHex(paths[min(buckets - 1, Int(q.z * Double(buckets)))], d, q, 0.9)
         }
         for i in 0..<buckets {
             let t = (Double(i) + 0.5) / Double(buckets)       // 0 = bord, 1 = centre
@@ -416,39 +432,40 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
             ctx.addPath(paths[i])
             ctx.fillPath()
         }
-        ctx.restoreGState()
 
-        // Commandes (violet, anneau qui s'étend) puis visiteurs (bleu, hexagone qui apparaît et s'efface)
-        if dead { return }
-        let tt = CACurrentMediaTime()
-        let sc = min(1 + (zoom - 1) * 0.35, 2.2)
-        for (k, d) in pings.enumerated() {
-            let c = project(d)
-            if c.z <= 0.05 { continue }
-            if c.x < -40 || c.x > w + 40 || c.y < -40 || c.y > h + 40 { continue }
-            let isOrder = k < orderCount
-            if !isOrder && k - orderCount >= max(0, visitors) { continue }   // un point bleu par visiteur, aucun à 0
-            let ph = (tt * (isOrder ? 0.5 : 0.35) + Double(k) * 0.37).truncatingRemainder(dividingBy: 1)
-            if isOrder {
-                ctx.setStrokeColor(red: 0.502, green: 0.318, blue: 1.0, alpha: CGFloat(0.7 * (1 - ph)))
-                ctx.setLineWidth(1.6)
-                let rr = (3.5 + ph * 12) * sc
-                ctx.strokeEllipse(in: CGRect(x: c.x - rr, y: c.y - rr, width: rr * 2, height: rr * 2))
-                let dr = 3.8 * sc
-                ctx.setFillColor(red: 0.502, green: 0.318, blue: 1.0, alpha: 1)
-                ctx.fillEllipse(in: CGRect(x: c.x - dr, y: c.y - dr, width: dr * 2, height: dr * 2))
-            } else {
-                let a = sin(ph * .pi)
-                let rr = (3.2 + a * 1.2) * sc
-                ctx.setFillColor(red: 0.07, green: 0.62, blue: 0.97, alpha: CGFloat(0.35 + a * 0.65))
-                for (i, v) in LVGlobeView.hexUnit.enumerated() {
-                    let p = CGPoint(x: c.x + v.0 * rr, y: c.y + v.1 * rr)
-                    if i == 0 { ctx.move(to: p) } else { ctx.addLine(to: p) }
+        // Commandes (violet) et visiteurs (bleu) : l'hexagone vert du lieu change de couleur (il ne s'ajoute pas par-dessus).
+        if !dead {
+            let tt = CACurrentMediaTime()
+            let grow = max(1.0, 2.1 - zoom * 0.55)          // un peu plus gros quand le globe est entier, pour rester visible
+            for (k, d) in pings.enumerated() where k < pingCell.count && pingCell[k] >= 0 && pingCell[k] < dots.count {
+                let isOrder = k < orderCount
+                if !isOrder && k - orderCount >= max(0, visitors) { continue }   // un hexagone bleu par visiteur, aucun à 0
+                let cell = dots[pingCell[k]]
+                let q = project(cell)
+                if q.z <= 0.05 { continue }
+                if q.x < -40 || q.x > w + 40 || q.y < -40 || q.y > h + 40 { continue }
+                let ph = (tt * (isOrder ? 0.5 : 0.35) + Double(k) * 0.37).truncatingRemainder(dividingBy: 1)
+                let path = CGMutablePath()
+                if isOrder {
+                    addHex(path, cell, q, 0.96 * grow)
+                    ctx.setFillColor(red: 0.502, green: 0.318, blue: 1.0, alpha: 1)
+                    ctx.addPath(path)
+                    ctx.fillPath()
+                    // anneau discret qui s'étend autour de la commande
+                    ctx.setStrokeColor(red: 0.502, green: 0.318, blue: 1.0, alpha: CGFloat(0.6 * (1 - ph)))
+                    ctx.setLineWidth(1.4)
+                    let rr = hexPx * grow * (1.4 + ph * 5)
+                    ctx.strokeEllipse(in: CGRect(x: q.x - rr, y: q.y - rr, width: rr * 2, height: rr * 2))
+                } else {
+                    let a = sin(ph * .pi)
+                    addHex(path, cell, q, 0.96 * grow)
+                    ctx.setFillColor(red: 0.07, green: 0.62, blue: 0.97, alpha: CGFloat(0.55 + a * 0.45))
+                    ctx.addPath(path)
+                    ctx.fillPath()
                 }
-                ctx.closePath()
-                ctx.fillPath()
             }
         }
+        ctx.restoreGState()
     }
 }
 
