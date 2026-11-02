@@ -225,6 +225,10 @@ enum WebViewContainer {
                         self?.host?.presentLiveView(info: dict)
                     } else if mode == "liveUpdate" {
                         self?.host?.updateLiveView(info: dict)
+                    } else if mode == "payouts" {
+                        self?.host?.presentPayouts(info: dict)
+                    } else if mode == "payoutsUpdate" {
+                        self?.host?.updatePayouts(info: dict)
                     } else if mode == "alerts" {
                         self?.host?.presentAlerts(info: dict)
                     } else if mode == "alertsUpdate" {
@@ -345,6 +349,8 @@ final class WebHostViewController: UIViewController {
     private var glassTabBar: UIView?
     private var productDetail: UIViewController?
     private var liveActive = false
+    /// Fonction JS à appeler quand la page plein écran native (Vue en direct ou Versements) se ferme.
+    private var fullPageClosedJS = "__larpNativeLiveClosed"
     private var glassTabBarBottom: NSLayoutConstraint?
     private var glassDrawerBar: UIView?
     private var alertsVC: UIViewController?
@@ -642,6 +648,7 @@ final class WebHostViewController: UIViewController {
             runJS("window.__larpNativeLiveClosed && window.__larpNativeLiveClosed()")
             return
         }
+        fullPageClosedJS = "__larpNativeLiveClosed"
         let live = LiveViewController(info: info)
         live.onWillClose = { [weak self] in self?.showTabBarAfterLive() }
         live.onClose = { [weak self] in self?.removeProductDetail() }
@@ -671,6 +678,47 @@ final class WebHostViewController: UIViewController {
         #endif
     }
 
+    // MARK: - Versements natifs (écran Finance, liste, transfert)
+
+    /// Ouvre l'écran Versements natif, de la même façon que la Vue en direct (page plein écran, barre d'onglets masquée).
+    /// Si ce n'est pas possible (iOS < 26, autre fiche ouverte), la page web affiche sa propre version.
+    func presentPayouts(info: [String: Any]) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), productDetail == nil, presentedViewController == nil else {
+            runJS("window.__larpNativePayoutsFallback && window.__larpNativePayoutsFallback()")
+            return
+        }
+        fullPageClosedJS = "__larpNativePayoutsClosed"
+        let vc = PayoutsViewController(info: info)
+        vc.onAct = { [weak self] payload in self?.sendProductEvent("__larpNativePayoutsAct", payload) }
+        vc.onWillClose = { [weak self] in self?.showTabBarAfterLive() }
+        vc.onClose = { [weak self] in self?.removeProductDetail() }
+        addChild(vc)
+        vc.view.frame = view.bounds
+        vc.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        if let anchor = glassChrome ?? webView {
+            view.insertSubview(vc.view, aboveSubview: anchor)
+        } else {
+            view.addSubview(vc.view)
+        }
+        vc.didMove(toParent: self)
+        productDetail = vc
+        liveActive = true
+        if let bar = glassTabBar as? GlassTabBarView { bar.setShown(false, animated: true) }
+        vc.slideIn()
+        #else
+        runJS("window.__larpNativePayoutsFallback && window.__larpNativePayoutsFallback()")
+        #endif
+    }
+
+    /// État à jour envoyé par la page web (solde, comptes, historique).
+    func updatePayouts(info: [String: Any]) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), let vc = productDetail as? PayoutsViewController else { return }
+        vc.update(info: info)
+        #endif
+    }
+
     private func showTabBarAfterLive() {
         #if compiler(>=6.2)
         guard #available(iOS 26.0, *), liveActive, let bar = glassTabBar as? GlassTabBarView else { return }
@@ -689,7 +737,7 @@ final class WebHostViewController: UIViewController {
         if liveActive {
             liveActive = false
             showTabBarAfterLiveForced()
-            runJS("window.__larpNativeLiveClosed && window.__larpNativeLiveClosed()")
+            runJS("window.\(fullPageClosedJS) && window.\(fullPageClosedJS)()")
         }
     }
 
