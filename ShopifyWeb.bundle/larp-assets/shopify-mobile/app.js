@@ -440,6 +440,7 @@
   function notifyPayout(t) {
     notifs.unshift({ kind: "payout", t: t, ts: t.ts, read: false });
     unread += 1; setBell();
+    nativeAlertsPush();
     if (S.pops !== false) postNative({ type: "shopify_payout", title: L10n("Transfer sent"), body: L10n(payoutBody(t)) });
   }
   function postNative(payload) {
@@ -2816,7 +2817,53 @@
   }
 
   /* ── Notifications, search, Sidekick ─────────────────────── */
+  /* iOS 26 : la fenêtre « Alertes » est une feuille native (Swift) ; la page lui envoie la liste et reçoit ses actions. */
+  var nativeAlertsOn = false;
+  function alertKey(x) { return x.kind === "payout" ? "p" + x.ts : "o" + x.o.n; }
+  function nativeAlertsInfo(first) {
+    var T = L10n;
+    return {
+      mode: first ? "alerts" : "alertsUpdate",
+      title: T("Alerts"), empty: T("No notifications"), filterTitle: T("Filter"), markAll: T("Mark all as read"),
+      filters: [{ k: "all", l: T("All") }, { k: "unread", l: T("Unread") }, { k: "order", l: T("Orders") }, { k: "payout", l: T("Payouts") }],
+      items: notifs.slice(0, 40).map(function (x) {
+        var pay = x.kind === "payout";
+        return {
+          id: alertKey(x), kind: x.kind, unread: !x.read, src: T(pay ? "Payouts" : "Orders"), when: pushTime(x.ts),
+          title: pay ? T("Transfer sent") : T("Order #" + x.o.n), body: pay ? T(payoutBody(x.t)) : T(pushBody(x.o))
+        };
+      })
+    };
+  }
+  function nativeAlertsPush() {
+    if (!nativeAlertsOn) return;
+    if (!nativeOrderPost(nativeAlertsInfo(false))) nativeAlertsOn = false;
+  }
+  window.__larpNativeAlertsClosed = function () { nativeAlertsOn = false; };
+  window.__larpNativeAlertsFallback = function () { nativeAlertsOn = false; openNotifsWeb(); };
+  window.__larpNativeAlertsAct = function (p) {
+    if (!p) return;
+    if (p.act === "open") {
+      var hit = null;
+      notifs.forEach(function (x) { if (alertKey(x) === p.id) hit = x; });
+      if (!hit) return;
+      if (!hit.read) { hit.read = true; unread = Math.max(0, unread - 1); setBell(); }
+      if (hit.kind === "payout") openPayouts(); else openOrder(hit.o.n);
+      return;
+    }
+    if (p.act === "readall") { notifs.forEach(function (x) { x.read = true; }); unread = 0; setBell(); }
+    nativeAlertsPush();
+  };
   function openNotifs() {
+    if (window.__LARP_NATIVE_PRODUCT__ && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpProduct) {
+      if (nativeAlertsOn) return;
+      nativeAlertsOn = true;
+      if (nativeOrderPost(nativeAlertsInfo(true))) return;
+      nativeAlertsOn = false;
+    }
+    openNotifsWeb();
+  }
+  function openNotifsWeb() {
     var body = notifs.slice(0, 40).map(function (x) {
       if (x.kind === "payout") return '<button class="nrow' + (x.read ? "" : " unr") + '" data-act="payouts"><span class="napp pay"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 12.5l4 4 8-9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><div class="nr1"><b>Transfer sent</b><em>' + esc(pushTime(x.ts)) + "</em></div><span>" + esc(payoutBody(x.t)) + "</span></div></button>";
       var o = x.o;
@@ -3083,6 +3130,7 @@
     if (quiet) return;
     notifs.unshift({ kind: "order", o: o, ts: o.ts, read: false });
     unread += 1; setBell();
+    nativeAlertsPush();
     // The owner can switch the pop-ups off; the order still lands quietly.
     if (S.pops !== false) {
       nativeOrderPush(o);
