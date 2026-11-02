@@ -1483,7 +1483,7 @@
     var active = current === "menu" ? menuView : current;
     var el = document.createElement("div");
     el.id = "drawer";
-    el.innerHTML = '<div class="dr-bg"></div><div class="dr-list">' + DRAWER.map(function (r) { return drawerRow(r, active); }).join("") +
+    el.innerHTML = '<div class="dr-bg" data-dclose></div><div class="dr-list">' + DRAWER.map(function (r) { return drawerRow(r, active); }).join("") +
       '<button class="dr-head" data-go="soon:Sales channels">Sales channels' + ic("chev-right") + "</button>" + CHANNELS.map(function (r) { return drawerRow(r, active); }).join("") +
       '<button class="dr-add" data-go="soon:Add sales channel">' + ic("plus-circle") + "Add</button>" +
       '<button class="dr-head" data-go="soon:Apps">Apps' + ic("chev-right") + "</button>" + drawerRow(["apps", "Shopify Email", "email"], active) + drawerRow(["apps", "Shopify Flow", "apps"], active) +
@@ -1492,7 +1492,6 @@
     app.appendChild(el);
     drawerEl = el;
     postDrawer(true);
-    statusBar("light");
     $("#tabbar").classList.add("hide");
     try { history.pushState({ dr: 1 }, ""); } catch (e) { }
     $$(".dr-item, .dr-head, .dr-add", el).forEach(function (r, k) { r.style.setProperty("--d", Math.min(k, 16) * 14 + "ms"); });
@@ -1518,11 +1517,10 @@
     if (!drawerEl) return;
     var el = drawerEl; drawerEl = null;
     postDrawer(false);
-    statusBar(glStatus ? "dark" : "light");
     el.classList.remove("on");
     $("#tabbar").classList.toggle("hide", !!(stack.length && noTabs(stack[stack.length - 1].el)));
     if (!fromHistory) { ignorePop++; try { history.back(); } catch (e) { ignorePop--; } }
-    setTimeout(function () { el.remove(); }, 380);
+    setTimeout(function () { el.remove(); }, 540);
   }
   function navigate(go) {
     if (go === "home" || go === "orders" || go === "products") { closeAll(); return setTab(go, true); }
@@ -2341,16 +2339,17 @@
     var info = {
       mode: first ? "live" : "liveUpdate",
       title: T("Live View"),
-      visitors: Math.max(0, Math.round(live.visitors)), visitorsLabel: T("Visitors right now"),
+      visitors: Math.max(0, Math.round(live.visitors)), visitorsLabel: T("Visitors right now"), ordersLabel: T("Orders"),
+      lang: (window.I18N && window.I18N.lang) || "en",
       stats: [
-        { l: T("Total sales"), v: money(R.tot.s) }, { l: T("Sessions"), v: count(R.tot.se) },
-        { l: T("Orders"), v: count(R.tot.o) }, { l: T("Page views"), v: count(Math.round(R.tot.se * 3.4)) }
+        { l: T("Visitors right now"), v: count(Math.max(0, Math.round(live.visitors))) }, { l: T("Total sales"), v: money(R.tot.s) },
+        { l: T("Visits"), v: count(R.tot.se) }, { l: T("Orders"), v: count(R.tot.o) }
       ],
       behaviorTitle: T("Customer behavior"),
       behavior: [
         { l: T("Active carts"), v: count(live.carts) }, { l: T("Checking out"), v: count(live.checkingOut) }, { l: T("Purchased"), v: count(live.purchased) }
       ],
-      locTitle: T("Sessions by location"), noSessions: T("No sessions yet"), locs: locData(),
+      locTitle: T("Visits by location"), noSessions: T("No data for this date range"), locs: locData(),
       globe: { pts: g.pts, nOrd: g.nOrd, home: g.home, dead: larpVibe() === "dead" }
     };
     if (first) info.mask = LAND_MASK;
