@@ -33,10 +33,10 @@ final class AlertCell: UITableViewCell {
         dot.layer.cornerRadius = 5
         dot.translatesAutoresizingMaskIntoConstraints = false
 
-        titleLabel.font = .systemFont(ofSize: 20, weight: .bold)
+        titleLabel.font = .inter(20, .bold)
         titleLabel.textColor = PCTheme.ink
         titleLabel.numberOfLines = 0
-        bodyLabel.font = .systemFont(ofSize: 19, weight: .regular)
+        bodyLabel.font = .inter(19, .regular)
         bodyLabel.textColor = UIColor(white: 0.33, alpha: 1)
         bodyLabel.numberOfLines = 0
 
@@ -73,11 +73,11 @@ final class AlertCell: UITableViewCell {
         let gray = UIColor(white: 0.38, alpha: 1)
         let text = NSMutableAttributedString(
             string: src,
-            attributes: [.font: UIFont.systemFont(ofSize: 17, weight: .semibold), .foregroundColor: gray]
+            attributes: [.font: UIFont.inter(17, .semibold), .foregroundColor: gray]
         )
         text.append(NSAttributedString(
             string: "  •  " + when,
-            attributes: [.font: UIFont.systemFont(ofSize: 17, weight: .regular), .foregroundColor: gray]
+            attributes: [.font: UIFont.inter(17, .regular), .foregroundColor: gray]
         ))
         srcLabel.attributedText = text
         titleLabel.text = title
@@ -142,7 +142,7 @@ final class AlertsViewController: UIViewController, UITableViewDataSource, UITab
 
         closeButton.onTap = { [weak self] in self?.dismiss(animated: true) }
 
-        titleLabel.font = .systemFont(ofSize: 18, weight: .bold)
+        titleLabel.font = .inter(18, .bold)
         titleLabel.textColor = PCTheme.ink
         titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -181,7 +181,7 @@ final class AlertsViewController: UIViewController, UITableViewDataSource, UITab
         refresh.addTarget(self, action: #selector(pulled), for: .valueChanged)
         table.refreshControl = refresh
 
-        emptyLabel.font = .systemFont(ofSize: 17)
+        emptyLabel.font = .inter(17)
         emptyLabel.textColor = PCTheme.sub
         emptyLabel.textAlignment = .center
         emptyLabel.numberOfLines = 0
