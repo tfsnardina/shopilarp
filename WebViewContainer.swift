@@ -225,6 +225,10 @@ enum WebViewContainer {
                         self?.host?.presentLiveView(info: dict)
                     } else if mode == "liveUpdate" {
                         self?.host?.updateLiveView(info: dict)
+                    } else if mode == "alerts" {
+                        self?.host?.presentAlerts(info: dict)
+                    } else if mode == "alertsUpdate" {
+                        self?.host?.updateAlerts(info: dict)
                     } else {
                         self?.host?.presentProductCreator(
                             currency: (dict["sym"] as? String) ?? "€",
@@ -343,6 +347,7 @@ final class WebHostViewController: UIViewController {
     private var liveActive = false
     private var glassTabBarBottom: NSLayoutConstraint?
     private var glassDrawerBar: UIView?
+    private var alertsVC: UIViewController?
     private var glassChrome: UIView?
     private var pullHost: PullRefreshHost?
     private var glassDrawerBarBottom: NSLayoutConstraint?
@@ -594,6 +599,36 @@ final class WebHostViewController: UIViewController {
         #if compiler(>=6.2)
         guard #available(iOS 26.0, *), let detail = productDetail as? OrderDetailViewController else { return }
         detail.update(info: info)
+        #endif
+    }
+
+    // MARK: - Alertes natives (feuille avec boutons Liquid Glass)
+
+    /// Ouvre la fenêtre « Alertes » native ; si ce n'est pas possible (iOS < 26, autre fiche ouverte), la page web affiche la sienne.
+    func presentAlerts(info: [String: Any]) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), presentedViewController == nil, productDetail == nil else {
+            runJS("window.__larpNativeAlertsFallback && window.__larpNativeAlertsFallback()")
+            return
+        }
+        let vc = AlertsViewController(info: info)
+        vc.onAct = { [weak self] payload in self?.sendProductEvent("__larpNativeAlertsAct", payload) }
+        vc.onClosed = { [weak self] in
+            self?.alertsVC = nil
+            self?.runJS("window.__larpNativeAlertsClosed && window.__larpNativeAlertsClosed()")
+        }
+        alertsVC = vc
+        present(vc, animated: true)
+        #else
+        runJS("window.__larpNativeAlertsFallback && window.__larpNativeAlertsFallback()")
+        #endif
+    }
+
+    /// Liste à jour envoyée par la page web (rafraîchissement, nouvelle commande).
+    func updateAlerts(info: [String: Any]) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), let vc = alertsVC as? AlertsViewController else { return }
+        vc.update(info: info)
         #endif
     }
 
