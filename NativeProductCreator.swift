@@ -59,7 +59,7 @@ final class PCGlassButton: UIVisualEffectView {
         if let symbol { config.image = PCTheme.symbol(symbol) }
         if let title {
             var t = AttributedString(title)
-            t.font = UIFont.systemFont(ofSize: 16, weight: weight)
+            t.font = UIFont.inter(16, weight)
             config.attributedTitle = t
             if symbol != nil { config.imagePadding = 6 }
         }
@@ -88,7 +88,7 @@ final class PCGlassButton: UIVisualEffectView {
     func setTitle(_ text: String) {
         var config = button.configuration
         var t = AttributedString(text)
-        t.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        t.font = UIFont.inter(16, .semibold)
         config?.attributedTitle = t
         button.configuration = config
     }
@@ -113,7 +113,7 @@ final class PCSearchField: UIVisualEffectView, UITextFieldDelegate {
         glass.setContentHuggingPriority(.required, for: .horizontal)
 
         field.placeholder = placeholder
-        field.font = .systemFont(ofSize: 16)
+        field.font = .inter(16)
         field.textColor = PCTheme.ink
         field.returnKeyType = .done
         field.autocorrectionType = .no
@@ -176,7 +176,7 @@ final class PCStepper: UIVisualEffectView {
         let plus = UIButton(type: .system)
         plus.setImage(PCTheme.symbol("plus", 15), for: .normal)
         [minus, plus].forEach { $0.tintColor = PCTheme.ink; $0.widthAnchor.constraint(equalToConstant: 44).isActive = true }
-        label.font = .monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
+        label.font = .inter(17, .semibold)
         label.textAlignment = .center
         label.text = "0"
         label.widthAnchor.constraint(equalToConstant: 48).isActive = true
@@ -218,7 +218,7 @@ final class PCStatusPill: UIVisualEffectView {
         cornerConfiguration = .capsule()
         translatesAutoresizingMaskIntoConstraints = false
         setContentHuggingPriority(.required, for: .horizontal)
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.font = .inter(13, .semibold)
         label.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(label)
         NSLayoutConstraint.activate([
@@ -267,12 +267,12 @@ final class PCRow: UIControl {
             stack.addArrangedSubview(icon)
         }
         titleLabel.text = title
-        titleLabel.font = .systemFont(ofSize: 16, weight: accent ? .semibold : .regular)
+        titleLabel.font = .inter(16, accent ? .semibold : .regular)
         titleLabel.textColor = PCTheme.ink
         titleLabel.numberOfLines = 0
         stack.addArrangedSubview(titleLabel)
 
-        valueLabel.font = .systemFont(ofSize: 15)
+        valueLabel.font = .inter(15)
         valueLabel.textColor = PCTheme.sub
         valueLabel.textAlignment = .right
         valueLabel.text = value
@@ -349,7 +349,7 @@ func pcCard(_ rows: [UIView]) -> UIView {
 func pcSectionHeader(_ title: String, count: Int? = nil, action: PCGlassButton? = nil) -> UIView {
     let label = UILabel()
     label.text = title
-    label.font = .systemFont(ofSize: 17, weight: .semibold)
+    label.font = .inter(17, .semibold)
     label.textColor = PCTheme.ink
     let stack = UIStackView(arrangedSubviews: [label])
     stack.axis = .horizontal
@@ -358,7 +358,7 @@ func pcSectionHeader(_ title: String, count: Int? = nil, action: PCGlassButton? 
     if let count {
         let c = UILabel()
         c.text = "\(count)"
-        c.font = .systemFont(ofSize: 15)
+        c.font = .inter(15)
         c.textColor = PCTheme.sub
         stack.addArrangedSubview(c)
     }
@@ -398,7 +398,7 @@ class PCSheetBase: UIViewController {
         close.onTap = { [weak self] in self?.dismiss(animated: true) }
         let title = UILabel()
         title.text = sheetTitle
-        title.font = .systemFont(ofSize: 17, weight: .semibold)
+        title.font = .inter(17, .semibold)
         title.textColor = PCTheme.ink
         title.textAlignment = .center
 
@@ -491,11 +491,11 @@ final class PCSearchSheet: PCSheetBase, UITableViewDataSource, UITableViewDelega
         table.keyboardDismissMode = .onDrag
         table.translatesAutoresizingMaskIntoConstraints = false
 
-        emptyTitle.font = .systemFont(ofSize: 17, weight: .bold)
+        emptyTitle.font = .inter(17, .bold)
         emptyTitle.textColor = PCTheme.ink
         emptyTitle.text = config.emptyTitle
         emptyTitle.textAlignment = .center
-        emptySub.font = .systemFont(ofSize: 15)
+        emptySub.font = .inter(15)
         emptySub.textColor = PCTheme.sub
         emptySub.text = config.emptySubtitle
         emptySub.textAlignment = .center
@@ -617,14 +617,14 @@ final class PCTextSheet: PCSheetBase, UITextViewDelegate {
         card.layer.cornerCurve = .continuous
         card.translatesAutoresizingMaskIntoConstraints = false
         textView.text = initial
-        textView.font = .systemFont(ofSize: 17)
+        textView.font = .inter(17)
         textView.textColor = PCTheme.ink
         textView.backgroundColor = .clear
         textView.textContainerInset = UIEdgeInsets(top: 14, left: 10, bottom: 14, right: 10)
         textView.delegate = self
         textView.translatesAutoresizingMaskIntoConstraints = false
         placeholderLabel.text = placeholder
-        placeholderLabel.font = .systemFont(ofSize: 17)
+        placeholderLabel.font = .inter(17)
         placeholderLabel.textColor = UIColor(white: 0.65, alpha: 1)
         placeholderLabel.isHidden = !initial.isEmpty
         placeholderLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -692,7 +692,7 @@ final class PCShippingSheet: PCSheetBase {
         spinner.stopAnimating()
         let label = UILabel()
         label.text = tr("Ce produit est physique", "This is a physical product")
-        label.font = .systemFont(ofSize: 16)
+        label.font = .inter(16)
         label.textColor = PCTheme.ink
         let toggle = UISwitch()
         toggle.isOn = physical
@@ -713,11 +713,11 @@ final class PCShippingSheet: PCSheetBase {
         // Frais de service : montant ajouté à chaque unité vendue de ce produit.
         let feeLabel = UILabel()
         feeLabel.text = tr("Frais de service", "Service fee")
-        feeLabel.font = .systemFont(ofSize: 16)
+        feeLabel.font = .inter(16)
         feeLabel.textColor = PCTheme.ink
         feeLabel.setContentHuggingPriority(.required, for: .horizontal)
         let feeField = UITextField()
-        feeField.font = .systemFont(ofSize: 16)
+        feeField.font = .inter(16)
         feeField.textColor = PCTheme.ink
         feeField.textAlignment = .right
         feeField.keyboardType = .decimalPad
@@ -737,7 +737,7 @@ final class PCShippingSheet: PCSheetBase {
         }, for: .editingChanged)
         let cur = UILabel()
         cur.text = currency
-        cur.font = .systemFont(ofSize: 16)
+        cur.font = .inter(16)
         cur.textColor = PCTheme.sub
         cur.setContentHuggingPriority(.required, for: .horizontal)
         let feeRow = UIStackView(arrangedSubviews: [feeLabel, feeField, cur])
@@ -752,7 +752,7 @@ final class PCShippingSheet: PCSheetBase {
 
         let note = UILabel()
         note.text = tr("Ajoutés au prix de chaque unité vendue et affichés sur la commande.", "Added to each unit sold and shown on the order.")
-        note.font = .systemFont(ofSize: 13)
+        note.font = .inter(13)
         note.textColor = PCTheme.sub
         note.numberOfLines = 0
         note.translatesAutoresizingMaskIntoConstraints = false
@@ -910,7 +910,7 @@ final class ProductCreatorViewController: UIViewController {
 
         // Titre · description · catégorie · prix.
         titleField.placeholder = tr("Titre de produit", "Product title")
-        titleField.font = .systemFont(ofSize: 17)
+        titleField.font = .inter(17)
         titleField.textColor = PCTheme.ink
         titleField.returnKeyType = .done
         titleField.autocapitalizationType = .sentences
@@ -930,7 +930,7 @@ final class ProductCreatorViewController: UIViewController {
         ])
 
         priceField.placeholder = tr("0,00 \(currency)", "\(currency)0.00")
-        priceField.font = .systemFont(ofSize: 16)
+        priceField.font = .inter(16)
         priceField.textColor = PCTheme.ink
         priceField.keyboardType = .decimalPad
         priceField.addAction(UIAction { [weak self] _ in self?.priceEdited() }, for: .editingChanged)
@@ -967,7 +967,7 @@ final class ProductCreatorViewController: UIViewController {
         content.addArrangedSubview(pcSectionHeader("Stock", action: modifyStock))
         let stockLabel = UILabel()
         stockLabel.text = tr("Disponible", "Available")
-        stockLabel.font = .systemFont(ofSize: 16)
+        stockLabel.font = .inter(16)
         stockLabel.textColor = PCTheme.ink
         let stepper = PCStepper()
         stepper.onChange = { [weak self] v in self?.inv = v }
@@ -1003,7 +1003,7 @@ final class ProductCreatorViewController: UIViewController {
         thumb.heightAnchor.constraint(equalToConstant: 34).isActive = true
         let label = UILabel()
         label.text = tr("Vous explorez simplement ? Ajoutez un exemple de produit.", "Just exploring? Add a sample product.")
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.font = .inter(13, .semibold)
         label.textColor = UIColor(red: 0.0, green: 0.2, blue: 0.3, alpha: 1)
         label.numberOfLines = 0
         let chevron = UIImageView(image: PCTheme.symbol("chevron.right", 13))
@@ -1062,11 +1062,11 @@ final class ProductCreatorViewController: UIViewController {
             ])
         }
         mediaLabel.text = tr("Ajouter des images", "Add images")
-        mediaLabel.font = .systemFont(ofSize: 15, weight: .medium)
+        mediaLabel.font = .inter(15, .medium)
         mediaLabel.textColor = PCTheme.ink
         let sub = UILabel()
         sub.text = tr("Choisissez un forfait pour ajouter d'autres types de supports multimédias.", "Choose a plan to add other types of media.")
-        sub.font = .systemFont(ofSize: 15)
+        sub.font = .inter(15)
         sub.textColor = PCTheme.sub
         sub.textAlignment = .center
         sub.numberOfLines = 0
