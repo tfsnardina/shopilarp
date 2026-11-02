@@ -82,6 +82,7 @@ targets:
     sources:
       - path: ShopifyWidgets
       - path: Shared
+      - path: Fonts
     info:
       path: Config/ShopifyWidgets-Info.plist
       properties:
