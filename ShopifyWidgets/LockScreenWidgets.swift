@@ -68,12 +68,12 @@ struct LockSalesView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 Text(WText.t("totalSales"))
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.inter(14, .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: 2)
                 Text(WText.t("sevenDays"))
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.inter(14, .medium))
                     .lineLimit(1)
             }
             LockBars(values: v)
@@ -83,7 +83,7 @@ struct LockSalesView: View {
                 Spacer(minLength: 2)
                 Text(lo > 0 ? WFormat.moneyCompact(lo, sym: m.sym) : "-")
             }
-            .font(.system(size: 13, weight: .medium))
+            .font(.inter(13, .medium))
             .opacity(0.85)
             .lineLimit(1)
         }
@@ -98,23 +98,23 @@ struct LockGrossView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(WFormat.moneyPlain(m.weekTotal, sym: m.sym))
-                    .font(.system(size: 30, weight: .bold))
+                    .font(.inter(30, .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                 if let c = m.weekChange {
                     let r = Int(c.rounded())
                     HStack(spacing: 2) {
                         if r != 0 {
-                            Text(r > 0 ? "\u{25B2}" : "\u{25BC}").font(.system(size: 12, weight: .bold))
+                            Text(r > 0 ? "\u{25B2}" : "\u{25BC}").font(.inter(12, .bold))
                         }
-                        Text(WFormat.change(c)).font(.system(size: 17, weight: .medium))
+                        Text(WFormat.change(c)).font(.inter(17, .medium))
                     }
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 }
             }
             Text(WText.t("grossVolume"))
-                .font(.system(size: 16, weight: .medium))
+                .font(.inter(16, .medium))
                 .opacity(0.85)
                 .lineLimit(1)
         }
