@@ -32,7 +32,7 @@ final class ODBadge: UIVisualEffectView {
         setContentCompressionResistancePriority(.required, for: .horizontal)
         let label = UILabel()
         label.text = text
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.font = .inter(13, .semibold)
         label.textColor = fg
         label.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(label)
@@ -56,7 +56,7 @@ final class ODStatusRow: UIView {
         translatesAutoresizingMaskIntoConstraints = false
         let label = UILabel()
         label.text = title
-        label.font = .systemFont(ofSize: 16, weight: .semibold)
+        label.font = .inter(16, .semibold)
         label.textColor = PCTheme.ink
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
@@ -106,11 +106,11 @@ final class ODKVRow: UIView {
         translatesAutoresizingMaskIntoConstraints = false
         let l = UILabel()
         l.text = label
-        l.font = .systemFont(ofSize: 16, weight: bold ? .semibold : .regular)
+        l.font = .inter(16, bold ? .semibold : .regular)
         l.textColor = PCTheme.ink
         let s = UILabel()
         s.text = sub
-        s.font = .systemFont(ofSize: 14)
+        s.font = .inter(14)
         s.textColor = PCTheme.sub
         s.numberOfLines = 0
         s.isHidden = sub.isEmpty
@@ -119,7 +119,7 @@ final class ODKVRow: UIView {
         left.spacing = 1
         let v = UILabel()
         v.text = value
-        v.font = .monospacedDigitSystemFont(ofSize: 16, weight: bold ? .semibold : .regular)
+        v.font = .inter(16, bold ? .semibold : .regular)
         v.textColor = PCTheme.ink
         v.textAlignment = .right
         v.setContentHuggingPriority(.required, for: .horizontal)
@@ -171,17 +171,17 @@ final class ODItemRow: UIView {
 
         let t = UILabel()
         t.text = title
-        t.font = .systemFont(ofSize: 16, weight: .semibold)
+        t.font = .inter(16, .semibold)
         t.textColor = PCTheme.ink
         t.numberOfLines = 2
         let v = UILabel()
         v.text = variant
-        v.font = .systemFont(ofSize: 14)
+        v.font = .inter(14)
         v.textColor = PCTheme.sub
         v.isHidden = variant.isEmpty
         let p = UILabel()
         p.text = price
-        p.font = .systemFont(ofSize: 14)
+        p.font = .inter(14)
         p.textColor = PCTheme.sub
         let texts = UIStackView(arrangedSubviews: [t, v, p])
         texts.axis = .vertical
@@ -189,7 +189,7 @@ final class ODItemRow: UIView {
 
         let q = UILabel()
         q.text = "× \(qty)"
-        q.font = .monospacedDigitSystemFont(ofSize: 16, weight: .regular)
+        q.font = .inter(16, .regular)
         q.textColor = PCTheme.sub
         q.setContentHuggingPriority(.required, for: .horizontal)
         q.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -241,7 +241,7 @@ final class ODCustomerRow: UIControl {
         translatesAutoresizingMaskIntoConstraints = false
         let avatar = UILabel()
         avatar.text = initials.uppercased()
-        avatar.font = .systemFont(ofSize: 15, weight: .semibold)
+        avatar.font = .inter(15, .semibold)
         avatar.textColor = PCTheme.ink
         avatar.textAlignment = .center
         avatar.backgroundColor = UIColor(white: 0.92, alpha: 1)
@@ -251,11 +251,11 @@ final class ODCustomerRow: UIControl {
 
         let n = UILabel()
         n.text = name
-        n.font = .systemFont(ofSize: 16, weight: .semibold)
+        n.font = .inter(16, .semibold)
         n.textColor = PCTheme.ink
         let s = UILabel()
         s.text = sub
-        s.font = .systemFont(ofSize: 14)
+        s.font = .inter(14)
         s.textColor = PCTheme.sub
         let texts = UIStackView(arrangedSubviews: [n, s])
         texts.axis = .vertical
@@ -299,12 +299,12 @@ final class ODAddressRow: UIView {
         translatesAutoresizingMaskIntoConstraints = false
         let t = UILabel()
         t.text = title
-        t.font = .systemFont(ofSize: 13)
+        t.font = .inter(13)
         t.textColor = PCTheme.sub
         t.isHidden = title.isEmpty
         let body = UILabel()
         body.text = lines.joined(separator: "\n")
-        body.font = .systemFont(ofSize: 16)
+        body.font = .inter(16)
         body.textColor = PCTheme.ink
         body.numberOfLines = 0
         let texts = UIStackView(arrangedSubviews: [t, body])
@@ -362,7 +362,7 @@ final class ODRiskRow: UIView {
         bars.setContentHuggingPriority(.required, for: .horizontal)
         let l = UILabel()
         l.text = label
-        l.font = .systemFont(ofSize: 16, weight: .semibold)
+        l.font = .inter(16, .semibold)
         l.textColor = PCTheme.ink
         l.numberOfLines = 0
         let row = UIStackView(arrangedSubviews: [bars, l])
@@ -400,12 +400,12 @@ final class ODTimelineRow: UIView {
 
         let t = UILabel()
         t.text = text
-        t.font = .systemFont(ofSize: 15)
+        t.font = .inter(15)
         t.textColor = PCTheme.ink
         t.numberOfLines = 0
         let w = UILabel()
         w.text = when
-        w.font = .systemFont(ofSize: 13)
+        w.font = .inter(13)
         w.textColor = PCTheme.sub
         let texts = UIStackView(arrangedSubviews: [t, w])
         texts.axis = .vertical
@@ -473,21 +473,21 @@ final class ODClientCard: UIView {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         nameButton.setTitle(name, for: .normal)
-        nameButton.titleLabel?.font = .systemFont(ofSize: 16)
+        nameButton.titleLabel?.font = .inter(16)
         nameButton.setTitleColor(PCTheme.blue, for: .normal)
         nameButton.contentHorizontalAlignment = .leading
         let subLabel = UILabel()
         subLabel.text = sub
-        subLabel.font = .systemFont(ofSize: 16)
+        subLabel.font = .inter(16)
         subLabel.textColor = PCTheme.ink
         let mail = UILabel()
         mail.text = email
-        mail.font = .systemFont(ofSize: 16)
+        mail.font = .inter(16)
         mail.textColor = PCTheme.blue
         mail.isHidden = email.isEmpty
         let tel = UILabel()
         tel.text = phone
-        tel.font = .systemFont(ofSize: 16)
+        tel.font = .inter(16)
         tel.textColor = PCTheme.ink
         tel.isHidden = phone.isEmpty
 
@@ -559,7 +559,7 @@ final class ODFulfillSheet: PCSheetBase {
 
         if !digital {
         trackField.placeholder = labels["Add tracking number"] ?? "Add tracking number"
-        trackField.font = .systemFont(ofSize: 16)
+        trackField.font = .inter(16)
         trackField.textColor = PCTheme.ink
         trackField.keyboardType = .numbersAndPunctuation
         trackField.autocorrectionType = .no
@@ -584,7 +584,7 @@ final class ODFulfillSheet: PCSheetBase {
         notify.onTintColor = PCTheme.ink
         let nLabel = UILabel()
         nLabel.text = labels["Send shipment details to your customer now"] ?? "Send shipment details to your customer now"
-        nLabel.font = .systemFont(ofSize: 15)
+        nLabel.font = .inter(15)
         nLabel.textColor = PCTheme.ink
         nLabel.numberOfLines = 0
         let nRow = UIStackView(arrangedSubviews: [nLabel, notify])
@@ -750,7 +750,7 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
 
         backButton.onTap = { [weak self] in self?.closeAnimated() }
 
-        barTitle.font = .systemFont(ofSize: 17, weight: .semibold)
+        barTitle.font = .inter(17, .semibold)
         barTitle.textColor = PCTheme.ink
         barTitle.textAlignment = .center
         barTitle.alpha = 0
@@ -801,7 +801,7 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
     private func header(_ title: String, count: Int? = nil, more: Bool = false) -> UIView {
         let label = UILabel()
         label.text = title
-        label.font = .systemFont(ofSize: 17, weight: .bold)
+        label.font = .inter(17, .bold)
         label.textColor = PCTheme.ink
         label.numberOfLines = 0
         let stack = UIStackView(arrangedSubviews: [label])
@@ -813,7 +813,7 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
         if let count {
             let c = UILabel()
             c.text = "\(count)"
-            c.font = .systemFont(ofSize: 16, weight: .semibold)
+            c.font = .inter(16, .semibold)
             c.textColor = UIColor(white: 0.55, alpha: 1)
             c.setContentHuggingPriority(.required, for: .horizontal)
             stack.addArrangedSubview(c)
@@ -855,7 +855,7 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
         // En-tête : « #1017 » + pastilles de statut, puis la ligne de date / canal.
         let title = UILabel()
         title.text = str("title")
-        title.font = .systemFont(ofSize: 30, weight: .bold)
+        title.font = .inter(30, .bold)
         title.textColor = PCTheme.ink
         title.setContentHuggingPriority(.required, for: .horizontal)
         title.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -869,7 +869,7 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
         line.spacing = 8
         let sub = UILabel()
         sub.text = str("sub")
-        sub.font = .systemFont(ofSize: 14)
+        sub.font = .inter(14)
         sub.textColor = PCTheme.sub
         sub.numberOfLines = 0
         let head = UIStackView(arrangedSubviews: [line, sub])
@@ -947,7 +947,7 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
         var rows: [UIView] = []
         let shipSub = UILabel()
         shipSub.text = str("shipSub")
-        shipSub.font = .systemFont(ofSize: 15)
+        shipSub.font = .inter(15)
         shipSub.textColor = PCTheme.sub
         shipSub.numberOfLines = 0
         let shipWrap = UIStackView(arrangedSubviews: [shipSub])
@@ -1071,7 +1071,7 @@ final class OrderDetailViewController: UIViewController, UIScrollViewDelegate, U
         pill.translatesAutoresizingMaskIntoConstraints = false
         let label = UILabel()
         label.text = text
-        label.font = .systemFont(ofSize: 15, weight: .semibold)
+        label.font = .inter(15, .semibold)
         label.textColor = PCTheme.ink
         label.translatesAutoresizingMaskIntoConstraints = false
         pill.contentView.addSubview(label)
