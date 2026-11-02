@@ -458,6 +458,17 @@
     } catch (e2) {}
     return false;
   }
+  // Locale de l'app (fr-FR, es-ES…) : sert à écrire les dates dans la langue choisie (« 1 nov. 2026 » en français).
+  function appLoc() {
+    var loc = "en-US";
+    try { if (window.I18N) window.I18N.langs.forEach(function (l) { if (l.code === window.I18N.lang) loc = l.loc; }); } catch (e) { }
+    return loc;
+  }
+  function dateFull(t) {
+    var d = L(t);
+    try { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toLocaleDateString(appLoc(), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }); }
+    catch (e) { return ymdStr(t); }
+  }
   function pushTime(t) {
     var s2 = (nowMs() - t) / 1000;
     if (s2 < 60) return "now";
@@ -467,6 +478,24 @@
     if (di === T) return hm(t);
     if (di >= T - 6) return WD[d.getUTCDay()].slice(0, 3) + " " + hm(t);
     return md(t);
+  }
+  // Même chose, mais déjà dans la langue de l'app et avec l'année pour les dates plus anciennes (fenêtre Alertes).
+  function pushTimeL(t) {
+    var s2 = (nowMs() - t) / 1000, loc = appLoc();
+    if (s2 < 60) return L10n("now");
+    if (s2 < 3600) return L10n(Math.floor(s2 / 60) + "m ago");
+    if (s2 < 6 * 3600) return L10n(Math.floor(s2 / 3600) + "h ago");
+    var d = L(t), di = dayIdx(t);
+    var clock = function () {
+      try { return new Date(Date.UTC(2001, 0, 1, d.getUTCHours(), d.getUTCMinutes())).toLocaleTimeString(loc, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }); }
+      catch (e) { return hm(t); }
+    };
+    if (di === T) return clock();
+    if (di >= T - 6) {
+      var wd = ""; try { wd = new Date(Date.UTC(2001, 0, 7 + d.getUTCDay())).toLocaleDateString(loc, { weekday: "short", timeZone: "UTC" }); } catch (e2) { wd = WD[d.getUTCDay()].slice(0, 3); }
+      return wd + " " + clock();
+    }
+    return dateFull(t);
   }
   var VAT = S.country !== "US" && S.country !== "CA" ? 1 : 0;
 
@@ -2541,13 +2570,131 @@
       b.addEventListener("click", function () { var p = payList()[+b.getAttribute("data-po")]; if (p) payDetail(p); });
     });
   }
-  function openPayouts() {
+  function openPayoutsWeb() {
     payEl = sheet("Payouts", payoutsHtml(), { navClose: true, cls: "notifs payouts" });
     bindPayouts(payEl);
     var sb = $(".sh-b", payEl); sb.classList.add("pv-in");
     setTimeout(function () { sb.classList.remove("pv-in"); }, 1800);
     var bn = $("#pvBal", payEl); if (bn && payBal() > 0) countTo(bn, 0, payBal(), money, 1000);
     setTimeout(function () { hap("light"); }, 120);
+  }
+  /* ── Versements natifs (Swift, iOS 26) ───────────────────────
+     L'écran Versements, la liste, le détail et le transfert (méthode → montant → compte → glisser pour envoyer) sont natifs.
+     La page garde les données et la logique (solde, comptes, historique, notifications) ; elle envoie à Swift un état déjà traduit
+     (mode « payouts » puis « payoutsUpdate ») et reçoit les actions (addAccount, delAccount, send) par __larpNativePayoutsAct. */
+  var nativePayOn = false;
+  var FLAGS = { EUR: "\uD83C\uDDEA\uD83C\uDDFA", USD: "\uD83C\uDDFA\uD83C\uDDF8", GBP: "\uD83C\uDDEC\uD83C\uDDE7", JPY: "\uD83C\uDDEF\uD83C\uDDF5", CAD: "\uD83C\uDDE8\uD83C\uDDE6", AUD: "\uD83C\uDDE6\uD83C\uDDFA", CHF: "\uD83C\uDDE8\uD83C\uDDED", KRW: "\uD83C\uDDF0\uD83C\uDDF7", MXN: "\uD83C\uDDF2\uD83C\uDDFD", BRL: "\uD83C\uDDE7\uD83C\uDDF7", INR: "\uD83C\uDDEE\uD83C\uDDF3", CNY: "\uD83C\uDDE8\uD83C\uDDF3", SEK: "\uD83C\uDDF8\uD83C\uDDEA", NOK: "\uD83C\uDDF3\uD83C\uDDF4", DKK: "\uD83C\uDDE9\uD83C\uDDF0", PLN: "\uD83C\uDDF5\uD83C\uDDF1", NZD: "\uD83C\uDDF3\uD83C\uDDFF", SGD: "\uD83C\uDDF8\uD83C\uDDEC", HKD: "\uD83C\uDDED\uD83C\uDDF0" };
+  function payFlag() {
+    if (FLAGS[S.cur]) return FLAGS[S.cur];
+    var cc = String(S.country || "").toUpperCase();
+    if (!/^[A-Z]{2}$/.test(cc)) return "";
+    return String.fromCodePoint(0x1F1E6 + cc.charCodeAt(0) - 65, 0x1F1E6 + cc.charCodeAt(1) - 65);
+  }
+  function payFee(c, method) {
+    var u = Math.pow(10, (S.dec == null ? 2 : S.dec) - 2);
+    return method === "paypal" ? Math.max(Math.round(10 * u), Math.round(c * 0.01)) : Math.round(25 * u);
+  }
+  function nativePayoutsInfo(first) {
+    var Tr = L10n, np = nextPayout(), bal = payBal(), list = payList();
+    var dec = S.dec == null ? 2 : S.dec, u = Math.pow(10, dec - 2);
+    var sent = transfers.reduce(function (a, t) { return a + t.amt; }, 0);
+    var moving = transfers.filter(function (t) { return payStatus(t) === "In transit"; }).reduce(function (a, t) { return a + t.amt; }, 0);
+    var items = list.slice(0, 30).map(function (p, k) {
+      var st = payStatus(p), tr = st === "In transit", rows;
+      if (p.bank) {
+        rows = [{ l: Tr("Destination"), v: p.bank }];
+        if (p.holder) rows.push({ l: Tr("Account holder"), v: p.holder });
+        if (p.fees > 0) { rows.push({ l: Tr("Amount"), v: money(p.gross) }); rows.push({ l: Tr("Withdrawal fee"), v: "-" + money(p.fees) }); }
+        rows.push({ l: Tr("Total"), v: money(p.amt), tot: true });
+      } else {
+        rows = [{ l: Tr("Orders"), s: String(p.n), v: money(p.gross) }, { l: Tr("Fees"), v: "-" + money(p.fees) }, { l: Tr("Total"), v: money(p.amt), tot: true }];
+      }
+      return {
+        id: k, bank: !!p.bank, tr: tr, st: Tr(st), amt: money(p.amt), date: dateFull(p.ts),
+        title: p.bank ? (p.kind === "paypal" ? "PayPal" : Tr("Bank transfer")) : Tr("Payout"),
+        sub: dateFull(p.ts) + " \u2022 " + (p.bank ? p.bank : Tr(p.n + " order" + (p.n === 1 ? "" : "s"))),
+        rows: rows
+      };
+    });
+    return {
+      mode: first ? "payouts" : "payoutsUpdate",
+      lang: window.I18N ? window.I18N.lang : "en", loc: S.loc || "en-US",
+      balanceTitle: Tr("Payout balance"), balanceInfo: Tr("Your payout balance is the money from your sales that has not been sent to your bank account yet."),
+      balance: money(bal), balanceCents: bal, curRow: money(bal), cur: S.cur, flag: payFlag(),
+      viewPayouts: Tr("View payouts"), taxes: Tr("Taxes"), taxSetup: Tr("Set up tax collection"),
+      learn: Tr("Learn more about"), learnLink: "Shopify Finance", soon: Tr("Coming soon"),
+      listTitle: Tr("Payouts"), avail: Tr("Available balance"), est: np ? Tr("Estimated " + md(np.ts)) : "",
+      account: Tr(payChip()), transferLabel: Tr("Transfer"),
+      statsOn: transfers.length > 0, inTransitL: Tr("In transit"), inTransit: money(moving), sentL: Tr("Transferred"), sent: money(sent),
+      empty: Tr("No payouts yet"), emptySub: Tr("Your transfers will show up here."),
+      items: items,
+      tr: {
+        bal: bal, dec: dec, sym: S.sym, symAfter: S.cur === "EUR", sep: (1.1).toLocaleString(S.loc || "en-US").charAt(1),
+        feeBank: Math.round(25 * u), feeMin: Math.round(10 * u),
+        method: payAccts.length || !payPal ? "bank" : "paypal", sel: paySel || (payAccts[0] ? payAccts[0].id : ""), email: payPal || "",
+        accounts: payAccts.map(function (a) { return { id: a.id, holder: a.holder, label: bankLabel(a.iban) }; }),
+        s: {
+          transfer: Tr("Transfer"), methodH: Tr("Withdrawal method"), methodP: Tr("Choose how you want to receive your money."),
+          bank: Tr("Bank account"), bankSub: Tr("1 to 2 business days"), paypal: "PayPal", paypalSub: Tr("Usually within minutes"),
+          cont: Tr("Continue"), available: Tr("Available"), chooseH: Tr("Choose an account"), chooseP: Tr("Select where to send"),
+          mailH: Tr("PayPal email"), mailP: Tr("Enter the email linked to your PayPal account."), holder: Tr("Account holder"), iban: "IBAN",
+          save: Tr("Save account"), cancel: Tr("Cancel"), add: Tr("Add a bank account"), reviewH: Tr("Review transfer"), reviewP: Tr("Check the details before sending."),
+          amount: Tr("Amount"), fee: Tr("Withdrawal fee"), free: Tr("Free"), to: Tr("To"), arrival: Tr("Arrival"), receive: Tr("You receive"),
+          arrBank: Tr("1 to 2 business days"), arrPaypal: Tr("Usually within minutes"), swipe: Tr("Swipe to send"), sending: Tr("Sending\u2026"),
+          sent: Tr("Transfer sent"), done: Tr("Done"), del: Tr("Delete"),
+          eMail: Tr("Enter a valid email address"), eAcc: Tr("Select an account"), eOver: Tr("Amount is higher than your balance"),
+          eFee: Tr("Amount too low to cover the fees"), eName: Tr("Enter the account holder's name"), eIban: Tr("Enter a valid IBAN"),
+          added: Tr("Account added"), removed: Tr("Account removed"), nothing: Tr("Nothing to transfer")
+        }
+      }
+    };
+  }
+  function nativePayoutsPush() {
+    if (!nativePayOn) return;
+    if (!nativeOrderPost(nativePayoutsInfo(false))) nativePayOn = false;
+  }
+  window.__larpNativePayoutsClosed = function () { nativePayOn = false; };
+  window.__larpNativePayoutsFallback = function () { nativePayOn = false; openPayoutsWeb(); };
+  window.__larpNativePayoutsAct = function (m) {
+    if (!m) return;
+    if (m.act === "addAccount") {
+      var name = String(m.holder || "").trim(), iban = String(m.iban || "").replace(/\s+/g, "").toUpperCase();
+      if (name && /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban) && !payAccts.some(function (a) { return a.id === m.id; })) {
+        payAccts.push({ id: String(m.id || "a" + Date.now()), holder: name, iban: iban }); paySel = String(m.id || paySel);
+        saveState();
+      }
+    } else if (m.act === "delAccount") {
+      payAccts = payAccts.filter(function (a) { return a.id !== m.id; });
+      if (paySel === m.id) paySel = payAccts[0] ? payAccts[0].id : "";
+      saveState();
+    } else if (m.act === "send") {
+      var c = Math.min(Math.round(Number(m.cents) || 0), payBal()), dest = null;
+      if (m.method === "paypal") {
+        var em = String(m.email || "").trim();
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { payPal = em; dest = { kind: "paypal", label: "PayPal " + maskMail(em), holder: "" }; }
+      } else {
+        var a = payAccts.filter(function (x) { return x.id === m.sel; })[0];
+        if (a) { paySel = a.id; dest = { kind: "bank", label: bankLabel(a.iban), holder: a.holder }; }
+      }
+      var fee = dest ? payFee(c, m.method) : 0;
+      if (dest && c > 0 && c > fee) {
+        S.payout = payBal() - c;
+        var row = { ts: nowMs(), amt: Math.max(0, c - fee), st: "In transit", n: 0, fees: fee, gross: c, bank: dest.label, holder: dest.holder, kind: dest.kind };
+        transfers.unshift(row); payouts.unshift(row);
+        saveState(); syncPayCard();
+        setTimeout(function () { notifyPayout(row); }, 260);
+      }
+    }
+    nativePayoutsPush();
+  };
+  function openPayouts() {
+    if (window.__LARP_NATIVE_PRODUCT__ && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpProduct) {
+      if (nativePayOn) return;
+      nativePayOn = true;
+      if (nativeOrderPost(nativePayoutsInfo(true))) return;
+      nativePayOn = false;
+    }
+    openPayoutsWeb();
   }
   function payDetail(p) {
     var st = payStatus(p);
@@ -2569,6 +2716,7 @@
       }
       rendered.menu = 0;
       if (payEl && payEl.isConnected) { $(".sh-b", payEl).innerHTML = payoutsHtml(); bindPayouts(payEl); }
+      nativePayoutsPush();
     } catch (e) { }
   }
   // Bottom sheet shown once a transfer is sent: animated check + a little haptic choreography.
@@ -2829,7 +2977,7 @@
       items: notifs.slice(0, 40).map(function (x) {
         var pay = x.kind === "payout";
         return {
-          id: alertKey(x), kind: x.kind, unread: !x.read, src: T(pay ? "Payouts" : "Orders"), when: pushTime(x.ts),
+          id: alertKey(x), kind: x.kind, unread: !x.read, src: T(pay ? "Payouts" : "Orders"), when: pushTimeL(x.ts),
           title: pay ? T("Transfer sent") : T("Order #" + x.o.n), body: pay ? T(payoutBody(x.t)) : T(pushBody(x.o))
         };
       })
@@ -2865,9 +3013,9 @@
   }
   function openNotifsWeb() {
     var body = notifs.slice(0, 40).map(function (x) {
-      if (x.kind === "payout") return '<button class="nrow' + (x.read ? "" : " unr") + '" data-act="payouts"><span class="napp pay"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 12.5l4 4 8-9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><div class="nr1"><b>Transfer sent</b><em>' + esc(pushTime(x.ts)) + "</em></div><span>" + esc(payoutBody(x.t)) + "</span></div></button>";
+      if (x.kind === "payout") return '<button class="nrow' + (x.read ? "" : " unr") + '" data-act="payouts"><span class="napp pay"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 12.5l4 4 8-9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><div class="nr1"><b>Transfer sent</b><em>' + esc(pushTimeL(x.ts)) + "</em></div><span>" + esc(payoutBody(x.t)) + "</span></div></button>";
       var o = x.o;
-      return '<button class="nrow' + (x.read ? "" : " unr") + '" data-order="' + o.n + '"><span class="napp">' + ic("bag-color") + '</span><div><div class="nr1"><b>Order #' + o.n + "</b><em>" + esc(pushTime(x.ts)) + "</em></div><span>" + esc(pushBody(o)) + "</span></div></button>";
+      return '<button class="nrow' + (x.read ? "" : " unr") + '" data-order="' + o.n + '"><span class="napp">' + ic("bag-color") + '</span><div><div class="nr1"><b>Order #' + o.n + "</b><em>" + esc(pushTimeL(x.ts)) + "</em></div><span>" + esc(pushBody(o)) + "</span></div></button>";
     }).join("");
     sheet("Notifications", body || emptyState("No notifications", ""), { navClose: true, cls: "notifs", actions: '<button class="nb-c" data-act="notifsettings" aria-label="Settings">' + ic("settings") + "</button>" });
     notifs.forEach(function (x) { x.read = true; });
