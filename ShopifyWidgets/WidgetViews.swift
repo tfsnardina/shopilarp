@@ -66,12 +66,12 @@ struct WidgetHeader: View {
         HStack(alignment: .top, spacing: 6) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(m.store)
-                    .font(.system(size: nameSize, weight: .bold))
+                    .font(.inter(nameSize, .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Text(WText.t("updated") + WFormat.time(m.updated))
-                    .font(.system(size: subSize, weight: .medium))
+                    .font(.inter(subSize, .medium))
                     .foregroundColor(WColor.sub)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -92,7 +92,7 @@ struct ChangeBadge: View {
         if let r = rounded, let v = value {
             if r == 0 {
                 Text(WFormat.change(0))
-                    .font(.system(size: size, weight: .semibold))
+                    .font(.inter(size, .semibold))
                     .foregroundColor(WColor.flat)
                     .lineLimit(1)
             } else {
@@ -100,7 +100,7 @@ struct ChangeBadge: View {
                     Image(systemName: r > 0 ? "chevron.up" : "chevron.down")
                         .font(.system(size: size * 0.72, weight: .heavy))
                     Text(WFormat.change(v))
-                        .font(.system(size: size, weight: .semibold))
+                        .font(.inter(size, .semibold))
                         .lineLimit(1)
                 }
                 .foregroundColor(r > 0 ? WColor.up : WColor.down)
@@ -121,13 +121,13 @@ struct MetricRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label)
-                .font(.system(size: labelSize, weight: .medium))
+                .font(.inter(labelSize, .medium))
                 .foregroundColor(WColor.label)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
-                    .font(.system(size: valueSize, weight: .bold))
+                    .font(.inter(valueSize, .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -149,12 +149,12 @@ struct SparkCell: View {
         HStack(alignment: .center, spacing: 6) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(.inter(12.5, .medium))
                     .foregroundColor(WColor.label)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Text(value)
-                    .font(.system(size: 21, weight: .bold))
+                    .font(.inter(21, .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -251,7 +251,7 @@ struct DigitTile: View {
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.05), lineWidth: 0.5)
             Text(String(char))
-                .font(.system(size: 62, weight: .bold, design: .rounded))
+                .font(.inter(62, .bold))
                 .foregroundColor(.white)
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
@@ -334,11 +334,11 @@ struct InsightsLargeView: View {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(WText.t("totalSales"))
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.inter(14, .medium))
                         .foregroundColor(WColor.label)
                         .lineLimit(1)
                     Text(WFormat.money(m.sales, sym: m.sym, dec: m.dec))
-                        .font(.system(size: 26, weight: .bold))
+                        .font(.inter(26, .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
