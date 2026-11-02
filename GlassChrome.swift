@@ -224,7 +224,7 @@ final class GlassButtonItem: GlassChromeItem {
             config.contentInsets = .zero
             if kind == "txt" || kind == "cta" {
                 var t = AttributedString(title)
-                t.font = UIFont.systemFont(ofSize: kind == "cta" ? 17 : 16, weight: .semibold)
+                t.font = UIFont.inter(kind == "cta" ? 17 : 16, .semibold)
                 config.attributedTitle = t
                 if kind == "cta", let name = glassSymbols[icon] {
                     config.image = UIImage(
@@ -277,7 +277,7 @@ final class GlassSearchField: GlassChromeItem, UITextFieldDelegate {
         icon.contentMode = .scaleAspectFit
         glass.contentView.addSubview(icon)
 
-        field.font = .systemFont(ofSize: 17)
+        field.font = .inter(17)
         field.textColor = GlassChromeItem.ink
         field.tintColor = UIColor(red: 0.0, green: 0.36, blue: 0.84, alpha: 1)
         field.returnKeyType = .search
@@ -310,7 +310,7 @@ final class GlassSearchField: GlassChromeItem, UITextFieldDelegate {
         if field.placeholder != ph {
             field.attributedPlaceholder = NSAttributedString(
                 string: ph,
-                attributes: [.foregroundColor: UIColor(white: 0.55, alpha: 1), .font: UIFont.systemFont(ofSize: 17)]
+                attributes: [.foregroundColor: UIColor(white: 0.55, alpha: 1), .font: UIFont.inter(17)]
             )
         }
         // La page ne réécrit le texte que s'il a changé ailleurs (ex. rendu) ; on ne casse pas la saisie en cours.
@@ -340,8 +340,8 @@ final class GlassChips: GlassChromeItem {
     private var lead: CGFloat = 0
     private var pendingMove = false
 
-    private static let font = UIFont.systemFont(ofSize: 17, weight: .semibold)      // mesure (le plus large)
-    private static let fontOff = UIFont.systemFont(ofSize: 17, weight: .medium)
+    private static let font = UIFont.inter(17, .semibold)      // mesure (le plus large)
+    private static let fontOff = UIFont.inter(17, .medium)
     private static let offColor = UIColor(white: 0.40, alpha: 1)
     private static let pad: CGFloat = 16
     private static let gap: CGFloat = 3.5
@@ -507,7 +507,7 @@ final class GlassGroupItem: GlassChromeItem, UITextFieldDelegate {
         )
         searchIcon.tintColor = UIColor(white: 0.45, alpha: 1)
         searchIcon.contentMode = .scaleAspectFit
-        field.font = .systemFont(ofSize: 17)
+        field.font = .inter(17)
         field.textColor = GlassChromeItem.ink
         field.tintColor = UIColor(red: 0.0, green: 0.36, blue: 0.84, alpha: 1)
         field.returnKeyType = .search
@@ -598,7 +598,7 @@ final class GlassGroupItem: GlassChromeItem, UITextFieldDelegate {
             if field.placeholder != ph {
                 field.attributedPlaceholder = NSAttributedString(
                     string: ph,
-                    attributes: [.foregroundColor: UIColor(white: 0.55, alpha: 1), .font: UIFont.systemFont(ofSize: 17)]
+                    attributes: [.foregroundColor: UIColor(white: 0.55, alpha: 1), .font: UIFont.inter(17)]
                 )
             }
             let text = (d["text"] as? String) ?? ""
