@@ -56,7 +56,7 @@ final class GlassSelectionBarView: UIView {
         delConfig.baseForegroundColor = .white
         delConfig.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
         var delTitle = AttributedString(Self.deleteTitle)
-        delTitle.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
+        delTitle.font = UIFont.inter(17, .semibold)
         delConfig.attributedTitle = delTitle
         deleteButton.configuration = delConfig
         deleteButton.accessibilityLabel = Self.deleteTitle
@@ -137,7 +137,7 @@ final class GlassSelectionBarView: UIView {
     private func applyCount() {
         var config = countButton.configuration
         var title = AttributedString("\(count)")
-        title.font = UIFont.monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
+        title.font = UIFont.inter(17, .semibold)
         config?.attributedTitle = title
         countButton.configuration = config
         let enabled = count > 0 && !busy
