@@ -82,10 +82,10 @@ final class PCDRow: UIControl {
         translatesAutoresizingMaskIntoConstraints = false
 
         titleLabel.text = title
-        titleLabel.font = .systemFont(ofSize: 16, weight: bold ? .semibold : .regular)
+        titleLabel.font = .inter(16, bold ? .semibold : .regular)
         titleLabel.textColor = PCTheme.ink
         titleLabel.numberOfLines = 0
-        subLabel.font = .systemFont(ofSize: 16)
+        subLabel.font = .inter(16)
         subLabel.textColor = PCTheme.sub
         subLabel.numberOfLines = 1
         subLabel.isHidden = true
@@ -216,7 +216,7 @@ final class PCDStatusPill: UIVisualEffectView {
         cornerConfiguration = .capsule()
         translatesAutoresizingMaskIntoConstraints = false
         setContentHuggingPriority(.required, for: .horizontal)
-        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.font = .inter(13, .semibold)
         label.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(label)
         NSLayoutConstraint.activate([
@@ -294,7 +294,7 @@ final class PCDNumberPill: UIVisualEffectView {
         translatesAutoresizingMaskIntoConstraints = false
         setContentHuggingPriority(.required, for: .horizontal)
         field.text = "\(value)"
-        field.font = .monospacedDigitSystemFont(ofSize: 17, weight: .regular)
+        field.font = .inter(17, .regular)
         field.textColor = PCTheme.ink
         field.textAlignment = .center
         field.keyboardType = .numberPad
@@ -517,7 +517,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         actionPill.moreButton.showsMenuAsPrimaryAction = true
         actionPill.moreButton.menu = makeMoreMenu()
 
-        barTitle.font = .systemFont(ofSize: 17, weight: .semibold)
+        barTitle.font = .inter(17, .semibold)
         barTitle.textColor = PCTheme.ink
         barTitle.textAlignment = .center
         barTitle.lineBreakMode = .byTruncatingTail
@@ -560,7 +560,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
     private func header(_ title: String, count: Int? = nil, action: String? = nil) -> UIView {
         let label = UILabel()
         label.text = title
-        label.font = .systemFont(ofSize: 17, weight: .bold)
+        label.font = .inter(17, .bold)
         label.textColor = PCTheme.ink
         let stack = UIStackView(arrangedSubviews: [label])
         stack.axis = .horizontal
@@ -571,7 +571,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         if let count {
             let c = UILabel()
             c.text = "\(count)"
-            c.font = .systemFont(ofSize: 16, weight: .semibold)
+            c.font = .inter(16, .semibold)
             c.textColor = UIColor(white: 0.55, alpha: 1)
             stack.addArrangedSubview(c)
         }
@@ -579,7 +579,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         if let action {
             let b = UIButton(type: .system)
             b.setTitle(action, for: .normal)
-            b.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+            b.titleLabel?.font = .inter(16, .semibold)
             b.tintColor = PCTheme.blue
             stack.addArrangedSubview(b)
         }
@@ -638,7 +638,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
 
         // Titre · description · catégorie · prix.
         titleField.placeholder = dtr("Titre de produit", "Product title")
-        titleField.font = .systemFont(ofSize: 17, weight: .semibold)
+        titleField.font = .inter(17, .semibold)
         titleField.textColor = PCTheme.ink
         titleField.returnKeyType = .done
         titleField.autocapitalizationType = .sentences
@@ -657,7 +657,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         ])
 
         priceField.placeholder = dtr("0,00 \(currency)", "\(currency)0.00")
-        priceField.font = .systemFont(ofSize: 16, weight: .semibold)
+        priceField.font = .inter(16, .semibold)
         priceField.textColor = PCTheme.ink
         priceField.keyboardType = .decimalPad
         priceField.addAction(UIAction { [weak self] _ in self?.priceEdited(); self?.refresh() }, for: .editingChanged)
@@ -696,7 +696,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         addHeader(header("Stock", action: dtr("Modifier", "Edit")))
         let stockLabel = UILabel()
         stockLabel.text = dtr("Disponible", "Available")
-        stockLabel.font = .systemFont(ofSize: 16)
+        stockLabel.font = .inter(16)
         stockLabel.textColor = PCTheme.ink
         let pill = PCDNumberPill(value: inv)
         pill.onChange = { [weak self] v in self?.inv = v; self?.refresh() }
@@ -763,12 +763,12 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
             ])
         }
 
-        mediaLabel.font = .systemFont(ofSize: 17, weight: .medium)
+        mediaLabel.font = .inter(17, .medium)
         mediaLabel.textColor = PCTheme.sub
         mediaLabel.textAlignment = .center
         let sub = UILabel()
         sub.text = dtr("Choisissez un forfait pour ajouter d'autres types de supports multimédias.", "Choose a plan to add other types of media.")
-        sub.font = .systemFont(ofSize: 17)
+        sub.font = .inter(17)
         sub.textColor = PCTheme.sub
         sub.textAlignment = .center
         sub.numberOfLines = 0
@@ -1087,7 +1087,7 @@ final class ProductDetailViewController: UIViewController, UIScrollViewDelegate,
         pill.translatesAutoresizingMaskIntoConstraints = false
         let label = UILabel()
         label.text = text
-        label.font = .systemFont(ofSize: 15, weight: .semibold)
+        label.font = .inter(15, .semibold)
         label.textColor = PCTheme.ink
         label.translatesAutoresizingMaskIntoConstraints = false
         pill.contentView.addSubview(label)
