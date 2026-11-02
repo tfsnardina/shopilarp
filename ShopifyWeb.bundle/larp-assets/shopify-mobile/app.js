@@ -588,6 +588,21 @@
     }
     return d;
   }
+  // Display-only smoothing so the curve flows like the real app's (round bumps instead of
+  // day-to-day spikes). Binomial kernel, endpoints kept (the last point is the day in progress).
+  // Few points (7 days, hours of a short day) are left alone so real peaks stay sharp enough.
+  function soften(v) {
+    var n = v.length;
+    if (n < 9) return v.slice();
+    var w = n >= 20 ? [1, 2, 1] : [1, 6, 1], sum = w[0] + w[1] + w[2], o = v.slice();
+    var passes = n >= 60 ? 2 : 1;
+    for (var p = 0; p < passes; p++) {
+      var q = o.slice();
+      for (var i = 1; i < n - 1; i++) q[i] = (w[0] * o[i - 1] + w[1] * o[i] + w[2] * o[i + 1]) / sum;
+      o = q;
+    }
+    return o;
+  }
   function xLabel(R, i) {
     if (R.hourly) { var h = i; return (h % 12 || 12) + " " + (h < 12 ? "AM" : "PM"); }
     var di = R.a + i * R.step, t = S.day0 + di * DAY + 12 * HOUR;
@@ -618,7 +633,8 @@
     opts = opts || {};
     var M = MET[mk];
     var W = host.clientWidth || 360, Hh = opts.h || 150;
-    var cur = R.cur.map(M.v), prev = R.prev.map(M.v);
+    var rawCur = R.cur.map(M.v), rawPrev = R.prev.map(M.v);
+    var cur = soften(rawCur), prev = soften(rawPrev);   // curve is drawn from the softened series
     var n = R.n;
     var max = Math.max.apply(null, cur.concat(prev).concat([0]));
     if (max <= 0) max = M.k === "money" ? 10000 : M.k === "pct" ? 5 : 10;
@@ -637,7 +653,7 @@
     var zl = M.k === "money" ? symAmt("0") : M.k === "pct" ? "0%" : "0";
     var lab = xTicks(R);
     var svg = '<svg width="' + W + '" height="' + Hh + '" viewBox="0 0 ' + W + " " + Hh + '">' +
-      '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#20a8e6" stop-opacity=".16"/><stop offset="1" stop-color="#20a8e6" stop-opacity="0"/></linearGradient></defs>' +
+      '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#20a8e6" stop-opacity=".26"/><stop offset="1" stop-color="#20a8e6" stop-opacity="0"/></linearGradient></defs>' +
       lines.map(function (v) { return '<line class="gl" x1="' + x0 + '" x2="' + x1 + '" y1="' + Y(v).toFixed(1) + '" y2="' + Y(v).toFixed(1) + '"/><text class="yl" x="' + (x0 - 12) + '" y="' + (Y(v) + 5).toFixed(1) + '" text-anchor="end">' + esc(axis(v)) + "</text>"; }).join("") +
       '<line class="gl" x1="' + x0 + '" x2="' + x1 + '" y1="' + yBot + '" y2="' + yBot + '"/>' +
       '<text class="yl" x="' + (x0 - 12) + '" y="' + (yBot + 5) + '" text-anchor="end">' + esc(zl) + "</text>" +
@@ -648,7 +664,7 @@
       '<line class="hair" y1="' + yTop + '" y2="' + yBot + '"/><circle class="cdot" r="4.5"/>' +
       "</svg>";
     host.innerHTML = svg;
-    host._g = { X: X, Y: Y, n: n, cur: cur, prev: prev, R: R, mk: mk, x0: x0, x1: x1 };
+    host._g = { X: X, Y: Y, n: n, cur: rawCur, prev: rawPrev, dcur: cur, R: R, mk: mk, x0: x0, x1: x1 };
     if (opts.anim && !reduce) {
       var ln = $(".ln", host), ar = $(".ar", host), pv = $(".pv", host);
       try {
@@ -676,7 +692,7 @@
       var xi = g.X(i), v = g.cur[i];
       var hair = $(".hair", host), dot = $(".cdot", host);
       hair.setAttribute("x1", xi); hair.setAttribute("x2", xi);
-      if (v != null) { dot.setAttribute("cx", xi); dot.setAttribute("cy", g.Y(v)); dot.style.opacity = 1; } else dot.style.opacity = 0;
+      if (v != null) { dot.setAttribute("cx", xi); dot.setAttribute("cy", g.Y(g.dcur[i])); dot.style.opacity = 1; } else dot.style.opacity = 0;
       host.classList.add("scrub");
       onMove(i, g);
     }
