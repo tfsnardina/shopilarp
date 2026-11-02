@@ -57,7 +57,7 @@ final class GlassDrawerBarView: UIView {
         config.imagePadding = 8
         config.baseForegroundColor = .white
         var title = AttributedString("Quick sale")
-        title.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        title.font = UIFont.inter(18, .semibold)
         config.attributedTitle = title
         quickButton.configuration = config
         quickButton.accessibilityLabel = "Quick sale"
