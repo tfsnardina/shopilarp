@@ -196,7 +196,7 @@ enum POUI {
     ) -> UILabel {
         let l = UILabel()
         l.text = text
-        l.font = .systemFont(ofSize: size, weight: weight)
+        l.font = .inter(size, weight)
         l.textColor = color
         l.numberOfLines = lines
         l.textAlignment = align
@@ -255,7 +255,7 @@ enum POUI {
         config.contentInsets = NSDirectionalEdgeInsets(top: 16, leading: 24, bottom: 16, trailing: 24)
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
             var attrs = attrs
-            attrs.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
+            attrs.font = UIFont.inter(17, .semibold)
             return attrs
         }
         let b = UIButton(configuration: config)
@@ -315,7 +315,7 @@ final class POField: UIView {
         super.init(frame: .zero)
         let cap = POUI.label(caption, 14, .medium, color: PCTheme.sub)
         field.placeholder = placeholder
-        field.font = .systemFont(ofSize: 17)
+        field.font = .inter(17)
         field.textColor = PCTheme.ink
         field.keyboardType = keyboard
         field.autocapitalizationType = capitalization
@@ -578,7 +578,7 @@ final class PayoutsViewController: UIViewController, UIGestureRecognizerDelegate
         content.addArrangedSubview(card)
 
         // « Afficher les versements »
-        viewButton.titleLabel?.font = .systemFont(ofSize: 20, weight: .regular)
+        viewButton.titleLabel?.font = .inter(20, .regular)
         viewButton.setTitleColor(POUI.link, for: .normal)
         viewButton.addAction(UIAction { [weak self] _ in PCTheme.haptic(); self?.showPayouts() }, for: .touchUpInside)
         content.addArrangedSubview(UIView.spacer(14))
@@ -588,7 +588,7 @@ final class PayoutsViewController: UIViewController, UIGestureRecognizerDelegate
         // Taxes
         content.addArrangedSubview(UIView.inset(taxesTitle, left: 4))
         content.addArrangedSubview(UIView.spacer(14))
-        taxesRow.titleLabel.font = .systemFont(ofSize: 19, weight: .regular)
+        taxesRow.titleLabel.font = .inter(19, .regular)
         taxesRow.heightAnchor.constraint(greaterThanOrEqualToConstant: 62).isActive = true
         taxesRow.onTap { [weak self] in self?.toast(self?.store.str("soon") ?? "") }
         content.addArrangedSubview(PCDetailCard(rows: [taxesRow]))
@@ -609,11 +609,11 @@ final class PayoutsViewController: UIViewController, UIGestureRecognizerDelegate
         flagLabel.text = store.str("flag")
         let cur = NSMutableAttributedString(
             string: store.str("curRow"),
-            attributes: [.font: UIFont.systemFont(ofSize: 20, weight: .regular), .foregroundColor: PCTheme.ink]
+            attributes: [.font: UIFont.inter(20, .regular), .foregroundColor: PCTheme.ink]
         )
         cur.append(NSAttributedString(
             string: " " + store.str("cur"),
-            attributes: [.font: UIFont.systemFont(ofSize: 20, weight: .regular), .foregroundColor: UIColor(white: 0.42, alpha: 1)]
+            attributes: [.font: UIFont.inter(20, .regular), .foregroundColor: UIColor(white: 0.42, alpha: 1)]
         ))
         currencyLabel.attributedText = cur
         viewButton.setTitle(store.str("viewPayouts"), for: .normal)
@@ -623,12 +623,12 @@ final class PayoutsViewController: UIViewController, UIGestureRecognizerDelegate
         let gray = UIColor(white: 0.30, alpha: 1)
         let learn = NSMutableAttributedString(
             string: store.str("learn") + " ",
-            attributes: [.font: UIFont.systemFont(ofSize: 18), .foregroundColor: gray]
+            attributes: [.font: UIFont.inter(18), .foregroundColor: gray]
         )
         learn.append(NSAttributedString(
             string: store.str("learnLink"),
             attributes: [
-                .font: UIFont.systemFont(ofSize: 18), .foregroundColor: gray,
+                .font: UIFont.inter(18), .foregroundColor: gray,
                 .underlineStyle: NSUnderlineStyle.single.rawValue,
             ]
         ))
@@ -1256,7 +1256,7 @@ final class POAmountViewController: POFlowBase {
         config.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
         config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
             var attrs = attrs
-            attrs.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+            attrs.font = UIFont.inter(14, .medium)
             return attrs
         }
         availableButton.configuration = config
@@ -1308,7 +1308,7 @@ final class POAmountViewController: POFlowBase {
                     b.setImage(PCTheme.symbol("delete.left", 22, .regular), for: .normal)
                 } else {
                     b.setTitle(key, for: .normal)
-                    b.titleLabel?.font = .systemFont(ofSize: 30, weight: .medium)
+                    b.titleLabel?.font = .inter(30, .medium)
                 }
                 b.tintColor = PCTheme.ink
                 b.setTitleColor(PCTheme.ink, for: .normal)
@@ -1620,7 +1620,7 @@ final class POSwipeSlider: UIView {
         addSubview(fill)
 
         label.text = text
-        label.font = .systemFont(ofSize: 17, weight: .semibold)
+        label.font = .inter(17, .semibold)
         label.textColor = UIColor(white: 0.35, alpha: 1)
         label.textAlignment = .center
         addSubview(label)
