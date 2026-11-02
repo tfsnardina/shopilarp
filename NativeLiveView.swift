@@ -120,7 +120,7 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
         countryTag.alpha = 0
         countryTag.isUserInteractionEnabled = false
         countryTag.translatesAutoresizingMaskIntoConstraints = false
-        tagLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        tagLabel.font = .inter(14, .semibold)
         tagLabel.textColor = UIColor(white: 0.15, alpha: 1)
         tagLabel.translatesAutoresizingMaskIntoConstraints = false
         countryTag.addSubview(tagLabel)
@@ -560,7 +560,7 @@ final class LVLegendPill: UIView {
                 hex.heightAnchor.constraint(equalToConstant: 18),
             ])
         }
-        label.font = .systemFont(ofSize: 15, weight: .regular)
+        label.font = .inter(15, .regular)
         label.textColor = PCTheme.ink
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -589,7 +589,7 @@ final class LVLegendPill: UIView {
 @available(iOS 26.0, *)
 func lvDotted(_ text: String, size: CGFloat = 17) -> NSAttributedString {
     NSAttributedString(string: text, attributes: [
-        .font: UIFont.systemFont(ofSize: size, weight: .bold),
+        .font: UIFont.inter(size, .bold),
         .foregroundColor: PCTheme.ink,
         .underlineStyle: NSUnderlineStyle.single.rawValue | NSUnderlineStyle.patternDot.rawValue,
         .underlineColor: UIColor(white: 0.62, alpha: 1),
@@ -609,7 +609,7 @@ final class LVStatCell: UIView {
         nameLabel.numberOfLines = 1
         nameLabel.lineBreakMode = .byTruncatingTail
         valueLabel.text = value
-        valueLabel.font = .systemFont(ofSize: 17, weight: .bold)
+        valueLabel.font = .inter(17, .bold)
         valueLabel.textColor = PCTheme.ink
         valueLabel.adjustsFontSizeToFitWidth = true
         valueLabel.minimumScaleFactor = 0.6
@@ -665,12 +665,12 @@ final class LVBehaviorColumn: UIView {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         nameLabel.text = label
-        nameLabel.font = .systemFont(ofSize: 14, weight: .regular)
+        nameLabel.font = .inter(14, .regular)
         nameLabel.textColor = PCTheme.ink
         nameLabel.numberOfLines = 1
         nameLabel.lineBreakMode = .byTruncatingTail
         valueLabel.text = value
-        valueLabel.font = .monospacedDigitSystemFont(ofSize: 17, weight: .regular)
+        valueLabel.font = .inter(17, .regular)
         valueLabel.textColor = PCTheme.ink
         let stack = UIStackView(arrangedSubviews: [nameLabel, valueLabel])
         stack.axis = .vertical
@@ -717,11 +717,11 @@ final class LVLocRow: UIView {
         translatesAutoresizingMaskIntoConstraints = false
         let n = UILabel()
         n.text = name
-        n.font = .systemFont(ofSize: 15, weight: .regular)
+        n.font = .inter(15, .regular)
         n.textColor = PCTheme.ink
         let p = UILabel()
         p.text = "\(pct) %"
-        p.font = .monospacedDigitSystemFont(ofSize: 15, weight: .semibold)
+        p.font = .inter(15, .semibold)
         p.textColor = PCTheme.ink
         p.textAlignment = .right
         p.setContentHuggingPriority(.required, for: .horizontal)
@@ -905,7 +905,7 @@ final class LiveViewController: UIViewController, UIGestureRecognizerDelegate, U
 
         closeButton.onTap = { [weak self] in self?.closeAnimated() }
 
-        barTitle.font = .systemFont(ofSize: 17, weight: .semibold)
+        barTitle.font = .inter(17, .semibold)
         barTitle.textColor = PCTheme.ink
         barTitle.textAlignment = .center
         barTitle.translatesAutoresizingMaskIntoConstraints = false
@@ -924,7 +924,7 @@ final class LiveViewController: UIViewController, UIGestureRecognizerDelegate, U
     }
 
     private func sectionTitleRow(_ label: UILabel) -> UIView {
-        label.font = .systemFont(ofSize: 17, weight: .bold)
+        label.font = .inter(17, .bold)
         label.textColor = PCTheme.ink
         label.numberOfLines = 0
         let wrap = UIView()
@@ -1058,7 +1058,7 @@ final class LiveViewController: UIViewController, UIGestureRecognizerDelegate, U
             if locs.isEmpty {
                 let none = UILabel()
                 none.text = str("noSessions")
-                none.font = .systemFont(ofSize: 17)
+                none.font = .inter(17)
                 none.textColor = PCTheme.sub
                 none.numberOfLines = 0
                 let wrap = UIView()
