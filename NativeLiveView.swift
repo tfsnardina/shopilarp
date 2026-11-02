@@ -67,6 +67,10 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
     private var dots: [Dot] = []
     private var pings: [Dot] = []
     private var pingCell: [Int] = []          // hexagone du globe le plus proche de chaque point
+    private var pingSignature = ""
+    /// Vrai pendant que la page défile (doigt ou inertie) : le globe se redessine moins souvent pour ne pas voler de temps au défilement.
+    var pageScrolling = false
+    private var frameSkip = 0
     private var orderCount = 0
     private var visitors = 0
     private var dead = false
@@ -98,6 +102,9 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
         contentMode = .redraw
         clipsToBounds = true
         isUserInteractionEnabled = true
+        // Dessin CPU : 2x suffit pour des hexagones (et divise par ~2 le travail sur un écran 3x) ; dessiné hors du thread principal.
+        contentScaleFactor = min(UIScreen.main.scale, 2)
+        layer.drawsAsynchronously = true
 
         let pan = UIPanGestureRecognizer(target: self, action: #selector(onPan(_:)))
         pan.delegate = self
@@ -183,18 +190,26 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
     /// pts : [[lat, lon]], les `orders` premiers sont des commandes ; home : [lat, lon] (le globe se tourne vers ce point au départ).
     func apply(globe: [String: Any], visitors: Int, lang: String) {
         let raw = (globe["pts"] as? [[Any]]) ?? []
-        pings = raw.compactMap { (p: [Any]) -> Dot? in
-            guard p.count >= 2, let la = (p[0] as? NSNumber)?.doubleValue, let lo = (p[1] as? NSNumber)?.doubleValue else { return nil }
-            return LVGlobeView.dot(lat: la, lon: lo)
+        // Les points ne changent presque jamais d'une mise à jour à l'autre : on ne refait le calcul (coûteux) que s'ils changent.
+        var sig = "\(dots.count)#"
+        for p in raw where p.count >= 2 {
+            sig += "\((p[0] as? NSNumber)?.doubleValue ?? 0),\((p[1] as? NSNumber)?.doubleValue ?? 0);"
         }
-        pingCell = pings.map { p in
-            var best = -1
-            var bestDot = -2.0
-            for (i, d) in dots.enumerated() {
-                let s = d.sinP * p.sinP + d.cosP * p.cosP * (d.cosL * p.cosL + d.sinL * p.sinL)
-                if s > bestDot { bestDot = s; best = i }
+        if sig != pingSignature {
+            pingSignature = sig
+            pings = raw.compactMap { (p: [Any]) -> Dot? in
+                guard p.count >= 2, let la = (p[0] as? NSNumber)?.doubleValue, let lo = (p[1] as? NSNumber)?.doubleValue else { return nil }
+                return LVGlobeView.dot(lat: la, lon: lo)
             }
-            return best
+            pingCell = pings.map { p in
+                var best = -1
+                var bestDot = -2.0
+                for (i, d) in dots.enumerated() {
+                    let s = d.sinP * p.sinP + d.cosP * p.cosP * (d.cosL * p.cosL + d.sinL * p.sinL)
+                    if s > bestDot { bestDot = s; best = i }
+                }
+                return best
+            }
         }
         orderCount = (globe["nOrd"] as? NSNumber)?.intValue ?? 0
         dead = (globe["dead"] as? NSNumber)?.boolValue ?? false
@@ -270,7 +285,7 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
         link = nil
         guard window != nil else { return }
         let l = CADisplayLink(target: self, selector: #selector(tick(_:)))
-        l.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
+        l.preferredFrameRateRange = CAFrameRateRange(minimum: 24, maximum: 30, preferred: 30)
         lastTime = CACurrentMediaTime()
         l.add(to: .main, forMode: .common)
         link = l
@@ -280,6 +295,13 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
 
     @objc private func tick(_ l: CADisplayLink) {
         let now = CACurrentMediaTime()
+        // Globe hors de l'écran (page défilée vers le bas) : rien à animer ni à dessiner.
+        if let w = window, !convert(bounds, to: nil).intersects(w.bounds) { lastTime = now; return }
+        // Pendant le défilement on ne redessine qu'une image sur trois : la page reste à 60 images/s.
+        if pageScrolling && !interacting {
+            frameSkip += 1
+            if frameSkip % 3 != 0 { return }
+        }
         let dt = min(now - lastTime, 0.1)
         lastTime = now
         if !interacting {
@@ -679,7 +701,7 @@ final class LVBehaviorColumn: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func set(label: String, value: String) {
-        nameLabel.text = label
+        if nameLabel.text != label { nameLabel.text = label }
         guard valueLabel.text != value else { return }
         UIView.transition(with: valueLabel, duration: 0.2, options: [.transitionCrossDissolve, .allowUserInteraction]) {
             self.valueLabel.text = value
@@ -744,7 +766,7 @@ final class LVLocRow: UIView {
 // MARK: - Page
 
 @available(iOS 26.0, *)
-final class LiveViewController: UIViewController, UIGestureRecognizerDelegate, DetailPushHosting {
+final class LiveViewController: UIViewController, UIGestureRecognizerDelegate, UIScrollViewDelegate, DetailPushHosting {
     let push = DetailPushTransition()
 
     /// Appelé dès que la fermeture commence (pour réafficher la barre d'onglets) puis une fois la page retirée.
@@ -853,6 +875,7 @@ final class LiveViewController: UIViewController, UIGestureRecognizerDelegate, D
 
     private func buildScroll() {
         scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.delegate = self
         scroll.alwaysBounceVertical = true
         scroll.contentInsetAdjustmentBehavior = .never
         scroll.showsVerticalScrollIndicator = true
@@ -1008,19 +1031,20 @@ final class LiveViewController: UIViewController, UIGestureRecognizerDelegate, D
     // MARK: Mise à jour sur place
 
     private func refresh() {
-        barTitle.text = str("title")
+        if barTitle.text != str("title") { barTitle.text = str("title") }
         let visitors = (info["visitors"] as? NSNumber)?.intValue ?? 0
         let ordersLabel = str("ordersLabel")
-        legendOrders.label.text = ordersLabel.isEmpty ? "Orders" : ordersLabel
-        legendVisitors.label.text = str("visitorsLabel")
+        let ordersText = ordersLabel.isEmpty ? "Orders" : ordersLabel
+        if legendOrders.label.text != ordersText { legendOrders.label.text = ordersText }
+        if legendVisitors.label.text != str("visitorsLabel") { legendVisitors.label.text = str("visitorsLabel") }
         if let g = info["globe"] as? [String: Any] { globe.apply(globe: g, visitors: visitors, lang: str("lang")) }
 
         for (cell, s) in zip(statCells, pairs("stats")) { cell.set(label: s.l, value: s.v) }
 
-        behaviorTitle.attributedText = lvDotted(str("behaviorTitle"))
+        if behaviorTitle.attributedText?.string != str("behaviorTitle") { behaviorTitle.attributedText = lvDotted(str("behaviorTitle")) }
         for (col, b) in zip(behaviorColumns, pairs("behavior")) { col.set(label: b.l, value: b.v) }
 
-        locTitle.attributedText = lvDotted(str("locTitle"))
+        if locTitle.attributedText?.string != str("locTitle") { locTitle.attributedText = lvDotted(str("locTitle")) }
         let locs = ((info["locs"] as? [[String: Any]]) ?? []).map {
             (name: ($0["name"] as? String) ?? "", pct: ($0["pct"] as? NSNumber)?.intValue ?? 0)
         }
@@ -1052,6 +1076,15 @@ final class LiveViewController: UIViewController, UIGestureRecognizerDelegate, D
             }
         }
     }
+
+    // MARK: Défilement (le globe se met en retrait pendant que la page bouge)
+
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) { globe.pageScrolling = true }
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if !decelerate { globe.pageScrolling = false }
+    }
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { globe.pageScrolling = false }
+    func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) { globe.pageScrolling = false }
 
     // MARK: Retour par glissement depuis le bord gauche
 
