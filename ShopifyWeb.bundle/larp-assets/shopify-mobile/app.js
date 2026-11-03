@@ -544,10 +544,35 @@
     for (var i = a; i <= b; i += step) { cur.push(agg(i, Math.min(b, i + step - 1))); labels.push(i); }
     for (var j = pa; j < a; j += step) prev.push(agg(j, Math.min(a - 1, j + step - 1)));
     tot = agg(a, b); ptot = agg(pa, a - 1);
+    var hh = rangeHours(key);
+    if (hh) { // heures partielles : premier / dernier jour proportionnels (totaux, et points du graphique en pas d'un jour)
+      var f0 = hh[0] / 24, f1 = (hh[1] + 1) / 24;
+      tot = trimAgg(a, b, f0, f1); ptot = trimAgg(pa, a - 1, f0, f1);
+      if (step === 1) [cur, prev].forEach(function (arr) {
+        if (arr.length === 1) arr[0] = scaleBucket(arr[0], Math.max(0, f1 - f0));
+        else if (arr.length > 1) { arr[0] = scaleBucket(arr[0], 1 - f0); arr[arr.length - 1] = scaleBucket(arr[arr.length - 1], f1); }
+      });
+    }
     return { key: key, hourly: false, cur: cur, prev: prev, tot: tot, ptot: ptot, a: a, b: b, len: len, step: step, n: cur.length };
   }
   /* Fenêtres en jours (indices de jour de la boutique) pour toutes les périodes sauf « today » / « yday » (horaires).
      Clés : 7d… · lw lm lq 12m ly (périodes passées) · wtd mtd qtd ytd (à ce jour) · c:a:b (dates fixes) · r:n:u:inc (période glissante). */
+  /* Heures de début / fin (« 08:00 » → « 18:59 ») d'une plage de dates fixes : c:a:b:h0:h1. Par défaut 00:00 → 23:59. */
+  function rangeHours(key) {
+    var mt = /^c:-?\d{1,5}:-?\d{1,5}:(\d{1,2}):(\d{1,2})$/.exec(String(key));
+    if (!mt) return null;
+    var h0 = Math.min(23, +mt[1]), h1 = Math.min(23, +mt[2]);
+    return h0 === 0 && h1 === 23 ? null : [h0, h1];
+  }
+  // Part d'une journée (indice i) gardée : les heures partielles du premier / dernier jour sont proportionnelles au jour entier.
+  function partAgg(i, f) { var x = agg(i, i); return { s: x.s * f, o: x.o * f, se: x.se * f, rc: x.rc * f }; }
+  function trimAgg(i0, i1, f0, f1) {
+    var full = agg(i0, i1), r;
+    if (i0 === i1) r = partAgg(i0, Math.max(0, f1 - f0));
+    else { var A = partAgg(i0, f0), B = partAgg(i1, 1 - f1); r = { s: A.s + B.s, o: A.o + B.o, se: A.se + B.se, rc: A.rc + B.rc }; r = { s: full.s - r.s, o: full.o - r.o, se: full.se - r.se, rc: full.rc - r.rc }; }
+    return { s: r.s, o: Math.round(r.o), se: Math.round(r.se), rc: Math.round(r.rc) };
+  }
+  function scaleBucket(x, f) { return { s: x.s * f, o: Math.round(x.o * f), se: Math.round(x.se * f), rc: x.rc }; }
   function dIdx(y, m, d) { return Math.round((Date.UTC(y, m, d) - (Number(S.off) || 0) - S.day0) / DAY); }
   function rangeWin(key) {
     var k = String(key), now = L(nowMs()), y = now.getUTCFullYear(), m = now.getUTCMonth(), wd = (now.getUTCDay() + 6) % 7, q = Math.floor(m / 3) * 3, mt, w = null;
@@ -561,7 +586,7 @@
     else if (k === "mtd") w = [dIdx(y, m, 1), T];
     else if (k === "qtd") w = [dIdx(y, q, 1), T];
     else if (k === "ytd") w = [dIdx(y, 0, 1), T];
-    else if ((mt = /^c:(-?\d{1,5}):(-?\d{1,5})$/.exec(k))) {
+    else if ((mt = /^c:(-?\d{1,5}):(-?\d{1,5})(?::\d{1,2}:\d{1,2})?$/.exec(k))) {
       var c0 = Math.min(+mt[1], +mt[2]), c1 = Math.min(T, Math.max(+mt[1], +mt[2]));
       w = [Math.min(c0, c1), c1];
     } else if ((mt = /^r:(\d{1,3}):([dwmy]):([01])$/.exec(k)) && +mt[1] > 0) {
@@ -1236,7 +1261,9 @@
     }
     var w = rangeWin(k); if (!w) return k;
     var yr = new Date(S.day0 + w[0] * DAY + 12 * HOUR + (Number(S.off) || 0)).getUTCFullYear() !== L(nowMs()).getUTCFullYear() || w[0] < 0;
-    return w[0] === w[1] ? dayLbl(w[0], true) : dayLbl(w[0], yr) + " – " + dayLbl(w[1], yr);
+    var hh = rangeHours(k), p2 = function (n) { return (n < 10 ? "0" : "") + n; };
+    if (w[0] === w[1] && !hh) return dayLbl(w[0], true);
+    return dayLbl(w[0], yr) + (hh ? " " + p2(hh[0]) + ":00" : "") + " – " + dayLbl(w[1], yr) + (hh ? " " + p2(hh[1]) + ":59" : "");
   }
   function rangeShort(k) { return { today: "Today", yday: "Yesterday", "7d": "7 days", "30d": "30 days", "90d": "90 days", "365d": "365 days" }[k] || RNG_L[k] || customLabel(k); }
   function rangeLabel(k) { for (var i = 0; i < RANGES.length; i++) if (RANGES[i][0] === k) return RANGES[i][1]; return RNG_L[k] || customLabel(k); }
