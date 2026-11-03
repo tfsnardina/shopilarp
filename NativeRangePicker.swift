@@ -174,6 +174,9 @@ final class RangeLinkCell: UITableViewCell {
         subLabel.textColor = PCTheme.sub
         subLabel.numberOfLines = 2
         chevron.tintColor = PCTheme.sub
+        chevron.contentMode = .scaleAspectFit
+        chevron.setContentHuggingPriority(.required, for: .horizontal)
+        chevron.setContentCompressionResistancePriority(.required, for: .horizontal)
         chevron.translatesAutoresizingMaskIntoConstraints = false
         let texts = UIStackView(arrangedSubviews: [titleLabel, subLabel])
         texts.axis = .vertical
@@ -192,6 +195,8 @@ final class RangeLinkCell: UITableViewCell {
             texts.trailingAnchor.constraint(equalTo: chevron.leadingAnchor, constant: -12),
             chevron.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
             chevron.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            chevron.widthAnchor.constraint(equalToConstant: 10),
+            chevron.heightAnchor.constraint(equalToConstant: 16),
         ])
     }
 
@@ -241,9 +246,9 @@ final class RangePickerViewController: UIViewController, UITableViewDataSource, 
             // Hauteur « compacte » : en-tête + les deux lignes (dates fixes / glissante) + Aujourd'hui … 365 derniers jours, rien de plus.
             let rows = CGFloat(self.info.groups.first?.count ?? 6)
             let compact = UISheetPresentationController.Detent.custom(identifier: .init("compact")) { [weak self] ctx in
-                let bottom = self?.bottomInset ?? 34
+                // iOS ajoute lui-même la zone de l'indicateur d'accueil à cette valeur : on ne la compte pas ici.
                 let h = RangePickerViewController.headH + RangePickerViewController.fixedH + RangePickerViewController.rollH
-                    + RangePickerViewController.gap + rows * RangePickerViewController.rowH + bottom
+                    + RangePickerViewController.gap + rows * RangePickerViewController.rowH
                 return min(ctx.maximumDetentValue, h)
             }
             sheet.detents = [compact, .large()]
@@ -336,7 +341,7 @@ final class RangePickerViewController: UIViewController, UITableViewDataSource, 
 
     /// Sous « 365 derniers jours » on laisse du blanc (hauteur compacte) : la suite n'apparaît qu'en agrandissant la feuille.
     func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
-        if case .items(0) = sections[section] { return bottomInset + RangePickerViewController.gap }
+        if case .items(0) = sections[section] { return bottomInset + RangePickerViewController.gap + 16 }
         return RangePickerViewController.gap
     }
 
