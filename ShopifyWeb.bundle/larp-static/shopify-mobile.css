@@ -203,6 +203,11 @@ em.flat{color:#8a8a8a}
 .hpill{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:12px;background:#141414;border:1px solid #2f2f2f;color:#fff;font-size:16px;font-weight:450}
 .hpill .ic{width:20px;height:20px}
 .hpill:active{background:#222}
+.hpills{padding:0 16px}
+.hpill{white-space:nowrap}
+.hpill:first-child{min-width:0}
+.hpill:first-child span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.hpill:last-child{flex:none}
 .hchart{transition:height .6s var(--ease),opacity .4s ease,margin .6s var(--ease),transform .6s var(--ease),filter .5s ease}
 .hm-top.anim .hchart,.hm-top.fold .hchart{overflow:hidden}
 .hm-top.fold .hchart{height:0!important;opacity:0;margin-top:0;transform:translateY(-22px) scaleY(.82);transform-origin:50% 0;filter:blur(5px)}
