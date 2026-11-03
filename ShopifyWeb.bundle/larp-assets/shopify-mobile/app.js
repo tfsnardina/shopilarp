@@ -538,13 +538,40 @@
       }
       return { key: key, hourly: true, cur: cur, prev: prev, tot: tot, ptot: ptot, n: 24, x0: T - (key === "yday" ? 1 : 0) };
     }
-    n = key === "7d" ? 7 : key === "30d" ? 30 : key === "90d" ? 90 : 365;
-    var a = T - n + 1, pa = a - n;
-    var step = n > 120 ? 7 : 1;
-    for (var i = a; i <= T; i += step) { cur.push(agg(i, Math.min(T, i + step - 1))); labels.push(i); }
+    var win = rangeWin(key) || rangeWin("30d");
+    var a = win[0], b = win[1], len = b - a + 1, pa = a - len;   // previous period = same length, right before
+    var step = len > 120 ? 7 : 1;
+    for (var i = a; i <= b; i += step) { cur.push(agg(i, Math.min(b, i + step - 1))); labels.push(i); }
     for (var j = pa; j < a; j += step) prev.push(agg(j, Math.min(a - 1, j + step - 1)));
-    tot = agg(a, T); ptot = agg(pa, a - 1);
-    return { key: key, hourly: false, cur: cur, prev: prev, tot: tot, ptot: ptot, a: a, step: step, n: cur.length };
+    tot = agg(a, b); ptot = agg(pa, a - 1);
+    return { key: key, hourly: false, cur: cur, prev: prev, tot: tot, ptot: ptot, a: a, b: b, len: len, step: step, n: cur.length };
+  }
+  /* Fenêtres en jours (indices de jour de la boutique) pour toutes les périodes sauf « today » / « yday » (horaires).
+     Clés : 7d… · lw lm lq 12m ly (périodes passées) · wtd mtd qtd ytd (à ce jour) · c:a:b (dates fixes) · r:n:u:inc (période glissante). */
+  function dIdx(y, m, d) { return Math.round((Date.UTC(y, m, d) - (Number(S.off) || 0) - S.day0) / DAY); }
+  function rangeWin(key) {
+    var k = String(key), now = L(nowMs()), y = now.getUTCFullYear(), m = now.getUTCMonth(), wd = (now.getUTCDay() + 6) % 7, q = Math.floor(m / 3) * 3, mt, w = null;
+    if ((mt = /^(\d{1,4})d$/.exec(k)) && +mt[1] > 0) w = [T - +mt[1] + 1, T];
+    else if (k === "lw") w = [T - wd - 7, T - wd - 1];
+    else if (k === "lm") w = [dIdx(y, m - 1, 1), dIdx(y, m, 1) - 1];
+    else if (k === "lq") w = [dIdx(y, q - 3, 1), dIdx(y, q, 1) - 1];
+    else if (k === "12m") w = [dIdx(y, m - 12, 1), dIdx(y, m, 1) - 1];
+    else if (k === "ly") w = [dIdx(y - 1, 0, 1), dIdx(y, 0, 1) - 1];
+    else if (k === "wtd") w = [T - wd, T];
+    else if (k === "mtd") w = [dIdx(y, m, 1), T];
+    else if (k === "qtd") w = [dIdx(y, q, 1), T];
+    else if (k === "ytd") w = [dIdx(y, 0, 1), T];
+    else if ((mt = /^c:(-?\d{1,5}):(-?\d{1,5})$/.exec(k))) {
+      var c0 = Math.min(+mt[1], +mt[2]), c1 = Math.min(T, Math.max(+mt[1], +mt[2]));
+      w = [Math.min(c0, c1), c1];
+    } else if ((mt = /^r:(\d{1,3}):([dwmy]):([01])$/.exec(k)) && +mt[1] > 0) {
+      var n = +mt[1], inc = mt[3] === "1";
+      if (mt[2] === "d") w = inc ? [T - n + 1, T] : [T - n, T - 1];
+      else if (mt[2] === "w") w = inc ? [T - wd - (n - 1) * 7, T] : [T - wd - n * 7, T - wd - 1];
+      else if (mt[2] === "m") w = inc ? [dIdx(y, m - n + 1, 1), T] : [dIdx(y, m - n, 1), dIdx(y, m, 1) - 1];
+      else if (n <= 50) w = inc ? [dIdx(y - n + 1, 0, 1), T] : [dIdx(y - n, 0, 1), dIdx(y, 0, 1) - 1];
+    }
+    return w && isFinite(w[0]) && isFinite(w[1]) && w[0] <= w[1] ? w : null;
   }
   function change(cv, pv) {
     if (!pv) return cv ? null : 0;
@@ -621,7 +648,7 @@
   // the segment into it is dotted (the way the app draws an unfinished day).
   function lnPaths(cur, X, Y, R) {
     var pts = cur.map(function (v, i) { return [X(i), Y(v)]; });
-    var open = !R.hourly && R.key !== "yday" && pts.length > 2;
+    var open = !R.hourly && R.key !== "yday" && !(R.b != null && R.b < T) && pts.length > 2;
     if (pts.length === 1) return '<path class="ln" d="' + smooth(pts) + '"/><circle cx="' + pts[0][0].toFixed(1) + '" cy="' + pts[0][1].toFixed(1) + '" r="3.2" fill="#20a8e6"/>';
     if (!open) return '<path class="ln" d="' + smooth(pts) + '"/>';
     var full = smooth(pts), head = smooth(pts.slice(0, -1));
@@ -1143,18 +1170,76 @@
     var M = MET[homeMet], v = M.v(rangeData(homeRange).tot);
     $$(".met.on .mv").forEach(function (mv) { countTo(mv, 0, v, function (x) { return fmtMet(M.k, x, true); }, 1000); });
   }
+  function setHomeRange(key) {
+    homeRange = key;
+    var R = rangeData(homeRange);
+    $("#mets").innerHTML = metStrip(R); bindMetButtons(); layoutStrip();
+    $("#rngL").textContent = rangeShort(homeRange);
+    drawChart($("#hchart"), R, homeMet, { anim: true, h: CH });
+    countIn();
+  }
+  /* Menu de période : feuille native (Swift, Liquid Glass, deux hauteurs) sur iOS 26 ; sinon l'ancienne liste web. */
   function rangeSheet() {
+    if (window.__LARP_NATIVE_PRODUCT__ && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpProduct) {
+      if (nativeOrderPost(nativeRangeInfo())) return;
+    }
+    rangeSheetWeb();
+  }
+  function rangeSheetWeb() {
     optSheet("Date range", RANGES.map(function (r) { return r[1]; }), rangeLabel(homeRange), function (v) {
-      RANGES.forEach(function (r) { if (r[1] === v) homeRange = r[0]; });
-      var R = rangeData(homeRange);
-      $("#mets").innerHTML = metStrip(R); bindMetButtons(); layoutStrip();
-      $("#rngL").textContent = rangeShort(homeRange);
-      drawChart($("#hchart"), R, homeMet, { anim: true, h: CH });
-      countIn();
+      RANGES.forEach(function (r) { if (r[1] === v) setHomeRange(r[0]); });
     });
   }
-  function rangeShort(k) { return { today: "Today", yday: "Yesterday", "7d": "7 days", "30d": "30 days", "90d": "90 days", "365d": "365 days" }[k] || k; }
-  function rangeLabel(k) { for (var i = 0; i < RANGES.length; i++) if (RANGES[i][0] === k) return RANGES[i][1]; return k; }
+  var RNG_L = {
+    today: "Today", yday: "Yesterday", "7d": "Last 7 days", "30d": "Last 30 days", "90d": "Last 90 days", "365d": "Last 365 days",
+    lw: "Last week", lm: "Last month", lq: "Last quarter", "12m": "Last 12 months", ly: "Last year",
+    wtd: "Week to date", mtd: "Month to date", qtd: "Quarter to date", ytd: "Year to date"
+  };
+  function nativeRangeInfo() {
+    var T_ = L10n;
+    function G(ks) { return ks.map(function (k) { return { k: k, l: T_(RNG_L[k]) }; }); }
+    return {
+      mode: "range", lang: (window.I18N && window.I18N.lang) || "en", title: T_("Date range"), cur: homeRange,
+      groups: [G(["today", "yday", "7d", "30d", "90d", "365d"]), G(["lw", "lm", "lq", "12m", "ly"]), G(["wtd", "mtd", "qtd", "ytd"])],
+      day0: S.day0, off: Number(S.off) || 0, today: T,
+      fixed: { title: T_("Fixed dates"), sub: T_("Set a fixed date range"), dlg: T_("Custom date range"), from: T_("Start date"), to: T_("End date"), apply: T_("Apply") },
+      roll: {
+        title: T_("Rolling period"), sub: T_("Set a period relative to today."), include: T_("Include current period"), apply: T_("Apply"),
+        units: [{ u: "d", l: T_("Days") }, { u: "w", l: T_("Weeks") }, { u: "m", l: T_("Months") }, { u: "y", l: T_("Years") }]
+      }
+    };
+  }
+  window.__larpNativeRangeFallback = function () { rangeSheetWeb(); };
+  window.__larpNativeRangeAct = function (p) {
+    if (!p || p.act !== "set") return;
+    var k = String(p.key || "");
+    if (k !== "today" && k !== "yday" && !rangeWin(k)) return;
+    if (k !== homeRange) setHomeRange(k);
+  };
+  function dayLbl(i, yr) {
+    var t = S.day0 + i * DAY + 12 * HOUR;
+    try { return new Date(t + (Number(S.off) || 0)).toLocaleDateString(appLoc(), { day: "numeric", month: "short", year: yr ? "numeric" : undefined, timeZone: "UTC" }); }
+    catch (e) { return md(t); }
+  }
+  var RNG_UNITS = {
+    en: { d: ["day", "days"], w: ["week", "weeks"], m: ["month", "months"], y: ["year", "years"] },
+    fr: { d: ["jour", "jours"], w: ["semaine", "semaines"], m: ["mois", "mois"], y: ["an", "ans"] },
+    es: { d: ["día", "días"], w: ["semana", "semanas"], m: ["mes", "meses"], y: ["año", "años"] },
+    de: { d: ["Tag", "Tage"], w: ["Woche", "Wochen"], m: ["Monat", "Monate"], y: ["Jahr", "Jahre"] }
+  };
+  // Libellé court d'une période hors liste : « 3 nov. – 20 nov. » (dates fixes) ou « 30 jours » (période glissante).
+  function customLabel(k) {
+    var mt = /^r:(\d+):([dwmy]):[01]$/.exec(k);
+    if (mt) {
+      var U = RNG_UNITS[(window.I18N && window.I18N.lang) || "en"] || RNG_UNITS.en;
+      return mt[1] + " " + U[mt[2]][+mt[1] === 1 ? 0 : 1];
+    }
+    var w = rangeWin(k); if (!w) return k;
+    var yr = new Date(S.day0 + w[0] * DAY + 12 * HOUR + (Number(S.off) || 0)).getUTCFullYear() !== L(nowMs()).getUTCFullYear() || w[0] < 0;
+    return w[0] === w[1] ? dayLbl(w[0], true) : dayLbl(w[0], yr) + " – " + dayLbl(w[1], yr);
+  }
+  function rangeShort(k) { return { today: "Today", yday: "Yesterday", "7d": "7 days", "30d": "30 days", "90d": "90 days", "365d": "365 days" }[k] || RNG_L[k] || customLabel(k); }
+  function rangeLabel(k) { for (var i = 0; i < RANGES.length; i++) if (RANGES[i][0] === k) return RANGES[i][1]; return RNG_L[k] || customLabel(k); }
   function showTip(i, g) {
     var tip = $("#tip");
     if (!tip) return;
@@ -1167,7 +1252,7 @@
       lbl = md(S.day0 + base * DAY + 12 * HOUR) + ", " + xLabel(R, i);
       plbl = md(S.day0 + (base - 1) * DAY + 12 * HOUR) + ", " + xLabel(R, i);
     } else {
-      var di = R.a + i * R.step, pdi = di - R.n * R.step;
+      var di = R.a + i * R.step, pdi = di - (R.len || R.n * R.step);
       lbl = md(S.day0 + di * DAY + 12 * HOUR) + (R.step > 1 ? " – " + md(S.day0 + Math.min(T, di + R.step - 1) * DAY + 12 * HOUR) : "");
       plbl = md(S.day0 + pdi * DAY + 12 * HOUR);
     }
@@ -3486,7 +3571,7 @@
   function bumpHome(o) {
     if (!$("#s-home").innerHTML) return;
     var R = rangeData(homeRange);
-    if (homeRange === "yday") return;
+    if (homeRange === "yday" || (R.b != null && R.b < T)) return;
     $$(".met.on .mv").forEach(function (mv) {
       var M = MET[homeMet], to = M.v(R.tot);
       var from = M.v({ s: R.tot.s - o.total, o: R.tot.o - 1, se: R.tot.se - 1, rc: 0 });
