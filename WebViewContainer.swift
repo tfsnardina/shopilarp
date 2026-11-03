@@ -233,6 +233,8 @@ enum WebViewContainer {
                         self?.host?.presentAlerts(info: dict)
                     } else if mode == "alertsUpdate" {
                         self?.host?.updateAlerts(info: dict)
+                    } else if mode == "range" {
+                        self?.host?.presentRangePicker(info: dict)
                     } else {
                         self?.host?.presentProductCreator(
                             currency: (dict["sym"] as? String) ?? "€",
@@ -635,6 +637,23 @@ final class WebHostViewController: UIViewController {
         #if compiler(>=6.2)
         guard #available(iOS 26.0, *), let vc = alertsVC as? AlertsViewController else { return }
         vc.update(info: info)
+        #endif
+    }
+
+    // MARK: - Menu de période de l'accueil (feuille Liquid Glass à deux hauteurs)
+
+    /// Ouvre le menu « Plage de dates » natif ; si ce n'est pas possible (iOS < 26, autre fiche ouverte), la page web affiche sa liste.
+    func presentRangePicker(info: [String: Any]) {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *), presentedViewController == nil, productDetail == nil else {
+            runJS("window.__larpNativeRangeFallback && window.__larpNativeRangeFallback()")
+            return
+        }
+        let vc = RangePickerViewController(info: info)
+        vc.onAct = { [weak self] payload in self?.sendProductEvent("__larpNativeRangeAct", payload) }
+        present(vc, animated: true)
+        #else
+        runJS("window.__larpNativeRangeFallback && window.__larpNativeRangeFallback()")
         #endif
     }
 
