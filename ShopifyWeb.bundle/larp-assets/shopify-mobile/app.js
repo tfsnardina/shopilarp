@@ -686,7 +686,9 @@
     var M = MET[mk];
     var W = host.clientWidth || 360, Hh = opts.h || 150;
     var rawCur = R.cur.map(M.v), rawPrev = R.prev.map(M.v);
-    var cur = soften(rawCur), prev = soften(rawPrev);   // curve is drawn from the softened series
+    // curve is drawn from the softened series, except by hour (Today / Yesterday): there the line must pass through the real
+    // values, otherwise it already climbs before an hour that the tooltip reports as 0.
+    var cur = R.hourly ? rawCur.slice() : soften(rawCur), prev = R.hourly ? rawPrev.slice() : soften(rawPrev);
     var n = R.n;
     var max = Math.max.apply(null, cur.concat(prev).concat([0]));
     if (max <= 0) max = M.k === "money" ? 10000 : M.k === "pct" ? 5 : 10;
