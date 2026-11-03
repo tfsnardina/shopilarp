@@ -1200,8 +1200,19 @@
     var R = rangeData(homeRange);
     $("#mets").innerHTML = metStrip(R); bindMetButtons(); layoutStrip();
     $("#rngL").textContent = rangeShort(homeRange);
+    fitRngPill();
     drawChart($("#hchart"), R, homeMet, { anim: true, h: CH });
     countIn();
+  }
+  // Libellé long (« 2 nov. 01:00 – 3 nov. 23:59 ») : on rapetisse la police de la pastille jusqu'à ce qu'il tienne sur une ligne.
+  function fitRngPill() {
+    function fit() {
+      var sp = $("#rngL"); if (!sp || !sp.parentNode) return;
+      var pill = sp.parentNode, fs = 16;
+      pill.style.fontSize = "";
+      while (fs > 9 && sp.scrollWidth > sp.clientWidth + 0.5) { fs -= 0.5; pill.style.fontSize = fs + "px"; }
+    }
+    fit(); requestAnimationFrame(fit); setTimeout(fit, 150);   // la traduction de la page peut changer le texte juste après
   }
   /* Menu de période : feuille native (Swift, Liquid Glass, deux hauteurs) sur iOS 26 ; sinon l'ancienne liste web. */
   function rangeSheet() {
