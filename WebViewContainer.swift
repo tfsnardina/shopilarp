@@ -233,6 +233,10 @@ enum WebViewContainer {
                         self?.host?.presentAlerts(info: dict)
                     } else if mode == "alertsUpdate" {
                         self?.host?.updateAlerts(info: dict)
+                    } else if mode == "sidekick" {
+                        self?.host?.presentSidekick(info: dict)
+                    } else if mode == "sidekickClose" {
+                        self?.host?.dismissSidekick()
                     } else if mode == "range" {
                         self?.host?.presentRangePicker(info: dict)
                     } else {
@@ -356,6 +360,7 @@ final class WebHostViewController: UIViewController {
     private var glassTabBarBottom: NSLayoutConstraint?
     private var glassDrawerBar: UIView?
     private var alertsVC: UIViewController?
+    private var sidekickVC: UIViewController?
     private var glassChrome: UIView?
     private var pullHost: PullRefreshHost?
     private var glassDrawerBarBottom: NSLayoutConstraint?
@@ -772,6 +777,58 @@ final class WebHostViewController: UIViewController {
               let json = String(data: data, encoding: .utf8) else { return }
         let literal = WebViewContainer.jsStringLiteral(json)
         runJS("window.\(function) && window.\(function)(JSON.parse(\(literal)))")
+    }
+
+    // MARK: - Page Sidekick native (SwiftUI + Liquid Glass)
+
+    /// L'IA et l'exécution des actions restent dans la page web ; Swift affiche le chat et anime les cartes.
+    func presentSidekick(info: [String: Any]) {
+        guard presentedViewController == nil, productDetail == nil, webView != nil else {
+            runJS("window.__larpNativeSidekickFallback && window.__larpNativeSidekickFallback()")
+            return
+        }
+        let bridge = SKBridge(
+            ask: { [weak self] q in
+                guard let raw = await self?.skEval("return await window.__larpSkAsk(q);", ["q": q]),
+                      let reply = SKReply(json: raw) else {
+                    return SKReply(id: 0, text: "…", count: 0, failed: true)
+                }
+                return reply
+            },
+            plan: { [weak self] id, i in
+                guard let raw = await self?.skEval("return window.__larpSkPlan(id, i);", ["id": id, "i": i]) else { return nil }
+                return SKPlan(json: raw)
+            },
+            commit: { [weak self] id, i in
+                guard let raw = await self?.skEval("return window.__larpSkCommit(id, i);", ["id": id, "i": i]),
+                      let res = SKCommit(json: raw) else { return SKCommit(ok: false, message: "") }
+                return res
+            },
+            button: { [weak self] id, i in self?.runJS("window.__larpSkBtn && window.__larpSkBtn(\(id), \(i))") },
+            after: { [weak self] id, i in self?.runJS("window.__larpSkAfter && window.__larpSkAfter(\(id), \(i))") },
+            reset: { [weak self] in self?.runJS("window.__larpSkReset && window.__larpSkReset()") }
+        )
+        let vc = SidekickViewController(info: info, bridge: bridge)
+        vc.onClosed = { [weak self] in
+            self?.sidekickVC = nil
+            self?.runJS("window.__larpNativeSidekickClosed && window.__larpNativeSidekickClosed()")
+        }
+        sidekickVC = vc
+        present(vc, animated: true)
+    }
+
+    func dismissSidekick() {
+        sidekickVC?.dismiss(animated: true)
+    }
+
+    private func skEval(_ body: String, _ args: [String: Any] = [:]) async -> String? {
+        guard let webView = webView else { return nil }
+        do {
+            let result = try await webView.callAsyncJavaScript(body, arguments: args, in: nil, contentWorld: .page)
+            return result as? String
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Boutons / recherche / filtres Liquid Glass natifs (iOS 26)
