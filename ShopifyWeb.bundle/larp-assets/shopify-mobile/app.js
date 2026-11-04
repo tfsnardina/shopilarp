@@ -3214,6 +3214,395 @@
     if (/description|write|rédig|écri|escrib|schreib|beschreib/.test(ql)) return "Here\u2019s a draft for " + top[0].title + ":\n\nMade for everyday wear, the " + top[0].title + " pairs a clean silhouette with materials that hold up wash after wash. It\u2019s the piece you\u2019ll reach for first.";
     return "Your store has " + count(S.custTotal) + " customers and " + count(R.tot.o) + " orders in the last 30 days. I can dig into sales, products, orders or customers, or help you write and edit content.";
   }
+  /* ── Sidekick AI : Groq + vraies actions dans l'app, avec cartes animées ─────────────────────
+     Config (clé, modèles) : sidekick-config.js. Le modèle répond en JSON {reply, actions[]} ;
+     chaque action est exécutée pour de vrai (createProduct, setStatus, fulfill…) pendant qu'une carte s'anime. */
+  var SKC = window.SIDEKICK_CFG || {};
+  var skTok = 0;
+  var SK_L = {
+    fr: {
+      cp_t: "Création du produit", cp_d: "Produit créé", cp_s: ["Analyse de ta demande", "Rédaction de la fiche produit", "Réglage du prix et du stock", "Publication dans ta boutique"],
+      up_t: "Modification du produit", up_d: "Produit modifié", up_s: ["Recherche du produit", "Application des changements", "Enregistrement"],
+      dl_t: "Suppression du produit", dl_d: "Produit supprimé", dl_s: ["Recherche du produit", "Retrait de la boutique", "Nettoyage"],
+      st_t: "Changement de statut", st_d: "Statut mis à jour", st_s: ["Sélection des produits", "Mise à jour du statut"],
+      fo_t: "Traitement de la commande", fo_d: "Commande traitée", fo_s: ["Vérification de la commande", "Génération du suivi", "Envoi au client"],
+      go_t: function (n) { return "Ouverture : " + n; }, go_d: "C’est ouvert", go_s: ["Navigation"],
+      f_title: "Nom", f_price: "Prix", f_compare: "Prix barré", f_inv: "Stock", f_status: "Statut", f_type: "Type", f_vendor: "Fournisseur", f_vars: "Variantes", f_desc: "Description",
+      sn: { Active: "Actif", Draft: "Brouillon", Archived: "Archivé", Unlisted: "Non listé" },
+      scr: { home: "Accueil", orders: "Commandes", products: "Produits", menu: "Menu", customers: "Clients", analytics: "Analyses", payouts: "Versements", alerts: "Alertes", search: "Recherche" },
+      e_prod: function (x) { return "Produit introuvable : " + x; }, e_ord: function (x) { return "Commande introuvable : #" + x; }, e_ful: "Cette commande est déjà traitée.",
+      e_demo: "Les produits de démo ne peuvent pas être supprimés.", e_bad: "Il manque une information (nom du produit, écran…).", e_none: "Rien à modifier : tout est déjà à jour.",
+      b_prod: "Voir le produit", b_ord: "Voir la commande", b_list: "Voir les produits", stock: function (n) { return n + " dispo"; },
+      x_key: "Clé API manquante dans sidekick-config.js.", x_401: "Clé Groq refusée (401). Vérifie la clé.", x_429: "Trop de demandes pour l’instant, réessaie dans un instant.",
+      x_net: "Impossible de joindre l’IA. Vérifie ta connexion.", x_gen: function (c) { return "Erreur de l’IA (" + c + ")."; }
+    },
+    en: {
+      cp_t: "Creating the product", cp_d: "Product created", cp_s: ["Understanding your request", "Writing the product page", "Setting price and stock", "Publishing to your store"],
+      up_t: "Updating the product", up_d: "Product updated", up_s: ["Finding the product", "Applying the changes", "Saving"],
+      dl_t: "Deleting the product", dl_d: "Product deleted", dl_s: ["Finding the product", "Removing from your store", "Cleaning up"],
+      st_t: "Changing status", st_d: "Status updated", st_s: ["Selecting products", "Updating the status"],
+      fo_t: "Fulfilling the order", fo_d: "Order fulfilled", fo_s: ["Checking the order", "Generating tracking", "Notifying the customer"],
+      go_t: function (n) { return "Opening: " + n; }, go_d: "Opened", go_s: ["Navigating"],
+      f_title: "Name", f_price: "Price", f_compare: "Compare-at", f_inv: "Stock", f_status: "Status", f_type: "Type", f_vendor: "Vendor", f_vars: "Variants", f_desc: "Description",
+      sn: { Active: "Active", Draft: "Draft", Archived: "Archived", Unlisted: "Unlisted" },
+      scr: { home: "Home", orders: "Orders", products: "Products", menu: "Menu", customers: "Customers", analytics: "Analytics", payouts: "Payouts", alerts: "Alerts", search: "Search" },
+      e_prod: function (x) { return "Product not found: " + x; }, e_ord: function (x) { return "Order not found: #" + x; }, e_ful: "This order is already fulfilled.",
+      e_demo: "Demo products can’t be deleted.", e_bad: "Something is missing (product name, screen…).", e_none: "Nothing to change: it’s already up to date.",
+      b_prod: "View product", b_ord: "View order", b_list: "View products", stock: function (n) { return n + " available"; },
+      x_key: "API key missing in sidekick-config.js.", x_401: "Groq rejected the key (401). Check the key.", x_429: "Too many requests right now, try again in a moment.",
+      x_net: "Can’t reach the AI. Check your connection.", x_gen: function (c) { return "AI error (" + c + ")."; }
+    }
+  };
+  function skLg() { var l = String((window.I18N && window.I18N.lang) || document.documentElement.lang || "en").slice(0, 2).toLowerCase(); return SK_L[l] ? l : "en"; }
+  function skT(k, a) { var d = SK_L[skLg()], s = d[k] != null ? d[k] : SK_L.en[k]; return typeof s === "function" ? s(a) : s; }
+
+  /* ── Petits outils ── */
+  function skNum(v) {
+    if (typeof v === "number") return isFinite(v) ? v : null;
+    if (v == null || v === "") return null;
+    var n = parseFloat(String(v).replace(/\s/g, "").replace(/[^\d.,-]/g, "").replace(",", "."));
+    return isFinite(n) ? n : null;
+  }
+  function skStatus(s) { s = String(s || "").toLowerCase(); return /draft|brouillon/.test(s) ? "Draft" : /archiv/.test(s) ? "Archived" : /unlist|non list/.test(s) ? "Unlisted" : "Active"; }
+  function skVars(v) { return Array.isArray(v) ? v.join(", ") : String(v || ""); }
+  function skShort(s, n) { s = String(s == null ? "" : s); return s.length > (n || 26) ? s.slice(0, (n || 26) - 1) + "…" : s; }
+  function skMoney(units) { var f = Math.pow(10, S.dec != null ? S.dec : 2); return money(Math.round(units * f)); }
+  function skDot(st) { return st === "Active" ? "on" : st === "Draft" ? "dr" : st === "Unlisted" ? "un" : "ar"; }
+  function skFind(ref) {
+    if (ref == null || ref === "") return null;
+    if (typeof ref === "number" || /^\d+$/.test(String(ref).trim())) { var k = +ref; if (prods[k]) return prods[k]; }
+    var q = String(ref).trim().toLowerCase(), i;
+    if (!q) return null;
+    for (i = 0; i < prods.length; i++) if (prods[i].title.toLowerCase() === q) return prods[i];
+    for (i = 0; i < prods.length; i++) { var t = prods[i].title.toLowerCase(); if (t.indexOf(q) >= 0 || q.indexOf(t) >= 0) return prods[i]; }
+    return null;
+  }
+  function skFlash(i) {
+    setTimeout(function () {
+      var r = document.querySelector('#s-products .prow[data-prod="' + i + '"]');
+      if (r) { r.classList.add("skflash"); setTimeout(function () { r.classList.remove("skflash"); }, 2100); }
+    }, 160);
+  }
+  function skOpen(fn) { var w = 0; if (skEl) { closeSidekick(); w = 380; } setTimeout(fn, w); }
+  function skGo(s) {
+    if (s === "home" || s === "orders" || s === "products" || s === "customers" || s === "analytics") return navigate(s);
+    if (s === "menu") { closeAll(); return setTab("menu"); }
+    closeAll();
+    setTimeout(function () { if (s === "payouts") openPayouts(); else if (s === "alerts") openNotifs(); else if (s === "search") openSearch(); }, 80);
+  }
+  function skTypeInto(el, txt, cb, hold) {
+    var k = 0; el.textContent = "";
+    if (!txt) { if (cb) cb(); return null; }
+    var t = setInterval(function () {
+      k += 2 + Math.floor(Math.random() * 3); el.textContent = txt.slice(0, k); if (hold) hold();
+      if (k >= txt.length) { clearInterval(t); if (cb) cb(); }
+    }, 22);
+    return t;
+  }
+  function skCount(el, to, fmt) {
+    var t0 = performance.now(), D = 700;
+    (function f(t) { var p = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - p, 3); el.textContent = fmt(to * e); if (p < 1) requestAnimationFrame(f); })(t0);
+  }
+  function skBurst(card) {
+    var fx = $(".ska-fx", card), cols = ["#8051ff", "#5ec8ff", "#ff7ad9", "#ffd166", "#34d399"], h = "";
+    for (var i = 0; i < 16; i++) {
+      var a = (Math.PI * 2 * i) / 16 + Math.random() * 0.4, d = 34 + Math.random() * 40;
+      h += '<i style="--c:' + cols[i % cols.length] + ";--dx:" + Math.round(Math.cos(a) * d) + "px;--dy:" + Math.round(Math.sin(a) * d) + "px;--r:" + Math.round(Math.random() * 360) + 'deg"></i>';
+    }
+    fx.innerHTML = h;
+  }
+
+  /* ── Les actions : chaque plan décrit la carte (titre, étapes, aperçu) et l'exécution réelle (commit) ── */
+  var SK_ACT = {
+    create_product: function (a) {
+      var plan = { title: skT("cp_t"), done: skT("cp_d"), steps: skT("cp_s") }, title = String(a.title || "").trim().slice(0, 120);
+      if (!title) { plan.err = skT("e_bad"); return plan; }
+      var price = skNum(a.price) || 0, inv = skNum(a.inventory); inv = inv == null ? 20 : Math.max(0, Math.round(inv));
+      var st = skStatus(a.status), hue = HUES[prods.length % HUES.length];
+      plan.pv = '<div class="skp"><div class="skp-th sk"><span>' + esc(title.charAt(0).toUpperCase()) + '</span></div><div class="skp-tx"><b class="skp-t sk"></b><span class="skp-m"><em class="skp-pr"></em><em class="skp-sk"></em></span></div><i class="skp-dot"></i></div>';
+      plan.onStep = function (i, card) {
+        var pv = $(".skp", card), th = $(".skp-th", card), t = $(".skp-t", card), pr = $(".skp-pr", card), sk = $(".skp-sk", card), dot = $(".skp-dot", card);
+        if (i === 1) {
+          th.classList.remove("sk"); th.style.background = "linear-gradient(135deg,hsl(" + hue + ",78%,62%),hsl(" + (hue + 35) + ",82%,50%))"; th.classList.add("rd");
+          t.classList.remove("sk"); skTypeInto(t, title);
+        }
+        if (i === 2) { pr.classList.add("in"); sk.classList.add("in"); skCount(pr, price, skMoney); sk.textContent = skT("stock", inv); }
+        if (i === 3) { dot.className = "skp-dot in " + skDot(st); pv.classList.add("lift"); }
+      };
+      plan.commit = function () {
+        var p = createProduct({ title: title, price: price, compare: skNum(a.compare_at) || 0, inv: inv, sku: "", vars: skVars(a.variants), type: String(a.type || ""), vendor: String(a.vendor || ""), status: st, img: "",
+          desc: String(a.description || ""), category: "", tags: Array.isArray(a.tags) ? a.tags.map(String).slice(0, 10) : [], collections: null });
+        pFilter = "All"; pQuery = ""; rendered.products = 0;
+        if (current === "products") { renderProducts(); skFlash(p.i); }
+        saveState();
+        return { ok: true, btn: { l: skT("b_prod"), fn: function () { skOpen(function () { openProduct(p.i); }); } } };
+      };
+      return plan;
+    },
+
+    update_product: function (a) {
+      var plan = { title: skT("up_t"), done: skT("up_d"), steps: skT("up_s") }, p = skFind(a.product);
+      if (!p) { plan.err = skT("e_prod", a.product); return plan; }
+      var f = Math.pow(10, S.dec != null ? S.dec : 2), ch = [], nv = {};
+      function add(key, from, to) { ch.push({ l: skT("f_" + key), from: skShort(from), to: skShort(to) }); }
+      var t = a.title != null ? String(a.title).trim() : ""; if (t && t !== p.title) { nv.title = t; add("title", p.title, t); }
+      var pr = skNum(a.price); if (pr != null && Math.round(pr * f) !== p.price) { nv.price = pr; add("price", money(p.price), skMoney(pr)); }
+      var cp = skNum(a.compare_at); if (cp != null && Math.round(cp * f) !== p.compare) { nv.compare = cp; add("compare", p.compare ? money(p.compare) : "–", cp > 0 ? skMoney(cp) : "–"); }
+      var iv = skNum(a.inventory); if (iv != null && Math.max(0, Math.round(iv)) !== p.inv) { nv.inv = Math.max(0, Math.round(iv)); add("inv", String(p.inv), String(nv.inv)); }
+      if (a.status != null && a.status !== "") { var s2 = skStatus(a.status); if (s2 !== p.status) { nv.status = s2; add("status", skT("sn")[p.status] || p.status, skT("sn")[s2]); } }
+      if (a.type && String(a.type) !== p.type) { nv.type = String(a.type); add("type", p.type || "–", nv.type); }
+      if (a.vendor && String(a.vendor) !== p.vendor) { nv.vendor = String(a.vendor); add("vendor", p.vendor || "–", nv.vendor); }
+      if (a.variants != null && a.variants !== "") { var vv = skVars(a.variants), cur = p.vnames[0] === "Default" ? "" : p.vnames.join(", "); if (vv !== cur) { nv.vars = vv; add("vars", cur || "–", vv); } }
+      if (a.description != null && String(a.description) !== (p.desc || "")) { nv.desc = String(a.description); add("desc", p.desc || "–", nv.desc); }
+      if (!ch.length) { plan.err = skT("e_none"); return plan; }
+      plan.pv = '<div class="skp">' + thumb(p, 44) + '<div class="skp-tx"><b class="skp-t">' + esc(p.title) + '</b></div></div><div class="skd">' +
+        ch.map(function (c) { return '<div class="skd-r"><span>' + esc(c.l) + "</span><s>" + esc(c.from) + "</s><i>→</i><b>" + esc(c.to) + "</b></div>"; }).join("") + "</div>";
+      plan.onStep = function (i, card) {
+        if (i === 1) $$(".skd-r", card).forEach(function (r, k) { setTimeout(function () { r.classList.add("in"); }, Math.min(k, 5) * 230); });
+        if (i === 2) $(".skp", card).classList.add("lift");
+      };
+      plan.commit = function () {
+        var info = nativeProductInfo(p);
+        if (nv.title != null) info.title = nv.title;
+        if (nv.price != null) info.price = nv.price;
+        if (nv.inv != null) info.inv = nv.inv;
+        if (nv.status != null) info.status = nv.status;
+        if (nv.type != null) info.type = nv.type;
+        if (nv.vendor != null) info.vendor = nv.vendor;
+        if (nv.vars != null) info.vars = nv.vars;
+        if (nv.desc != null) info.desc = nv.desc;
+        if (nv.compare != null) p.compare = Math.round(nv.compare * f);
+        window.__larpNativeProductUpdate(info);
+        if (current === "products") skFlash(p.i);
+        return { ok: true, btn: { l: skT("b_prod"), fn: function () { skOpen(function () { openProduct(p.i); }); } } };
+      };
+      return plan;
+    },
+
+    delete_product: function (a) {
+      var plan = { title: skT("dl_t"), done: skT("dl_d"), steps: skT("dl_s"), commitAt: 1 }, p = skFind(a.product);
+      if (!p) { plan.err = skT("e_prod", a.product); return plan; }
+      if (!EMPTY) { plan.err = skT("e_demo"); return plan; }
+      plan.pv = '<div class="skp">' + thumb(p, 44) + '<div class="skp-tx"><b class="skp-t">' + esc(p.title) + "</b></div></div>";
+      plan.onStep = function (i, card) {
+        var pv = $(".ska-pv", card);
+        if (i === 0) pv.style.maxHeight = pv.scrollHeight + "px";
+        if (i === 1) { $(".skp", card).classList.add("zap"); setTimeout(function () { pv.classList.add("shrink"); }, 560); }
+      };
+      plan.commit = function () {
+        deleteProducts([p]); pFilter = "All"; pQuery = ""; rendered.products = 0;
+        if (current === "products") renderProducts();
+        return { ok: true, btn: { l: skT("b_list"), fn: function () { skOpen(function () { navigate("products"); }); } } };
+      };
+      return plan;
+    },
+
+    set_status: function (a) {
+      var plan = { title: skT("st_t"), done: skT("st_d"), steps: skT("st_s"), commitAt: 1 }, refs = a.products, list = [];
+      if (typeof refs === "string") refs = [refs];
+      if (!Array.isArray(refs)) refs = a.product ? [a.product] : [];
+      var all = refs.some(function (r) { return /^(all|tous|toutes|\*)$/i.test(String(r).trim()); });
+      if (all) list = prods.slice(); else refs.forEach(function (r) { var p = skFind(r); if (p && list.indexOf(p) < 0) list.push(p); });
+      if (!list.length) { plan.err = skT("e_prod", refs.join(", ") || "?"); return plan; }
+      var st = skStatus(a.status), show = list.slice(0, 4);
+      plan.pv = show.map(function (p) {
+        return '<div class="skp">' + thumb(p, 40) + '<div class="skp-tx"><b class="skp-t">' + esc(p.title) + '</b></div><i class="skp-dot in ' + skDot(p.status) + '"></i><span class="skp-lb">' + esc(skT("sn")[p.status] || p.status) + "</span></div>";
+      }).join("") + (list.length > 4 ? '<div class="skp-more">+' + (list.length - 4) + "</div>" : "");
+      plan.onStep = function (i, card) {
+        if (i !== 1) return;
+        $$(".skp", card).forEach(function (r, k) {
+          setTimeout(function () {
+            var d = $(".skp-dot", r), l = $(".skp-lb", r);
+            d.className = "skp-dot in " + skDot(st); l.textContent = skT("sn")[st]; l.classList.add("pop");
+          }, k * 170);
+        });
+      };
+      plan.commit = function () {
+        setStatus(list, st); rendered.products = 0;
+        if (current === "products") renderProducts();
+        return { ok: true, btn: { l: skT("b_list"), fn: function () { skOpen(function () { navigate("products"); }); } } };
+      };
+      return plan;
+    },
+
+    fulfill_order: function (a) {
+      var plan = { title: skT("fo_t"), done: skT("fo_d"), steps: skT("fo_s") }, n = skNum(a.number), o = n != null ? findOrder(Math.round(n)) : null;
+      if (!o) { plan.err = skT("e_ord", a.number); return plan; }
+      if (o.ful === "Fulfilled") { plan.err = skT("e_ful"); return plan; }
+      plan.pv = '<div class="skf"><div class="skf-h"><b>#' + o.n + "</b><span>" + esc(o.c && o.c.name ? o.c.name : "") + "</span><em>" + esc(money(o.total)) + '</em></div>' +
+        '<div class="skf-bar"><i></i><svg class="skf-tr" viewBox="0 0 24 16"><path d="M1 2h14v10H1z"/><path d="M15 5h5l3 3v4h-8z"/><circle cx="6" cy="13" r="2"/><circle cx="19" cy="13" r="2"/></svg></div></div>';
+      plan.onStep = function (i, card) {
+        if (i !== 0) return;
+        var bar = $(".skf-bar", card);
+        setTimeout(function () { $("i", bar).style.width = "100%"; $(".skf-tr", bar).style.left = "calc(100% - 24px)"; }, 40);
+      };
+      plan.commit = function () {
+        var carrier = S.country === "US" ? "USPS" : S.country === "CA" ? "Canada Post" : S.country === "GB" ? "Royal Mail" : S.country === "AU" ? "Australia Post" : "DHL Express";
+        o.ful = "Fulfilled"; o.fat = nowMs(); o.carrier = carrier;
+        if (isDigital(o)) { o.carrier = "E-product"; o.trk = "Delivered by email"; } else o.trk = rnd(12);
+        refreshAll();
+        return { ok: true, btn: { l: skT("b_ord"), fn: function () { skOpen(function () { openOrder(o.n); }); } } };
+      };
+      return plan;
+    },
+
+    go: function (a) {
+      var s = String(a.screen || "").toLowerCase(), label = skT("scr")[s], plan = { title: skT("go_t", label || s), done: skT("go_d"), steps: skT("go_s"), delay: 650 };
+      if (!label) { plan.err = skT("e_bad"); return plan; }
+      plan.pv = '<div class="skn"><span>' + esc(label) + '</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>';
+      plan.commit = function () { return { ok: true, after: function () { skOpen(function () { skGo(s); }); } }; };
+      return plan;
+    },
+
+    open_product: function (a) {
+      var plan = { title: "", done: skT("go_d"), steps: skT("go_s"), delay: 650 }, p = skFind(a.product);
+      plan.title = skT("go_t", p ? p.title : String(a.product || ""));
+      if (!p) { plan.err = skT("e_prod", a.product); return plan; }
+      plan.pv = '<div class="skn"><span>' + esc(skShort(p.title, 30)) + '</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>';
+      plan.commit = function () { return { ok: true, after: function () { skOpen(function () { openProduct(p.i); }); } }; };
+      return plan;
+    },
+
+    open_order: function (a) {
+      var n = skNum(a.number), o = n != null ? findOrder(Math.round(n)) : null, plan = { title: skT("go_t", "#" + (n != null ? Math.round(n) : "?")), done: skT("go_d"), steps: skT("go_s"), delay: 650 };
+      if (!o) { plan.err = skT("e_ord", a.number); return plan; }
+      plan.pv = '<div class="skn"><span>#' + o.n + '</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>';
+      plan.commit = function () { return { ok: true, after: function () { skOpen(function () { openOrder(o.n); }); } }; };
+      return plan;
+    }
+  };
+
+  /* ── Lecture d'une carte : étapes qui s'enchaînent, vraie exécution, éclats de confettis ── */
+  function skPlay(act, host, tick, done) {
+    var mk = SK_ACT[act.type], plan, card = document.createElement("div"), lis, steps, i = 0, res = null;
+    if (!mk) return done();
+    try { plan = mk(act.args || {}); } catch (e) { plan = { title: "Sidekick", done: "", steps: [""], err: String((e && e.message) || e) }; }
+    steps = plan.err ? plan.steps.slice(0, 1) : plan.steps;
+    card.className = "ska";
+    card.innerHTML = '<span class="ska-bd"></span><div class="ska-hd"><span class="ska-face">' + mascot() + '</span><b class="ska-ttl"></b><span class="ska-st"><i class="ska-sp"></i>' +
+      '<svg class="ska-ck" viewBox="0 0 26 26"><circle cx="13" cy="13" r="13"/><path d="M7.5 13.5l3.7 3.7 7.3-8"/></svg>' +
+      '<svg class="ska-er" viewBox="0 0 26 26"><circle cx="13" cy="13" r="13"/><path d="M9 9l8 8M17 9l-8 8"/></svg></span></div>' +
+      '<div class="ska-pv"></div><ul class="ska-steps">' + steps.map(function (s) { return '<li><i class="d"></i><span>' + esc(s) + "</span></li>"; }).join("") + '</ul><div class="ska-ft"></div><span class="ska-fx"></span>';
+    $(".ska-ttl", card).textContent = plan.title;
+    if (plan.pv && !plan.err) $(".ska-pv", card).innerHTML = plan.pv;
+    lis = $$(".ska-steps li", card);
+    host.appendChild(card); tick();
+    requestAnimationFrame(function () { requestAnimationFrame(function () { card.classList.add("on"); tick(); }); });
+    var delay = plan.delay || 540, ca = plan.commitAt != null ? plan.commitAt : steps.length - 1;
+    function fail(msg) {
+      lis[i].classList.remove("on"); lis[i].classList.add("bad");
+      card.classList.add("err");
+      var m = document.createElement("div"); m.className = "ska-msg"; m.textContent = msg || "Error";
+      card.insertBefore(m, $(".ska-ft", card));
+      hap("error"); tick(); setTimeout(tick, 600); setTimeout(done, 350);
+    }
+    function end() {
+      card.classList.add("done"); $(".ska-ttl", card).textContent = plan.done || plan.title; skBurst(card); hap("success");
+      var ft = $(".ska-ft", card);
+      if (res && res.btn) {
+        ft.innerHTML = '<button class="ska-btn">' + esc(res.btn.l) + "</button>"; ft.classList.add("has");
+        $(".ska-btn", ft).addEventListener("click", function () { hap(5); res.btn.fn(); });
+      }
+      setTimeout(function () { card.classList.add("fold"); tick(); setTimeout(tick, 600); }, 950);
+      tick(); setTimeout(tick, 600);
+      if (res && res.after) setTimeout(res.after, 800);
+      setTimeout(done, res && res.after ? 120 : 420);
+    }
+    function run() {
+      if (i >= steps.length) return end();
+      var li = lis[i]; li.classList.add("on");
+      if (plan.onStep && !plan.err) { try { plan.onStep(i, card); } catch (e) { } }
+      hap(4); tick();
+      setTimeout(function () {
+        if (plan.err) return fail(plan.err);
+        if (i === ca) {
+          try { res = plan.commit ? plan.commit() : { ok: true }; } catch (e) { res = { ok: false, msg: String((e && e.message) || e) }; }
+          if (res && res.ok === false) return fail(res.msg);
+        }
+        li.classList.remove("on"); li.classList.add("ok"); i++; run();
+      }, delay);
+    }
+    setTimeout(run, 420);
+  }
+  function skPlayAll(acts, host, tick, alive, done) {
+    var nav = { go: 1, open_product: 1, open_order: 1 }, first = null;
+    var list = acts.filter(function (a) { return !nav[a.type]; }).concat(acts.filter(function (a) { if (!nav[a.type] || first) return false; first = a; return true; })).slice(0, 8), k = 0;
+    (function next() { if (k >= list.length || !alive()) return done && done(); skPlay(list[k++], host, tick, next); })();
+  }
+
+  /* ── Appel à Groq ── */
+  var SK_SYS = [
+    "You are Sidekick, the AI assistant built into a Shopify-style mobile app for merchants. You answer questions about the store AND you can execute actions directly in the app.",
+    "Reply ONLY with one JSON object: {\"reply\": string, \"actions\": array}. No markdown, no text outside the JSON.",
+    "- \"reply\": a short, warm, natural message (1-3 sentences) in the SAME language as the user's last message. When you run actions, say what you are doing in the present tense (e.g. \"Je crée ton produit…\"). Never claim something is done unless it is in \"actions\".",
+    "- \"actions\": ordered list of {\"type\": ..., \"args\": {...}}, or [] when there is nothing to execute (questions, advice, analysis, small talk).",
+    "",
+    "ACTION TYPES (type → args):",
+    "- create_product → {title, price (number in store currency, no symbol), compare_at?, inventory? (integer), status? \"Active\"|\"Draft\", type?, vendor?, variants? (comma-separated, e.g. \"S, M, L\"), description?, tags? (array of strings)}",
+    "- update_product → {product (exact title from the product list, or its index number), title?, price?, compare_at?, inventory?, status? \"Active\"|\"Draft\"|\"Archived\"|\"Unlisted\", type?, vendor?, variants?, description?}",
+    "- delete_product → {product}",
+    "- set_status → {products: [titles or indexes] or [\"all\"], status: \"Active\"|\"Draft\"|\"Archived\"|\"Unlisted\"}",
+    "- fulfill_order → {number}",
+    "- open_product → {product}",
+    "- open_order → {number}",
+    "- go → {screen: \"home\"|\"orders\"|\"products\"|\"menu\"|\"customers\"|\"analytics\"|\"payouts\"|\"alerts\"|\"search\"}",
+    "",
+    "RULES:",
+    "- When asked to create a product with missing details, invent sensible ones (a nice title, a 1-2 sentence description, a few tags, stock 20, status Active) instead of asking questions.",
+    "- Several products requested → several create_product actions (max 8). To change a price, stock or status of an existing product use update_product / set_status, never create a duplicate.",
+    "- Refer to existing products only with the exact titles or indexes from the product list in the store data. Never invent order numbers.",
+    "- Put navigation actions (go, open_product, open_order) last, and at most one.",
+    "- If a request is a destructive bulk operation and not explicit, ask for confirmation and return no actions.",
+    "- If asked for something you cannot do (refunds, emails, ads…), say so honestly and suggest what you can do.",
+    "",
+    "EXAMPLE",
+    "User: crée un t-shirt noir à 25€ en S M L",
+    "{\"reply\":\"Je crée ton t-shirt noir tout de suite ✨\",\"actions\":[{\"type\":\"create_product\",\"args\":{\"title\":\"T-shirt noir\",\"price\":25,\"inventory\":20,\"variants\":\"S, M, L\",\"status\":\"Active\",\"type\":\"T-shirts\",\"description\":\"Un t-shirt noir intemporel en coton doux, coupe regular.\",\"tags\":[\"t-shirt\",\"noir\"]}}]}"
+  ].join("\n");
+  function skContext() {
+    var R = rangeData("30d"), Rt = rangeData("today"), u = unfulfilled(), top = prods.slice().sort(function (x, y) { return y.sold - x.sold; }).slice(0, 3);
+    var pl = prods.slice(0, 60).map(function (p) { return p.i + ". " + p.title + " | " + money(p.price) + " | stock " + p.inv + " | " + p.status + (p.vnames[0] !== "Default" ? " | variants: " + p.vnames.join("/") : ""); });
+    return "Store: " + S.name + "\nCurrency: " + S.cur + " (" + String(S.sym).trim() + ")\nSales today: " + money(Rt.tot.s) + " from " + Rt.tot.o + " orders\nSales last 30 days: " + money(R.tot.s) + " from " + R.tot.o + " orders\nCustomers: " + count(S.custTotal) +
+      "\nOrders to fulfill (" + u.length + "): " + (u.slice(0, 12).map(function (o) { return "#" + o.n + (o.c ? " " + o.c.name : "") + " " + money(o.total); }).join("; ") || "none") +
+      "\nBest sellers: " + (top.map(function (p) { return p.title + " (" + p.sold + ")"; }).join(", ") || "none") +
+      "\nProducts (" + prods.length + "):\n" + (pl.join("\n") || "(no products yet)");
+  }
+  function skCall(messages) {
+    var models = SKC.models && SKC.models.length ? SKC.models : ["llama-3.3-70b-versatile"], key = SKC.apiKey;
+    if (!key) return Promise.reject({ code: "nokey" });
+    function tryModel(i) {
+      var ctl = window.AbortController ? new AbortController() : null, to = setTimeout(function () { if (ctl) ctl.abort(); }, 30000);
+      return fetch(SKC.endpoint || "https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key }, signal: ctl ? ctl.signal : undefined,
+        body: JSON.stringify({ model: models[i], messages: messages, temperature: 0.4, max_tokens: 1600, response_format: { type: "json_object" } })
+      }).then(function (r) {
+        clearTimeout(to);
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          if (r.ok && j.choices && j.choices[0] && j.choices[0].message) return j.choices[0].message.content || "";
+          if ((r.status === 400 || r.status === 404) && i + 1 < models.length) return tryModel(i + 1);   // modèle retiré / indisponible → suivant
+          throw { code: r.status, msg: j && j.error && j.error.message };
+        });
+      }, function (e) { clearTimeout(to); throw { code: "net", msg: String(e && e.message) }; });
+    }
+    return tryModel(0);
+  }
+  function skParse(txt) {
+    var o = null, s = String(txt || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+    try { o = JSON.parse(s); } catch (e) { var m = s.match(/\{[\s\S]*\}/); if (m) { try { o = JSON.parse(m[0]); } catch (e2) { } } }
+    if (!o || typeof o !== "object") return { reply: s.slice(0, 600), actions: [] };
+    return { reply: typeof o.reply === "string" ? o.reply : "", actions: Array.isArray(o.actions) ? o.actions.filter(function (a) { return a && SK_ACT[a.type]; }) : [] };
+  }
+  function skErrText(e) {
+    var c = e && e.code;
+    return c === "nokey" ? skT("x_key") : c === 401 ? skT("x_401") : c === 429 ? skT("x_429") : c === "net" ? skT("x_net") : skT("x_gen", c || "?");
+  }
+  function skRun(q) {
+    var msgs = [{ role: "system", content: SK_SYS }, { role: "system", content: "Current store data:\n" + skContext() }];
+    skThread.slice(-6).forEach(function (m) { msgs.push({ role: "user", content: m.q }); msgs.push({ role: "assistant", content: JSON.stringify({ reply: m.a, actions: m.acts || [] }) }); });
+    msgs.push({ role: "user", content: q });
+    return skCall(msgs).then(skParse).then(null, function (e) { return { reply: skErrText(e), actions: [], failed: true }; });
+  }
+
   function openSidekickChat(first, replay) {
     var R = rangeData("30d"), Rt = rangeData("today");
     var sugg = ["How are sales today?", "What are my best sellers?", "Which orders need attention?", "Write a product description"];
@@ -3230,13 +3619,15 @@
       log.insertAdjacentHTML("beforeend", '<div class="sk-u">' + esc(q) + "</div>");
       var b = document.createElement("div"); b.className = "sk-a typing"; b.innerHTML = "<i></i><i></i><i></i>"; log.appendChild(b);
       var pb = $(".pg-b", el); pb.scrollTop = pb.scrollHeight;
-      setTimeout(function () {
-        var txt = skAnswer(q), k = 0; if (window.I18N) txt = window.I18N.tr(txt); skThread.push({ q: q, a: txt }); b.classList.remove("typing"); b.textContent = "";
-        var timer = setInterval(function () {
-          k += 2 + Math.floor(Math.random() * 3); b.textContent = txt.slice(0, k); pb.scrollTop = pb.scrollHeight;
-          if (k >= txt.length) { clearInterval(timer); b.insertAdjacentHTML("afterend", '<div class="sk-fb"><button aria-label="Good response">' + ic("thumb-up") + '</button><button aria-label="Bad response">' + ic("thumb-down") + "</button></div>"); }
-        }, 22);
-      }, 1100);
+      function sc() { pb.scrollTop = pb.scrollHeight; }
+      function fb() { if (b.parentNode) { var f = document.createElement("div"); f.innerHTML = '<div class="sk-fb"><button aria-label="Good response">' + ic("thumb-up") + '</button><button aria-label="Bad response">' + ic("thumb-down") + "</button></div>"; var last = b.nextSibling && b.nextSibling.classList && b.nextSibling.classList.contains("ska-list") ? b.nextSibling : b; last.parentNode.insertBefore(f.firstChild, last.nextSibling); sc(); } }
+      skRun(q).then(function (res) {
+        skThread.push({ q: q, a: res.reply, acts: res.actions }); b.classList.remove("typing");
+        var list = document.createElement("div"); list.className = "ska-list"; b.parentNode.insertBefore(list, b.nextSibling);
+        skTypeInto(b, res.reply, function () {
+          if (res.actions.length) skPlayAll(res.actions, list, sc, function () { return document.body.contains(b); }, fb); else fb();
+        }, sc);
+      });
     }
     function sync() { var has = !!qi.value.trim(); go.classList.toggle("send", has); go.innerHTML = has ? ic("arrow-up") : '<span class="wave"><i></i><i></i><i></i><i></i></span>'; }
     $$(".sk-s", el).forEach(function (x) { x.addEventListener("click", function () { hap(5); ask(x.textContent); }); });
@@ -3272,17 +3663,24 @@
     try { history.pushState({ sk: 1 }, ""); } catch (e) { }
     var qi = $("#skov-q", el), go = $("#skov-go", el), ans = $("#skov-ans", el), timer = null, typer = null;
     function sync() { var has = !!qi.value.trim(); go.classList.toggle("send", has); go.innerHTML = has ? ic("arrow-up") : ic("mic"); }
-    function reset() { clearTimeout(timer); clearInterval(typer); el.classList.remove("thinking", "answered"); }
+    function reset() { skTok++; clearTimeout(timer); clearInterval(typer); ans.classList.remove("has-ska"); el.classList.remove("thinking", "answered"); }
     function send() {
       var q = qi.value.trim(); if (!q) return;
       hap(5); reset(); qi.value = ""; sync(); qi.blur();
       el.classList.add("thinking");
-      timer = setTimeout(function () {
-        var txt = skAnswer(q), k = 0; if (window.I18N) txt = window.I18N.tr(txt);
-        skThread.push({ q: q, a: txt });
-        el.classList.remove("thinking"); el.classList.add("answered", "has-thread"); ans.textContent = "";
-        typer = setInterval(function () { k += 2 + Math.floor(Math.random() * 3); ans.textContent = txt.slice(0, k); if (k >= txt.length) clearInterval(typer); }, 22);
-      }, 1700);
+      var tok = ++skTok;
+      skRun(q).then(function (res) {
+        if (tok !== skTok) return;
+        skThread.push({ q: q, a: res.reply, acts: res.actions });
+        el.classList.remove("thinking"); el.classList.add("answered", "has-thread");
+        ans.innerHTML = '<div class="ska-txt"></div><div class="ska-list"></div>';
+        function sc() { ans.scrollTop = ans.scrollHeight; }
+        typer = skTypeInto($(".ska-txt", ans), res.reply, function () {
+          if (!res.actions.length) return;
+          ans.classList.add("has-ska");
+          skPlayAll(res.actions, $(".ska-list", ans), sc, function () { return tok === skTok && skEl === el; });
+        });
+      });
     }
     qi.addEventListener("input", sync);
     qi.addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
