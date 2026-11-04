@@ -3219,6 +3219,7 @@
      chaque action est exécutée pour de vrai (createProduct, setStatus, fulfill…) pendant qu'une carte s'anime. */
   var SKC = window.SIDEKICK_CFG || {};
   var skTok = 0;
+  var skNative = { on: false, seq: 0, plans: {} };
   var SK_L = {
     fr: {
       cp_t: "Création du produit", cp_d: "Produit créé", cp_s: ["Analyse de ta demande", "Rédaction de la fiche produit", "Réglage du prix et du stock", "Publication dans ta boutique"],
@@ -3283,7 +3284,7 @@
       if (r) { r.classList.add("skflash"); setTimeout(function () { r.classList.remove("skflash"); }, 2100); }
     }, 160);
   }
-  function skOpen(fn) { var w = 0; if (skEl) { closeSidekick(); w = 380; } setTimeout(fn, w); }
+  function skOpen(fn) { var w = 0; if (skEl) { closeSidekick(); w = 380; } if (skNative.on) { skNative.on = false; nativeOrderPost({ mode: "sidekickClose" }); w = 480; } setTimeout(fn, w); }
   function skGo(s) {
     if (s === "home" || s === "orders" || s === "products" || s === "customers" || s === "analytics") return navigate(s);
     if (s === "menu") { closeAll(); return setTab("menu"); }
@@ -3319,6 +3320,7 @@
       if (!title) { plan.err = skT("e_bad"); return plan; }
       var price = skNum(a.price) || 0, inv = skNum(a.inventory); inv = inv == null ? 20 : Math.max(0, Math.round(inv));
       var st = skStatus(a.status), hue = HUES[prods.length % HUES.length];
+      plan.nv = { k: "create", title: title, price: skMoney(price), stock: skT("stock", inv), status: skT("sn")[st] || st, st: st, hue: hue };
       plan.pv = '<div class="skp"><div class="skp-th sk"><span>' + esc(title.charAt(0).toUpperCase()) + '</span></div><div class="skp-tx"><b class="skp-t sk"></b><span class="skp-m"><em class="skp-pr"></em><em class="skp-sk"></em></span></div><i class="skp-dot"></i></div>';
       plan.onStep = function (i, card) {
         var pv = $(".skp", card), th = $(".skp-th", card), t = $(".skp-t", card), pr = $(".skp-pr", card), sk = $(".skp-sk", card), dot = $(".skp-dot", card);
@@ -3355,6 +3357,7 @@
       if (a.variants != null && a.variants !== "") { var vv = skVars(a.variants), cur = p.vnames[0] === "Default" ? "" : p.vnames.join(", "); if (vv !== cur) { nv.vars = vv; add("vars", cur || "–", vv); } }
       if (a.description != null && String(a.description) !== (p.desc || "")) { nv.desc = String(a.description); add("desc", p.desc || "–", nv.desc); }
       if (!ch.length) { plan.err = skT("e_none"); return plan; }
+      plan.nv = { k: "update", title: p.title, changes: ch };
       plan.pv = '<div class="skp">' + thumb(p, 44) + '<div class="skp-tx"><b class="skp-t">' + esc(p.title) + '</b></div></div><div class="skd">' +
         ch.map(function (c) { return '<div class="skd-r"><span>' + esc(c.l) + "</span><s>" + esc(c.from) + "</s><i>→</i><b>" + esc(c.to) + "</b></div>"; }).join("") + "</div>";
       plan.onStep = function (i, card) {
@@ -3383,6 +3386,7 @@
       var plan = { title: skT("dl_t"), done: skT("dl_d"), steps: skT("dl_s"), commitAt: 1 }, p = skFind(a.product);
       if (!p) { plan.err = skT("e_prod", a.product); return plan; }
       if (!EMPTY) { plan.err = skT("e_demo"); return plan; }
+      plan.nv = { k: "delete", title: p.title };
       plan.pv = '<div class="skp">' + thumb(p, 44) + '<div class="skp-tx"><b class="skp-t">' + esc(p.title) + "</b></div></div>";
       plan.onStep = function (i, card) {
         var pv = $(".ska-pv", card);
@@ -3405,6 +3409,7 @@
       if (all) list = prods.slice(); else refs.forEach(function (r) { var p = skFind(r); if (p && list.indexOf(p) < 0) list.push(p); });
       if (!list.length) { plan.err = skT("e_prod", refs.join(", ") || "?"); return plan; }
       var st = skStatus(a.status), show = list.slice(0, 4);
+      plan.nv = { k: "status", items: show.map(function (p) { return { title: p.title, st: p.status, label: skT("sn")[p.status] || p.status }; }), more: Math.max(0, list.length - 4), to: st, toLabel: skT("sn")[st] };
       plan.pv = show.map(function (p) {
         return '<div class="skp">' + thumb(p, 40) + '<div class="skp-tx"><b class="skp-t">' + esc(p.title) + '</b></div><i class="skp-dot in ' + skDot(p.status) + '"></i><span class="skp-lb">' + esc(skT("sn")[p.status] || p.status) + "</span></div>";
       }).join("") + (list.length > 4 ? '<div class="skp-more">+' + (list.length - 4) + "</div>" : "");
@@ -3429,6 +3434,7 @@
       var plan = { title: skT("fo_t"), done: skT("fo_d"), steps: skT("fo_s") }, n = skNum(a.number), o = n != null ? findOrder(Math.round(n)) : null;
       if (!o) { plan.err = skT("e_ord", a.number); return plan; }
       if (o.ful === "Fulfilled") { plan.err = skT("e_ful"); return plan; }
+      plan.nv = { k: "fulfill", n: o.n, name: o.c && o.c.name ? o.c.name : "", total: money(o.total) };
       plan.pv = '<div class="skf"><div class="skf-h"><b>#' + o.n + "</b><span>" + esc(o.c && o.c.name ? o.c.name : "") + "</span><em>" + esc(money(o.total)) + '</em></div>' +
         '<div class="skf-bar"><i></i><svg class="skf-tr" viewBox="0 0 24 16"><path d="M1 2h14v10H1z"/><path d="M15 5h5l3 3v4h-8z"/><circle cx="6" cy="13" r="2"/><circle cx="19" cy="13" r="2"/></svg></div></div>';
       plan.onStep = function (i, card) {
@@ -3449,6 +3455,7 @@
     go: function (a) {
       var s = String(a.screen || "").toLowerCase(), label = skT("scr")[s], plan = { title: skT("go_t", label || s), done: skT("go_d"), steps: skT("go_s"), delay: 650 };
       if (!label) { plan.err = skT("e_bad"); return plan; }
+      plan.nv = { k: "nav", label: label };
       plan.pv = '<div class="skn"><span>' + esc(label) + '</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>';
       plan.commit = function () { return { ok: true, after: function () { skOpen(function () { skGo(s); }); } }; };
       return plan;
@@ -3458,6 +3465,7 @@
       var plan = { title: "", done: skT("go_d"), steps: skT("go_s"), delay: 650 }, p = skFind(a.product);
       plan.title = skT("go_t", p ? p.title : String(a.product || ""));
       if (!p) { plan.err = skT("e_prod", a.product); return plan; }
+      plan.nv = { k: "nav", label: skShort(p.title, 30) };
       plan.pv = '<div class="skn"><span>' + esc(skShort(p.title, 30)) + '</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>';
       plan.commit = function () { return { ok: true, after: function () { skOpen(function () { openProduct(p.i); }); } }; };
       return plan;
@@ -3466,6 +3474,7 @@
     open_order: function (a) {
       var n = skNum(a.number), o = n != null ? findOrder(Math.round(n)) : null, plan = { title: skT("go_t", "#" + (n != null ? Math.round(n) : "?")), done: skT("go_d"), steps: skT("go_s"), delay: 650 };
       if (!o) { plan.err = skT("e_ord", a.number); return plan; }
+      plan.nv = { k: "nav", label: "#" + o.n };
       plan.pv = '<div class="skn"><span>#' + o.n + '</span><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>';
       plan.commit = function () { return { ok: true, after: function () { skOpen(function () { openOrder(o.n); }); } }; };
       return plan;
@@ -3603,7 +3612,59 @@
     return skCall(msgs).then(skParse).then(null, function (e) { return { reply: skErrText(e), actions: [], failed: true }; });
   }
 
+
+  /* ── Page Sidekick native (SwiftUI, Liquid Glass) : la page garde l'IA et l'exécution, Swift affiche et anime ── */
+  function skOrderActs(acts) {
+    var nav = { go: 1, open_product: 1, open_order: 1 }, first = null;
+    return acts.filter(function (a) { return !nav[a.type]; }).concat(acts.filter(function (a) { if (!nav[a.type] || first) return false; first = a; return true; })).slice(0, 8);
+  }
+  function skNativeInfo(first) {
+    var T = L10n;
+    return {
+      mode: "sidekick", title: T("New conversation"), greeting: greeting().replace("!", ""), headline: T("How can I help?"), whatsNew: T("What\u2019s new?"), placeholder: T("Ask anything..."),
+      suggestions: ["How are sales today?", "What are my best sellers?", "Which orders need attention?", "Write a product description"].map(function (x) { return T(x); }),
+      thread: skThread.map(function (m) { return { q: m.q, a: m.a }; }), first: first || ""
+    };
+  }
+  window.__larpSkAsk = function (q) {
+    return skRun(q).then(function (res) {
+      skThread.push({ q: q, a: res.reply, acts: res.actions });
+      var id = ++skNative.seq, acts = skOrderActs(res.actions);
+      skNative.plans[id] = { acts: acts, made: {} };
+      return JSON.stringify({ id: id, reply: res.reply, count: acts.length, failed: !!res.failed });
+    });
+  };
+  window.__larpSkPlan = function (id, i) {
+    var e = skNative.plans[id], act = e && e.acts[i], mk = act && SK_ACT[act.type], plan;
+    if (!mk) return "null";
+    try { plan = mk(act.args || {}); } catch (er) { plan = { title: "Sidekick", done: "", steps: [""], err: String((er && er.message) || er) }; }
+    e.made[i] = { plan: plan, res: null };
+    var steps = plan.err ? plan.steps.slice(0, 1) : plan.steps;
+    return JSON.stringify({ title: plan.title, done: plan.done || plan.title, steps: steps, err: plan.err || null, delay: plan.delay || 540, commitAt: plan.commitAt != null ? plan.commitAt : steps.length - 1, nv: plan.err ? null : (plan.nv || null) });
+  };
+  window.__larpSkCommit = function (id, i) {
+    var e = skNative.plans[id], m = e && e.made[i], res;
+    if (!m) return JSON.stringify({ ok: false, msg: "" });
+    try { res = m.plan.commit ? m.plan.commit() : { ok: true }; } catch (er) { res = { ok: false, msg: String((er && er.message) || er) }; }
+    m.res = res || { ok: true };
+    return JSON.stringify({ ok: m.res.ok !== false, msg: m.res.msg || "", btn: m.res.btn ? m.res.btn.l : null, after: !!m.res.after });
+  };
+  function skMade(id, i) { var e = skNative.plans[id]; return e && e.made[i] && e.made[i].res; }
+  window.__larpSkBtn = function (id, i) { var r = skMade(id, i); if (r && r.btn) { hap(5); r.btn.fn(); } };
+  window.__larpSkAfter = function (id, i) { var r = skMade(id, i); if (r && r.after) r.after(); };
+  window.__larpSkReset = function () { skThread = []; };
+  window.__larpNativeSidekickClosed = function () { skNative.on = false; };
+  window.__larpNativeSidekickFallback = function () { skNative.on = false; openSidekickChatWeb(null, skThread); };
   function openSidekickChat(first, replay) {
+    if (window.__LARP_NATIVE_PRODUCT__ && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.larpProduct) {
+      if (skNative.on) return;
+      skNative.on = true;
+      if (nativeOrderPost(skNativeInfo(first))) return;
+      skNative.on = false;
+    }
+    openSidekickChatWeb(first, replay);
+  }
+  function openSidekickChatWeb(first, replay) {
     var R = rangeData("30d"), Rt = rangeData("today");
     var sugg = ["How are sales today?", "What are my best sellers?", "Which orders need attention?", "Write a product description"];
     var g = greeting().replace("!", "");
