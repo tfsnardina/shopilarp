@@ -1,4 +1,5 @@
 import UIKit
+import simd
 
 /// Vue en direct native (Liquid Glass, iOS 26) : globe de points qui tourne, visiteurs en ce moment,
 /// chiffres du jour, comportement des clients et sessions par lieu. S'ouvre au-dessus de la page web
@@ -52,19 +53,21 @@ private let lvCountries: [(String, Double, Double, Double)] = [
 /// Commandes = violet (anneau qui s'étend), visiteurs = bleu (hexagone qui pulse).
 @available(iOS 26.0, *)
 final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
+    /// Un point de la sphère : vecteur unitaire (x vers 0°N 0°E, y vers 0°N 90°E, z vers le pôle Nord).
+    /// Pour une cellule du globe, `first`/`count` désignent ses sommets dans `corners`.
     private struct Dot {
-        let cosP: Double, sinP: Double, cosL: Double, sinL: Double
+        let x: Double, y: Double, z: Double
+        var first = 0
+        var count = 0
     }
 
-    private static let spacing = 1.2          // distance entre deux hexagones, en degrés
+    private static let spacing = 1.2          // distance entre deux hexagones, en degrés (sert à la taille des anneaux et des marges)
+    private static let freq = 58              // subdivision de l'icosaèdre : 10·58²+2 = 33 642 cellules (≈ 1,2° entre centres)
     private static let maxZoom = 5.0
     private static let tilt = 0.32            // latitude du centre de la vue au repos (radians)
-    private static let hexUnit: [(Double, Double)] = (0..<6).map { k in
-        let a = (30.0 + 60.0 * Double(k)) * .pi / 180
-        return (cos(a), sin(a))
-    }
 
     private var dots: [Dot] = []
+    private var corners: [SIMD3<Double>] = []  // sommets des hexagones (pentagones pour 12 cellules), sur la sphère unité
     private var pings: [Dot] = []
     private var pingCell: [Int] = []          // hexagone du globe le plus proche de chaque point
     private var pingSignature = ""
@@ -140,11 +143,101 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
 
     private static func dot(lat: Double, lon: Double) -> Dot {
         let p = lat * .pi / 180, l = lon * .pi / 180
-        return Dot(cosP: cos(p), sinP: sin(p), cosL: cos(l), sinL: sin(l))
+        return Dot(x: cos(p) * cos(l), y: cos(p) * sin(l), z: sin(p))
+    }
+
+    private static func slerp(_ a: SIMD3<Double>, _ b: SIMD3<Double>, _ s: Double) -> SIMD3<Double> {
+        let om = acos(min(1, max(-1, simd_dot(a, b))))
+        if om < 1e-9 { return a }
+        let so = sin(om)
+        return a * (sin((1 - s) * om) / so) + b * (sin(s * om) / so)
+    }
+
+    private struct GridKey: Hashable { let x: Int32, y: Int32, z: Int32 }
+
+    /// Grille géodésique : icosaèdre subdivisé, dont chaque sommet devient le centre d'un hexagone (12 pentagones aux sommets
+    /// de l'icosaèdre). Contrairement à des rangées par latitude, tous les voisins se touchent partout : plus de rangées décalées
+    /// ni de losanges blancs, et la taille des cellules reste quasi constante sur tout le globe.
+    /// Ne garde que les cellules pour lesquelles `keep(lat, lon)` est vrai ; renvoie les cellules et leurs sommets.
+    private static func buildGrid(keep: (Double, Double) -> Bool) -> ([Dot], [SIMD3<Double>]) {
+        let f = freq
+        let t = (1 + 5.0.squareRoot()) / 2
+        let raw: [(Double, Double, Double)] = [
+            (-1, t, 0), (1, t, 0), (-1, -t, 0), (1, -t, 0), (0, -1, t), (0, 1, t),
+            (0, -1, -t), (0, 1, -t), (t, 0, -1), (t, 0, 1), (-t, 0, -1), (-t, 0, 1),
+        ]
+        let base: [SIMD3<Double>] = raw.map { simd_normalize(SIMD3<Double>($0.0, $0.1, $0.2)) }
+        let faces: [(Int, Int, Int)] = [
+            (0, 11, 5), (0, 5, 1), (0, 1, 7), (0, 7, 10), (0, 10, 11),
+            (1, 5, 9), (5, 11, 4), (11, 10, 2), (10, 7, 6), (7, 1, 8),
+            (3, 9, 4), (3, 4, 2), (3, 2, 6), (3, 6, 8), (3, 8, 9),
+            (4, 9, 5), (2, 4, 11), (6, 2, 10), (8, 6, 7), (9, 8, 1),
+        ]
+
+        var verts: [SIMD3<Double>] = []
+        verts.reserveCapacity(10 * f * f + 2)
+        var index: [GridKey: Int] = [:]
+        index.reserveCapacity(10 * f * f + 2)
+        func vertexId(_ p: SIMD3<Double>) -> Int {
+            let k = GridKey(x: Int32((p.x * 1e5).rounded()), y: Int32((p.y * 1e5).rounded()), z: Int32((p.z * 1e5).rounded()))
+            if let i = index[k] { return i }
+            verts.append(p)
+            index[k] = verts.count - 1
+            return verts.count - 1
+        }
+
+        var tris: [(Int, Int, Int)] = []
+        tris.reserveCapacity(20 * f * f)
+        for (ia, ib, ic) in faces {
+            let a = base[ia], b = base[ib], c = base[ic]
+            var rows: [[Int]] = []
+            rows.reserveCapacity(f + 1)
+            for r in 0...f {
+                let e1 = slerp(a, b, Double(r) / Double(f)), e2 = slerp(a, c, Double(r) / Double(f))
+                var row: [Int] = []
+                row.reserveCapacity(r + 1)
+                for k in 0...r {
+                    row.append(vertexId(r == 0 ? e1 : slerp(e1, e2, Double(k) / Double(r))))
+                }
+                rows.append(row)
+            }
+            for r in 0..<f {
+                for k in 0...r { tris.append((rows[r][k], rows[r + 1][k], rows[r + 1][k + 1])) }
+                if r > 0 { for k in 0..<r { tris.append((rows[r][k], rows[r][k + 1], rows[r + 1][k + 1])) } }
+            }
+        }
+
+        // Cellules gardées (terres)
+        var kept = [Bool](repeating: false, count: verts.count)
+        for (i, v) in verts.enumerated() {
+            let lat = asin(min(1, max(-1, v.z))) * 180 / .pi
+            kept[i] = keep(lat, atan2(v.y, v.x) * 180 / .pi)
+        }
+
+        // Sommets d'un hexagone = centres (normalisés) des triangles qui entourent son centre.
+        var around = [[SIMD3<Double>]](repeating: [], count: verts.count)
+        for (a, b, c) in tris where kept[a] || kept[b] || kept[c] {
+            let m = simd_normalize(verts[a] + verts[b] + verts[c])
+            if kept[a] { around[a].append(m) }
+            if kept[b] { around[b].append(m) }
+            if kept[c] { around[c].append(m) }
+        }
+
+        var out: [Dot] = []
+        var pts: [SIMD3<Double>] = []
+        for (i, v) in verts.enumerated() where kept[i] {
+            let helper = abs(v.z) < 0.9 ? SIMD3<Double>(0, 0, 1) : SIMD3<Double>(1, 0, 0)
+            let u = simd_normalize(simd_cross(v, helper))
+            let w = simd_cross(v, u)
+            let sorted = around[i].sorted { atan2(simd_dot($0, w), simd_dot($0, u)) < atan2(simd_dot($1, w), simd_dot($1, u)) }
+            out.append(Dot(x: v.x, y: v.y, z: v.z, first: pts.count, count: sorted.count))
+            pts.append(contentsOf: sorted)
+        }
+        return (out, pts)
     }
 
     /// Masque des terres : 180 colonnes (depuis 180°O) × 90 lignes (depuis 90°N), un point tous les 2°, codé en base64.
-    /// On échantillonne un réseau d'hexagones plus fin (1,2°) en interpolant le masque, pour des côtes lisses.
+    /// On échantillonne la grille d'hexagones (≈1,2°) en interpolant le masque, pour des côtes lisses.
     func setLandMask(_ base64: String) {
         guard dots.isEmpty, let data = Data(base64Encoded: base64) else { return }
         let bytes = [UInt8](data)
@@ -164,26 +257,11 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
             let bot = land(r0 + 1, c0) * (1 - tc) + land(r0 + 1, c0 + 1) * tc
             return top * (1 - tr) + bot * tr >= 0.5
         }
-        let d = LVGlobeView.spacing
-        let rowStep = d * 0.8660254
-        var out: [Dot] = []
-        out.reserveCapacity(9000)
-        var j = 0
-        var lat = -58.0
-        while lat <= 84 {
-            let cosLat = max(cos(lat * .pi / 180), 0.05)
-            let n = max(8, Int((360 * cosLat / d).rounded()))
-            let step = 360.0 / Double(n)
-            let offset = (j % 2 == 0) ? 0.0 : step / 2
-            for i in 0..<n {
-                var lon = -180 + offset + Double(i) * step
-                if lon > 180 { lon -= 360 }
-                if landAt(lat: lat, lon: lon) { out.append(LVGlobeView.dot(lat: lat, lon: lon)) }
-            }
-            lat += rowStep
-            j += 1
+        let (cells, pts) = LVGlobeView.buildGrid { lat, lon in
+            lat >= -58 && lat <= 84 && landAt(lat: lat, lon: lon)
         }
-        dots = out
+        dots = cells
+        corners = pts
         setNeedsDisplay()
     }
 
@@ -205,7 +283,7 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
                 var best = -1
                 var bestDot = -2.0
                 for (i, d) in dots.enumerated() {
-                    let s = d.sinP * p.sinP + d.cosP * p.cosP * (d.cosL * p.cosL + d.sinL * p.sinL)
+                    let s = d.x * p.x + d.y * p.y + d.z * p.z
                     if s > bestDot { bestDot = s; best = i }
                 }
                 return best
@@ -410,27 +488,22 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
         let l0 = centerLon * .pi / 180
         let sinL0 = sin(l0), cosL0 = cos(l0)
         let sinP0 = sin(centerLat), cosP0 = cos(centerLat)
-        func project(_ d: Dot) -> (x: Double, y: Double, z: Double, sinD: Double, cosD: Double) {
-            let sinD = d.sinL * cosL0 - d.cosL * sinL0
-            let cosD = d.cosL * cosL0 + d.sinL * sinL0
-            let x = d.cosP * sinD
-            let y = cosP0 * d.sinP - sinP0 * d.cosP * cosD
-            let z = sinP0 * d.sinP + cosP0 * d.cosP * cosD
-            return (cx + x * R, cy - y * R, z, sinD, cosD)
+        func project(_ x: Double, _ y: Double, _ z: Double) -> (x: Double, y: Double, z: Double) {
+            let sinD = y * cosL0 - x * sinL0          // = cos(lat) · sin(lon − lon0)
+            let cosD = x * cosL0 + y * sinL0          // = cos(lat) · cos(lon − lon0)
+            return (cx + sinD * R, cy - (cosP0 * z - sinP0 * cosD) * R, sinP0 * z + cosP0 * cosD)
         }
+        func projectDot(_ d: Dot) -> (x: Double, y: Double, z: Double) { project(d.x, d.y, d.z) }
 
-        // Hexagone « vrai » : ses 6 sommets suivent la sphère (axes est / nord du point projetés à l'écran),
-        // donc il se déforme exactement comme la surface et les voisins se touchent proprement.
+        // Hexagone « vrai » : ses sommets sont de vrais points de la sphère (ceux de la grille géodésique), projetés un par un,
+        // donc il se déforme exactement comme la surface et tous les voisins se touchent proprement.
         let hexAng = LVGlobeView.spacing * .pi / 180 / 3.0.squareRoot()
         let hexPx = hexAng * R
-        func addHex(_ path: CGMutablePath, _ d: Dot, _ q: (x: Double, y: Double, z: Double, sinD: Double, cosD: Double), _ scale: Double) {
-            let ex = q.cosD, ey = -q.sinD * sinP0
-            let nx = -d.sinP * q.sinD, ny = -(d.cosP * cosP0 + d.sinP * sinP0 * q.cosD)
-            let r = hexPx * scale
-            for (k, v) in LVGlobeView.hexUnit.enumerated() {
-                let px = q.x + r * (v.0 * ex + v.1 * nx)
-                let py = q.y + r * (v.0 * ey + v.1 * ny)
-                if k == 0 { path.move(to: CGPoint(x: px, y: py)) } else { path.addLine(to: CGPoint(x: px, y: py)) }
+        func addHex(_ path: CGMutablePath, _ d: Dot, _ scale: Double) {
+            for k in 0..<d.count {
+                let c = corners[d.first + k]
+                let q = project(d.x + (c.x - d.x) * scale, d.y + (c.y - d.y) * scale, d.z + (c.z - d.z) * scale)
+                if k == 0 { path.move(to: CGPoint(x: q.x, y: q.y)) } else { path.addLine(to: CGPoint(x: q.x, y: q.y)) }
             }
             path.closeSubpath()
         }
@@ -440,10 +513,10 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
         let paths = (0..<buckets).map { _ in CGMutablePath() }
         let margin = hexPx + 2
         for d in dots {
-            let q = project(d)
+            let q = projectDot(d)
             if q.z <= 0.02 { continue }
             if q.x < -margin || q.x > w + margin || q.y < -margin || q.y > h + margin { continue }
-            addHex(paths[min(buckets - 1, Int(q.z * Double(buckets)))], d, q, 0.9)
+            addHex(paths[min(buckets - 1, Int(q.z * Double(buckets)))], d, 0.9)
         }
         for i in 0..<buckets {
             let t = (Double(i) + 0.5) / Double(buckets)       // 0 = bord, 1 = centre
@@ -463,13 +536,13 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
                 let isOrder = k < orderCount
                 if !isOrder && k - orderCount >= max(0, visitors) { continue }   // un hexagone bleu par visiteur, aucun à 0
                 let cell = dots[pingCell[k]]
-                let q = project(cell)
+                let q = projectDot(cell)
                 if q.z <= 0.05 { continue }
                 if q.x < -40 || q.x > w + 40 || q.y < -40 || q.y > h + 40 { continue }
                 let ph = (tt * (isOrder ? 0.5 : 0.35) + Double(k) * 0.37).truncatingRemainder(dividingBy: 1)
                 let path = CGMutablePath()
                 if isOrder {
-                    addHex(path, cell, q, 0.96 * grow)
+                    addHex(path, cell, 0.96 * grow)
                     ctx.setFillColor(red: 0.502, green: 0.318, blue: 1.0, alpha: 1)
                     ctx.addPath(path)
                     ctx.fillPath()
@@ -480,7 +553,7 @@ final class LVGlobeView: UIView, UIGestureRecognizerDelegate {
                     ctx.strokeEllipse(in: CGRect(x: q.x - rr, y: q.y - rr, width: rr * 2, height: rr * 2))
                 } else {
                     let a = sin(ph * .pi)
-                    addHex(path, cell, q, 0.96 * grow)
+                    addHex(path, cell, 0.96 * grow)
                     ctx.setFillColor(red: 0.07, green: 0.62, blue: 0.97, alpha: CGFloat(0.55 + a * 0.45))
                     ctx.addPath(path)
                     ctx.fillPath()
