@@ -1,0 +1,141 @@
+/* Sidekick AI : cartes d'actions animées (création de produit, modifications, commandes…) */
+.ska-txt{white-space:pre-wrap}
+.ska-list{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.ska-list:empty{display:none}
+.sk-ans.has-ska{max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+
+.ska{position:relative;border-radius:22px;padding:14px 14px 12px;background:linear-gradient(180deg,#fbfaff,#f5f2ff);color:#111;font-size:15px;line-height:1.3;letter-spacing:-.1px;text-align:left;white-space:normal;
+  box-shadow:0 10px 30px rgba(110,63,243,.14),inset 0 1px 0 rgba(255,255,255,.9);
+  opacity:0;transform:translateY(20px) scale(.93);filter:blur(6px);
+  transition:opacity .45s ease,transform .65s cubic-bezier(.2,1.25,.3,1),filter .45s ease,box-shadow .6s ease;overflow:hidden}
+.ska.on{opacity:1;transform:none;filter:none}
+.ska.done{box-shadow:0 10px 30px rgba(16,185,129,.16),inset 0 1px 0 rgba(255,255,255,.9)}
+.ska.err{animation:skaShake .5s .35s both;box-shadow:0 10px 30px rgba(244,63,94,.14),inset 0 1px 0 rgba(255,255,255,.9)}
+@keyframes skaShake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}100%{transform:none}}
+
+/* bordure dégradée qui tourne pendant le travail */
+.ska-bd{position:absolute;inset:0;border-radius:inherit;padding:1.5px;pointer-events:none;
+  background:linear-gradient(110deg,#6e3ff3,#b9a3ff,#5ec8ff,#ff7ad9,#6e3ff3);background-size:300% 100%;animation:skaBd 2s linear infinite;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;transition:opacity .6s}
+@keyframes skaBd{to{background-position:-300% 0}}
+.ska.done .ska-bd{animation:none;background:linear-gradient(135deg,#34d399,#10b981);opacity:.85}
+.ska.err .ska-bd{animation:none;background:#f43f5e;opacity:.85}
+/* reflet qui traverse la carte à la fin */
+.ska::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.75) 50%,transparent 62%);transform:translateX(-130%)}
+.ska.done::after{animation:skaShine .95s .1s ease}
+@keyframes skaShine{to{transform:translateX(130%)}}
+
+.ska-hd{display:flex;align-items:center;gap:10px}
+.ska-face{width:32px;height:32px;flex:none;animation:skaBob 1.7s ease-in-out infinite}
+.ska-face svg{width:100%;height:100%;display:block}
+@keyframes skaBob{50%{transform:translateY(-3px) rotate(-5deg)}}
+.ska.done .ska-face,.ska.err .ska-face{animation:skaHop .65s cubic-bezier(.3,1.6,.5,1)}
+@keyframes skaHop{0%{transform:scale(1)}40%{transform:translateY(-9px) scale(1.14) rotate(8deg)}100%{transform:none}}
+.ska-ttl{flex:1;min-width:0;font-weight:600;font-size:15.5px;
+  background:linear-gradient(100deg,#6e3ff3 20%,#b9a3ff 45%,#6e3ff3 70%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:skaShim 1.6s linear infinite}
+@keyframes skaShim{to{background-position:-120% 0}}
+.ska.done .ska-ttl,.ska.err .ska-ttl{animation:none;background:none;-webkit-text-fill-color:currentColor;color:#111}
+
+.ska-st{position:relative;width:26px;height:26px;flex:none}
+.ska-sp{position:absolute;inset:2px;border-radius:50%;border:2.5px solid #e4dcff;border-top-color:#6e3ff3;animation:skaSpin .8s linear infinite;transition:opacity .2s,transform .3s}
+@keyframes skaSpin{to{transform:rotate(360deg)}}
+.ska-ck,.ska-er{position:absolute;inset:0;width:26px;height:26px;opacity:0;transform:scale(.3)}
+.ska-ck circle{fill:#10b981}.ska-er circle{fill:#f43f5e}
+.ska-ck path,.ska-er path{fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:24;stroke-dashoffset:24}
+.ska.done .ska-ck,.ska.err .ska-er{opacity:1;transform:scale(1);transition:transform .55s cubic-bezier(.3,1.8,.5,1),opacity .2s}
+.ska.done .ska-ck path,.ska.err .ska-er path{stroke-dashoffset:0;transition:stroke-dashoffset .45s .2s ease-out}
+.ska.done .ska-sp,.ska.err .ska-sp{opacity:0;transform:scale(.3)}
+
+/* éclats + onde de choc à la validation */
+.ska-fx{position:absolute;right:27px;top:30px;width:0;height:0;pointer-events:none}
+.ska-fx i{position:absolute;left:-3px;top:-3px;width:7px;height:7px;border-radius:2px;background:var(--c);opacity:0;animation:skaBurst .95s cubic-bezier(.1,.8,.3,1) forwards}
+@keyframes skaBurst{0%{opacity:1;transform:translate(0,0) rotate(0) scale(.4)}70%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--r)) scale(1.1)}}
+.ska-fx::before{content:"";position:absolute;left:-13px;top:-13px;width:26px;height:26px;border-radius:50%;border:2px solid #10b981;opacity:0}
+.ska.done .ska-fx::before{animation:skaRing .8s .1s ease-out}
+.ska.err .ska-fx::before{border-color:#f43f5e;animation:skaRing .8s .1s ease-out}
+@keyframes skaRing{0%{opacity:.9;transform:scale(.6)}100%{opacity:0;transform:scale(3.2)}}
+
+/* aperçu de ce qui se construit */
+.ska-pv{margin-top:12px}
+.ska-pv:empty{display:none}
+.skp{display:flex;align-items:center;gap:12px;padding:10px;border-radius:16px;background:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 4px 14px rgba(20,10,60,.06);
+  transition:transform .55s cubic-bezier(.2,1.3,.3,1),box-shadow .5s,opacity .45s,filter .45s}
+.skp+.skp{margin-top:8px}
+.skp.lift{transform:translateY(-2px) scale(1.015);box-shadow:0 0 0 .5px rgba(110,63,243,.25),0 14px 28px rgba(110,63,243,.2)}
+.skp-th{width:52px;height:52px;border-radius:13px;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:22px;overflow:hidden}
+.skp-th span{transform:scale(0);transition:transform .55s cubic-bezier(.3,1.8,.5,1)}
+.skp-th.rd span{transform:scale(1)}
+.skp-th.sk,.skp-t.sk{background:linear-gradient(100deg,#ececf1 30%,#f8f8fb 50%,#ececf1 70%);background-size:220% 100%;animation:skaSk 1.2s linear infinite}
+@keyframes skaSk{to{background-position:-120% 0}}
+.skp-tx{flex:1;min-width:0}
+.skp-t{display:block;font-size:16px;font-weight:600;min-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skp-t.sk{height:16px;width:68%;border-radius:6px}
+.skp-m{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:13px}
+.skp-m em{font-style:normal;padding:2px 9px;border-radius:999px;background:#f1eefc;color:#5b34d6;font-weight:600;opacity:0;transform:translateY(6px) scale(.88);transition:all .45s cubic-bezier(.3,1.6,.5,1)}
+.skp-m em.in{opacity:1;transform:none}
+.skp-dot{width:10px;height:10px;border-radius:50%;background:#c9c9d1;flex:none;transition:transform .55s cubic-bezier(.3,2,.5,1),background .4s,box-shadow .4s}
+.skp-dot.in{transform:scale(1)}
+.skp-dot:not(.in){transform:scale(0)}
+.skp-dot.on{background:#10b981;box-shadow:0 0 0 4px rgba(16,185,129,.18)}
+.skp-dot.dr{background:#a78bfa;box-shadow:0 0 0 4px rgba(167,139,250,.2)}
+.skp-dot.un{background:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.18)}
+.skp-dot.ar{background:#9ca3af;box-shadow:0 0 0 4px rgba(156,163,175,.2)}
+.skp-lb{font-size:13px;color:#6b6b76;font-weight:500;min-width:64px;text-align:right}
+.skp-lb.pop{animation:skaPop .5s cubic-bezier(.3,1.8,.5,1)}
+@keyframes skaPop{0%{transform:scale(.6);opacity:0}100%{transform:none;opacity:1}}
+.skp-more{margin:8px 0 0 4px;font-size:13px;color:#8051ff;font-weight:600}
+.skp.zap{animation:skaZap .62s ease forwards}
+@keyframes skaZap{30%{transform:scale(1.04)}100%{transform:scale(.7) translateY(6px);opacity:0;filter:blur(8px)}}
+.ska-pv.shrink{transition:max-height .5s ease,margin .5s ease,opacity .4s;max-height:0!important;margin-top:0;opacity:0;overflow:hidden}
+
+/* lignes avant → après */
+.skd{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.skd-r{display:flex;align-items:center;gap:8px;font-size:14px;opacity:0;transform:translateX(-12px);transition:all .5s cubic-bezier(.2,1.2,.3,1)}
+.skd-r.in{opacity:1;transform:none}
+.skd-r span{color:#6b6b76;width:78px;flex:none}
+.skd-r s{color:#a0a0aa;max-width:34%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.skd-r i{font-style:normal;color:#8051ff;flex:none}
+.skd-r b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:4px;padding:0 3px;
+  background:linear-gradient(rgba(110,63,243,.2),rgba(110,63,243,.2)) no-repeat left 100%/0% 55%;transition:background-size .7s .25s ease}
+.skd-r.in b{background-size:100% 55%}
+
+/* commande : camion qui avance */
+.skf{padding:12px 12px 14px;border-radius:16px;background:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 4px 14px rgba(20,10,60,.06)}
+.skf-h{display:flex;align-items:center;gap:8px;font-size:15px}
+.skf-h span{flex:1;color:#6b6b76;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.skf-h em{font-style:normal;font-weight:600}
+.skf-bar{position:relative;height:6px;border-radius:3px;background:#ece8fb;margin:22px 0 2px}
+.skf-bar>i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:3px;background:linear-gradient(90deg,#6e3ff3,#5ec8ff);transition:width 1.5s cubic-bezier(.35,.8,.3,1)}
+.skf-tr{position:absolute;top:-19px;left:0;width:24px;height:16px;transition:left 1.5s cubic-bezier(.35,.8,.3,1)}
+.skf-tr *{fill:none;stroke:#6e3ff3;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+
+/* navigation */
+.skn{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:16px;background:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.08);font-weight:600;font-size:16px}
+.skn svg{width:22px;height:22px;stroke:#6e3ff3;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;animation:skaNudge 1s ease-in-out infinite}
+@keyframes skaNudge{50%{transform:translateX(5px)}}
+
+/* étapes */
+.ska-steps{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:7px;max-height:220px;transition:max-height .55s ease,opacity .4s,margin .55s ease}
+.ska-steps li{display:flex;align-items:center;gap:9px;font-size:13.5px;color:#a3a3ad;transition:color .3s}
+.ska-steps .d{width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:2px solid #dcd7ee;position:relative;flex:none;transition:background .3s,border-color .3s}
+.ska-steps li.on{color:#4b2bb8;font-weight:500}
+.ska-steps li.on .d{border-color:#e4dcff;border-top-color:#6e3ff3;animation:skaSpin .7s linear infinite}
+.ska-steps li.ok{color:#3f3f4a}
+.ska-steps li.ok .d{border-color:#10b981;background:#10b981}
+.ska-steps li.ok .d::after{content:"";position:absolute;left:3.6px;top:1px;width:3px;height:6px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) scale(0);animation:skaTick .3s .05s forwards}
+.ska-steps li.bad{color:#e11d48}
+.ska-steps li.bad .d{border-color:#f43f5e;background:#f43f5e}
+@keyframes skaTick{to{transform:rotate(45deg) scale(1)}}
+.ska.fold .ska-steps{max-height:0;opacity:0;margin-top:0;overflow:hidden}
+.ska-msg{margin-top:10px;font-size:14px;color:#e11d48}
+
+.ska-ft{display:flex;gap:8px;max-height:0;overflow:hidden;opacity:0;transition:max-height .5s,margin .5s,opacity .5s}
+.ska.done .ska-ft.has{max-height:54px;margin-top:12px;opacity:1}
+.ska-btn{flex:1;height:42px;border-radius:21px;border:0;font:inherit;font-weight:600;font-size:15px;color:#fff;background:linear-gradient(135deg,#7c4dff,#5a2fe0);box-shadow:0 6px 16px rgba(110,63,243,.35);transition:transform .15s}
+.ska-btn:active{transform:scale(.97)}
+
+/* ligne produit qui clignote après création */
+.prow.skflash{animation:skaFlash 2s ease}
+@keyframes skaFlash{0%,100%{background:transparent}20%,55%{background:rgba(128,81,255,.18)}}
+
+@media (prefers-reduced-motion:reduce){.ska,.ska *{animation-duration:.01s!important;transition-duration:.01s!important}}
