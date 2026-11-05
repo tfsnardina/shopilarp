@@ -4,8 +4,8 @@
 .ska-list:empty{display:none}
 .sk-ans.has-ska{max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 
-.ska{position:relative;border-radius:22px;padding:14px 14px 12px;background:linear-gradient(180deg,#fbfaff,#f5f2ff);color:#111;font-size:15px;line-height:1.3;letter-spacing:-.1px;text-align:left;white-space:normal;
-  box-shadow:0 10px 30px rgba(110,63,243,.14),inset 0 1px 0 rgba(255,255,255,.9);
+.ska{position:relative;border-radius:22px;padding:14px 14px 12px;background:rgba(255,255,255,.5);color:#111;font-size:15px;line-height:1.3;letter-spacing:-.1px;text-align:left;white-space:normal;
+  box-shadow:0 10px 30px rgba(20,20,24,.14),inset 0 1px 0 rgba(255,255,255,.9);
   opacity:0;transform:translateY(20px) scale(.93);filter:blur(6px);
   transition:opacity .45s ease,transform .65s cubic-bezier(.2,1.25,.3,1),filter .45s ease,box-shadow .6s ease;overflow:hidden}
 .ska.on{opacity:1;transform:none;filter:none}
@@ -15,7 +15,7 @@
 
 /* bordure dégradée qui tourne pendant le travail */
 .ska-bd{position:absolute;inset:0;border-radius:inherit;padding:1.5px;pointer-events:none;
-  background:linear-gradient(110deg,#6e3ff3,#b9a3ff,#5ec8ff,#ff7ad9,#6e3ff3);background-size:300% 100%;animation:skaBd 2s linear infinite;
+  background:linear-gradient(110deg,#2a2a2e,#9a9aa2,#d0d0d6,#34c38f,#2a2a2e);background-size:300% 100%;animation:skaBd 2s linear infinite;
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;transition:opacity .6s}
 @keyframes skaBd{to{background-position:-300% 0}}
 .ska.done .ska-bd{animation:none;background:linear-gradient(135deg,#34d399,#10b981);opacity:.85}
@@ -32,12 +32,12 @@
 .ska.done .ska-face,.ska.err .ska-face{animation:skaHop .65s cubic-bezier(.3,1.6,.5,1)}
 @keyframes skaHop{0%{transform:scale(1)}40%{transform:translateY(-9px) scale(1.14) rotate(8deg)}100%{transform:none}}
 .ska-ttl{flex:1;min-width:0;font-weight:600;font-size:15.5px;
-  background:linear-gradient(100deg,#6e3ff3 20%,#b9a3ff 45%,#6e3ff3 70%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:skaShim 1.6s linear infinite}
+  background:linear-gradient(100deg,#2a2a2e 20%,#9a9aa2 45%,#2a2a2e 70%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:skaShim 1.6s linear infinite}
 @keyframes skaShim{to{background-position:-120% 0}}
 .ska.done .ska-ttl,.ska.err .ska-ttl{animation:none;background:none;-webkit-text-fill-color:currentColor;color:#111}
 
 .ska-st{position:relative;width:26px;height:26px;flex:none}
-.ska-sp{position:absolute;inset:2px;border-radius:50%;border:2.5px solid #e4dcff;border-top-color:#6e3ff3;animation:skaSpin .8s linear infinite;transition:opacity .2s,transform .3s}
+.ska-sp{position:absolute;inset:2px;border-radius:50%;border:2.5px solid #dcdce0;border-top-color:#2a2a2e;animation:skaSpin .8s linear infinite;transition:opacity .2s,transform .3s}
 @keyframes skaSpin{to{transform:rotate(360deg)}}
 .ska-ck,.ska-er{position:absolute;inset:0;width:26px;height:26px;opacity:0;transform:scale(.3)}
 .ska-ck circle{fill:#10b981}.ska-er circle{fill:#f43f5e}
@@ -61,7 +61,7 @@
 .skp{display:flex;align-items:center;gap:12px;padding:10px;border-radius:16px;background:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 4px 14px rgba(20,10,60,.06);
   transition:transform .55s cubic-bezier(.2,1.3,.3,1),box-shadow .5s,opacity .45s,filter .45s}
 .skp+.skp{margin-top:8px}
-.skp.lift{transform:translateY(-2px) scale(1.015);box-shadow:0 0 0 .5px rgba(110,63,243,.25),0 14px 28px rgba(110,63,243,.2)}
+.skp.lift{transform:translateY(-2px) scale(1.015);box-shadow:0 0 0 .5px rgba(20,20,24,.25),0 14px 28px rgba(20,20,24,.2)}
 .skp-th{width:52px;height:52px;border-radius:13px;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:22px;overflow:hidden}
 .skp-th span{transform:scale(0);transition:transform .55s cubic-bezier(.3,1.8,.5,1)}
 .skp-th.rd span{transform:scale(1)}
@@ -71,13 +71,13 @@
 .skp-t{display:block;font-size:16px;font-weight:600;min-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .skp-t.sk{height:16px;width:68%;border-radius:6px}
 .skp-m{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:13px}
-.skp-m em{font-style:normal;padding:2px 9px;border-radius:999px;background:#f1eefc;color:#5b34d6;font-weight:600;opacity:0;transform:translateY(6px) scale(.88);transition:all .45s cubic-bezier(.3,1.6,.5,1)}
+.skp-m em{font-style:normal;padding:2px 9px;border-radius:999px;background:#efeff1;color:#3a3a40;font-weight:600;opacity:0;transform:translateY(6px) scale(.88);transition:all .45s cubic-bezier(.3,1.6,.5,1)}
 .skp-m em.in{opacity:1;transform:none}
 .skp-dot{width:10px;height:10px;border-radius:50%;background:#c9c9d1;flex:none;transition:transform .55s cubic-bezier(.3,2,.5,1),background .4s,box-shadow .4s}
 .skp-dot.in{transform:scale(1)}
 .skp-dot:not(.in){transform:scale(0)}
 .skp-dot.on{background:#10b981;box-shadow:0 0 0 4px rgba(16,185,129,.18)}
-.skp-dot.dr{background:#a78bfa;box-shadow:0 0 0 4px rgba(167,139,250,.2)}
+.skp-dot.dr{background:#9a9aa2;box-shadow:0 0 0 4px rgba(150,150,160,.2)}
 .skp-dot.un{background:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.18)}
 .skp-dot.ar{background:#9ca3af;box-shadow:0 0 0 4px rgba(156,163,175,.2)}
 .skp-lb{font-size:13px;color:#6b6b76;font-weight:500;min-width:64px;text-align:right}
@@ -96,7 +96,7 @@
 .skd-r s{color:#a0a0aa;max-width:34%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .skd-r i{font-style:normal;color:#8051ff;flex:none}
 .skd-r b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:4px;padding:0 3px;
-  background:linear-gradient(rgba(110,63,243,.2),rgba(110,63,243,.2)) no-repeat left 100%/0% 55%;transition:background-size .7s .25s ease}
+  background:linear-gradient(rgba(20,20,24,.2),rgba(20,20,24,.2)) no-repeat left 100%/0% 55%;transition:background-size .7s .25s ease}
 .skd-r.in b{background-size:100% 55%}
 
 /* commande : camion qui avance */
@@ -105,13 +105,13 @@
 .skf-h span{flex:1;color:#6b6b76;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .skf-h em{font-style:normal;font-weight:600}
 .skf-bar{position:relative;height:6px;border-radius:3px;background:#ece8fb;margin:22px 0 2px}
-.skf-bar>i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:3px;background:linear-gradient(90deg,#6e3ff3,#5ec8ff);transition:width 1.5s cubic-bezier(.35,.8,.3,1)}
+.skf-bar>i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:3px;background:linear-gradient(90deg,#2a2a2e,#d0d0d6);transition:width 1.5s cubic-bezier(.35,.8,.3,1)}
 .skf-tr{position:absolute;top:-19px;left:0;width:24px;height:16px;transition:left 1.5s cubic-bezier(.35,.8,.3,1)}
-.skf-tr *{fill:none;stroke:#6e3ff3;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.skf-tr *{fill:none;stroke:#2a2a2e;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
 
 /* navigation */
 .skn{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:16px;background:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.08);font-weight:600;font-size:16px}
-.skn svg{width:22px;height:22px;stroke:#6e3ff3;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;animation:skaNudge 1s ease-in-out infinite}
+.skn svg{width:22px;height:22px;stroke:#2a2a2e;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;animation:skaNudge 1s ease-in-out infinite}
 @keyframes skaNudge{50%{transform:translateX(5px)}}
 
 /* étapes */
@@ -119,7 +119,7 @@
 .ska-steps li{display:flex;align-items:center;gap:9px;font-size:13.5px;color:#a3a3ad;transition:color .3s}
 .ska-steps .d{width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:2px solid #dcd7ee;position:relative;flex:none;transition:background .3s,border-color .3s}
 .ska-steps li.on{color:#4b2bb8;font-weight:500}
-.ska-steps li.on .d{border-color:#e4dcff;border-top-color:#6e3ff3;animation:skaSpin .7s linear infinite}
+.ska-steps li.on .d{border-color:#dcdce0;border-top-color:#2a2a2e;animation:skaSpin .7s linear infinite}
 .ska-steps li.ok{color:#3f3f4a}
 .ska-steps li.ok .d{border-color:#10b981;background:#10b981}
 .ska-steps li.ok .d::after{content:"";position:absolute;left:3.6px;top:1px;width:3px;height:6px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) scale(0);animation:skaTick .3s .05s forwards}
@@ -131,12 +131,12 @@
 
 .ska-ft{display:flex;gap:8px;max-height:0;overflow:hidden;opacity:0;transition:max-height .5s,margin .5s,opacity .5s}
 .ska.done .ska-ft.has{max-height:54px;margin-top:12px;opacity:1}
-.ska-btn{flex:1;height:42px;border-radius:21px;border:0;font:inherit;font-weight:600;font-size:15px;color:#fff;background:linear-gradient(135deg,#7c4dff,#5a2fe0);box-shadow:0 6px 16px rgba(110,63,243,.35);transition:transform .15s}
+.ska-btn{flex:1;height:42px;border-radius:21px;border:0;font:inherit;font-weight:600;font-size:15px;color:#fff;background:linear-gradient(180deg,rgba(62,62,66,.94),rgba(16,16,18,.96));box-shadow:0 6px 16px rgba(20,20,24,.35);transition:transform .15s}
 .ska-btn:active{transform:scale(.97)}
 
 /* ligne produit qui clignote après création */
 .prow.skflash{animation:skaFlash 2s ease}
-@keyframes skaFlash{0%,100%{background:transparent}20%,55%{background:rgba(128,81,255,.18)}}
+@keyframes skaFlash{0%,100%{background:transparent}20%,55%{background:rgba(52,195,143,.18)}}
 
 @media (prefers-reduced-motion:reduce){.ska,.ska *{animation-duration:.01s!important;transition-duration:.01s!important}}
 
@@ -156,3 +156,26 @@
 @keyframes skBr4{0%{opacity:1}10%{opacity:1}20%{opacity:0}30%{opacity:0}40%{opacity:0}50%{opacity:0}60%{opacity:0}70%{opacity:1}80%{opacity:1}90%{opacity:1}}
 @keyframes skBr5{0%{opacity:1}10%{opacity:1}20%{opacity:1}30%{opacity:1}40%{opacity:0}50%{opacity:0}60%{opacity:0}70%{opacity:0}80%{opacity:1}90%{opacity:1}}
 .sk-thinking{font-size:15px!important;font-weight:400!important;letter-spacing:0!important;background:none!important;-webkit-text-fill-color:#4a4a4f!important;color:#4a4a4f!important;animation:none!important}
+
+/* ───────── Liquid Glass iOS (dock Sidekick + cartes d'actions) ───────── */
+.sk-ov .sk-glass,.sk-ov .ska,.sk-ov .skp{position:relative}
+.sk-ov .sk-glass{
+  background:linear-gradient(135deg,rgba(255,255,255,.58),rgba(255,255,255,.26))!important;
+  -webkit-backdrop-filter:blur(20px) saturate(190%) brightness(1.03);backdrop-filter:blur(20px) saturate(190%) brightness(1.03);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.95),inset 0 -1px 2px rgba(255,255,255,.4),0 0 0 .5px rgba(0,0,0,.07),0 10px 32px rgba(0,0,0,.10)!important}
+.sk-ov .sk-glass::before,.sk-ov .ska::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.2px;pointer-events:none;
+  background:linear-gradient(150deg,rgba(255,255,255,1),rgba(255,255,255,0) 38%,rgba(255,255,255,0) 62%,rgba(255,255,255,.85));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+/* feuille de réponse */
+.sk-ov.answered .sk-ov-dock{background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(255,255,255,.68));-webkit-backdrop-filter:blur(34px) saturate(190%);backdrop-filter:blur(34px) saturate(190%);box-shadow:inset 0 1px 1px rgba(255,255,255,.95),0 -14px 50px rgba(0,0,0,.14)}
+.sk-ov.answered .sk-card{background:linear-gradient(135deg,rgba(255,255,255,.7),rgba(255,255,255,.34))!important}
+/* cartes d'actions */
+.sk-ov .ska{background:linear-gradient(135deg,rgba(255,255,255,.66),rgba(255,255,255,.36));-webkit-backdrop-filter:blur(18px) saturate(180%);backdrop-filter:blur(18px) saturate(180%);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.95),0 0 0 .5px rgba(0,0,0,.07),0 12px 30px rgba(0,0,0,.09)}
+.sk-ov .ska.done{box-shadow:inset 0 1px 1px rgba(255,255,255,.95),0 0 0 1.5px rgba(52,195,143,.55),0 12px 30px rgba(52,195,143,.14)}
+.sk-ov .ska.err{box-shadow:inset 0 1px 1px rgba(255,255,255,.95),0 0 0 1.5px rgba(244,63,94,.5),0 12px 30px rgba(244,63,94,.12)}
+.sk-ov .skp{background:rgba(255,255,255,.62)!important;box-shadow:inset 0 1px 1px #fff,0 0 0 .5px rgba(0,0,0,.07),0 6px 18px rgba(0,0,0,.06)!important}
+.sk-ov .ska-btn{display:flex;align-items:center;justify-content:center;text-align:center;color:#fff;
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.35),inset 0 -1px 2px rgba(255,255,255,.08),0 8px 20px rgba(0,0,0,.22)}
+.sk-face svg,.ska-face svg{filter:grayscale(1) contrast(1.05)}
+.sk-ov .ska-ck circle{fill:#34c38f}
