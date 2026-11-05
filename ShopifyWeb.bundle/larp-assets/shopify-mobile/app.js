@@ -3434,7 +3434,7 @@
       var plan = { title: skT("fo_t"), done: skT("fo_d"), steps: skT("fo_s") }, n = skNum(a.number), o = n != null ? findOrder(Math.round(n)) : null;
       if (!o) { plan.err = skT("e_ord", a.number); return plan; }
       if (o.ful === "Fulfilled") { plan.err = skT("e_ful"); return plan; }
-      plan.nv = { k: "fulfill", n: o.n, name: o.c && o.c.name ? o.c.name : "", total: money(o.total) };
+      plan.nv = { k: "fulfill", n: String(o.n == null ? "" : o.n).replace(/^#/, ""), name: o.c && o.c.name ? o.c.name : "", total: money(o.total) + " " + (S.cur || "") };
       plan.pv = '<div class="skf"><div class="skf-h"><b>#' + o.n + "</b><span>" + esc(o.c && o.c.name ? o.c.name : "") + "</span><em>" + esc(money(o.total)) + '</em></div>' +
         '<div class="skf-bar"><i></i><svg class="skf-tr" viewBox="0 0 24 16"><path d="M1 2h14v10H1z"/><path d="M15 5h5l3 3v4h-8z"/><circle cx="6" cy="13" r="2"/><circle cx="19" cy="13" r="2"/></svg></div></div>';
       plan.onStep = function (i, card) {
