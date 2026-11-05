@@ -1158,9 +1158,11 @@ struct SKPreviewView: View {
                         HStack(spacing: 8) {
                             Text(c.label).font(.inter(14, .medium)).foregroundStyle(SK.sub)
                             Spacer(minLength: 4)
-                            Text(c.from).font(.inter(14, .medium)).foregroundStyle(SK.sub).strikethrough().lineLimit(1)
-                            Image(systemName: "arrow.right").font(.system(size: 11, weight: .bold)).foregroundStyle(SK.sub)
-                            Text(c.to).font(.inter(15, .bold)).foregroundStyle(SK.purple).lineLimit(1)
+                            if !c.from.isEmpty {
+                                Text(c.from).font(.inter(14, .medium)).foregroundStyle(SK.sub).strikethrough().lineLimit(1)
+                                Image(systemName: "arrow.right").font(.system(size: 11, weight: .bold)).foregroundStyle(SK.sub)
+                            }
+                            Text(c.to).font(.inter(15, .bold)).foregroundStyle(SK.ink).lineLimit(1)
                         }
                         .opacity(m.step >= 1 ? 1 : 0)
                         .offset(x: m.step >= 1 ? 0 : 14)
