@@ -3219,7 +3219,7 @@
      chaque action est exécutée pour de vrai (createProduct, setStatus, fulfill…) pendant qu'une carte s'anime. */
   var SKC = window.SIDEKICK_CFG || {};
   var skTok = 0;
-  var skNative = { on: false, seq: 0, plans: {} };
+  var skNative = { on: false, seq: 0, plans: {} }, skPending = "";
   var SK_L = {
     fr: {
       cp_t: "Création du produit", cp_d: "Produit créé", cp_s: ["Analyse de ta demande", "Rédaction de la fiche produit", "Réglage du prix et du stock", "Publication dans ta boutique"],
@@ -3621,7 +3621,7 @@
   function skNativeInfo(first) {
     var T = L10n;
     return {
-      mode: "sidekick", title: T("New conversation"), greeting: greeting().replace("!", ""), headline: T("How can I help?"), whatsNew: T("What\u2019s new?"), placeholder: T("Ask anything..."),
+      mode: "sidekick", title: T("New conversation"), greeting: greeting().replace("!", ""), headline: T("How can I help?"), whatsNew: T("What\u2019s new?"), placeholder: T("Work with Sidekick"), processing: T("Processing"),
       suggestions: ["How are sales today?", "What are my best sellers?", "Which orders need attention?", "Write a product description"].map(function (x) { return T(x); }),
       thread: skThread.map(function (m) { return { q: m.q, a: m.a }; }), first: first || ""
     };
@@ -3715,7 +3715,7 @@
       '<div class="sk-ov-row"><div class="sk-glass sk-card"><input id="skov-q" placeholder="Work with Sidekick" autocomplete="off" enterkeyhint="send">' +
       '<div class="sk-card-bar"><span class="sk-face">' + mascot() + '</span><span class="sk-fill"></span>' +
       '<button class="sk-ib" data-skplus aria-label="Attach">' + ic("plus") + '</button><button class="sk-ib" id="skov-go" aria-label="Voice">' + ic("mic") + "</button></div>" +
-      '<div class="sk-think"><span class="sk-face">' + mascot() + '</span><span class="sk-thinking">Thinking</span><span class="sk-fill"></span>' +
+      '<div class="sk-think"><span class="sk-dots"><i></i><i></i><i></i><i></i></span><span class="sk-thinking">Processing</span><span class="sk-fill"></span>' +
       '<button class="sk-ib" data-skplus aria-label="Attach">' + ic("plus") + '</button><button class="sk-ib sk-stop" data-skstop aria-label="Stop"><i></i></button></div></div>' +
       '<button class="sk-glass sk-circ sk-x" data-skclose aria-label="Close">' + ic("x") + "</button></div></div>";
     app.appendChild(el);
@@ -3727,7 +3727,7 @@
     function reset() { skTok++; clearTimeout(timer); clearInterval(typer); ans.classList.remove("has-ska"); el.classList.remove("thinking", "answered"); }
     function send() {
       var q = qi.value.trim(); if (!q) return;
-      hap(5); reset(); qi.value = ""; sync(); qi.blur();
+      hap(5); reset(); skPending = q; qi.value = ""; sync(); qi.blur();
       el.classList.add("thinking");
       var tok = ++skTok;
       skRun(q).then(function (res) {
@@ -3743,6 +3743,15 @@
         });
       });
     }
+    function expand() {
+      var f = el.classList.contains("thinking") ? skPending : null;
+      hap(5); reset(); closeSidekick();
+      setTimeout(function () { openSidekickChat(f, skThread); }, 360);
+    }
+    /* glisser vers le haut sur le dock : ouvre la conversation en grand */
+    var sy = null;
+    el.addEventListener("touchstart", function (e) { var t = e.target; sy = (t.closest && t.closest(".sk-ov-dock") && !(t.closest(".sk-ans.has-ska"))) ? e.touches[0].clientY : null; }, { passive: true });
+    el.addEventListener("touchend", function (e) { if (sy == null) return; var dy = sy - e.changedTouches[0].clientY; sy = null; if (dy > 48 && (el.classList.contains("answered") || el.classList.contains("thinking") || skThread.length)) expand(); }, { passive: true });
     qi.addEventListener("input", sync);
     qi.addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
     go.addEventListener("click", function () { if (qi.value.trim()) send(); else toast("Listening\u2026"); });
@@ -3751,7 +3760,7 @@
       if (!t) return;
       if (t.hasAttribute("data-skclose")) { hap(4); return closeSidekick(); }
       if (t.hasAttribute("data-skstop")) { hap(4); reset(); return setTimeout(function () { try { qi.focus({ preventScroll: true }); } catch (er) { } }, 80); }
-      if (t.hasAttribute("data-skexpand")) { hap(5); closeSidekick(); return setTimeout(function () { openSidekickChat(null, skThread); }, 360); }
+      if (t.hasAttribute("data-skexpand")) { expand(); return; }
       if (t.hasAttribute("data-skhist")) { hap(4); return toast("No previous chats"); }
       if (t.hasAttribute("data-skopts")) { hap(4); return toast("Private chat"); }
       if (t.hasAttribute("data-skplus")) { hap(4); return toast("Attachments are not available yet"); }
