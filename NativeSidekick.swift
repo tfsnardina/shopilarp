@@ -10,17 +10,17 @@ import UIKit
 // MARK: - Thème
 
 enum SK {
-    static let purple = Color(red: 0.43, green: 0.25, blue: 0.95)
-    static let lilac = Color(red: 0.73, green: 0.64, blue: 1.0)
-    static let sky = Color(red: 0.37, green: 0.78, blue: 1.0)
-    static let pink = Color(red: 1.0, green: 0.48, blue: 0.85)
+    static let purple = Color(white: 0.16)   // « accent » = noir doux (plus de violet)
+    static let lilac = Color(white: 0.55)
+    static let sky = Color(white: 0.74)
+    static let pink = Color(red: 0.20, green: 0.72, blue: 0.50)
     static let green = Color(red: 0.20, green: 0.72, blue: 0.50)
     static let red = Color(red: 0.96, green: 0.25, blue: 0.37)
     static let amber = Color(red: 0.98, green: 0.72, blue: 0.20)
     static let ink = Color(white: 0.07)
     static let sub = Color(white: 0.42)
     static let bg = Color.white
-    static let confetti: [Color] = [purple, sky, pink, Color(red: 1.0, green: 0.82, blue: 0.40), green]
+    static let confetti: [Color] = [purple, sky, lilac, Color(white: 0.9), green]
 
     static func statusColor(_ key: String) -> Color {
         switch key {
@@ -202,7 +202,11 @@ struct SKPlan {
 
     private static func parse(_ nv: [String: Any]?) -> SKPreview {
         guard let nv = nv, let k = nv["k"] as? String else { return .none }
-        func s(_ key: String) -> String { (nv[key] as? String) ?? "" }
+        func s(_ key: String) -> String {
+            if let v = nv[key] as? String { return v }
+            if let n = nv[key] as? NSNumber { return n.stringValue }
+            return ""
+        }
         switch k {
         case "create":
             return .create(title: s("title"), price: s("price"), stock: s("stock"),
@@ -493,9 +497,9 @@ struct SKHeader: View {
                 SKCircleButton(icon: "square.and.pencil") { SK.tap(); model.reset() }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 6)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 20)
+        .padding(.top, 26)
+        .padding(.bottom, 12)
     }
 }
 
@@ -685,10 +689,10 @@ struct SKMascot: View {
         Canvas { ctx, size in
             let s = size.width / 40
             func P(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: x * s, y: y * s) }
-            let navy = Color(red: 0.12, green: 0.16, blue: 0.35)
+            let navy = Color(white: 0.12)
 
             ctx.fill(Path(ellipseIn: CGRect(x: 0, y: 0, width: 40 * s, height: 40 * s)),
-                     with: .color(Color(red: 0.96, green: 0.95, blue: 1.0)))
+                     with: .color(Color(white: 0.95)))
 
             var hair = Path()
             hair.move(to: P(8, 17))
@@ -701,7 +705,7 @@ struct SKMascot: View {
 
             ctx.fill(Path(ellipseIn: CGRect(x: 8.5 * s, y: 12 * s, width: 23 * s, height: 22 * s)), with: .color(.white))
             ctx.fill(Path(roundedRect: CGRect(x: 8.5 * s, y: 20.5 * s, width: 23 * s, height: 6.5 * s), cornerRadius: 3 * s),
-                     with: .color(Color(red: 0.43, green: 0.25, blue: 0.95)))
+                     with: .color(Color(white: 0.34)))
             for cx in [14.5, 25.5] {
                 ctx.fill(Path(ellipseIn: CGRect(x: (cx - 2.5) * s, y: 21.2 * s, width: 5 * s, height: 5 * s)), with: .color(.white))
                 ctx.fill(Path(ellipseIn: CGRect(x: (cx - 1.1) * s, y: 22.6 * s, width: 2.2 * s, height: 2.2 * s)), with: .color(navy))
@@ -724,9 +728,9 @@ struct SKActionCard: View {
 
     private var tint: Color {
         switch m.phase {
-        case .done: return SK.green.opacity(0.07)
-        case .failed: return SK.red.opacity(0.08)
-        default: return Color.white.opacity(0.35)
+        case .done: return SK.green.opacity(0.05)
+        case .failed: return SK.red.opacity(0.06)
+        default: return Color.clear
         }
     }
 
@@ -751,13 +755,15 @@ struct SKActionCard: View {
                             .padding(.vertical, 15)
                     }
                     .buttonStyle(.plain)
-                    .skGlass(Capsule(), tint: SK.purple, interactive: true)
+                    .skGlass(Capsule(), tint: SK.ink, interactive: true)
                     .transition(.scale(scale: 0.9).combined(with: .opacity))
                 }
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .skGlass(shape, tint: tint)
+            .background(shape.fill(Color.white.opacity(0.82)))
+            .background(shape.fill(tint))
+            .skGlass(shape)
             .overlay(SKBorder(phase: m.phase))
             .overlay(SKShine(on: m.phase == .done))
             .overlay(alignment: .topTrailing) {
@@ -1111,8 +1117,7 @@ struct SKPreviewView: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(m.step >= 1
-                                  ? AnyShapeStyle(LinearGradient(colors: [Color(hue: hue / 360, saturation: 0.78, brightness: 0.96),
-                                                                          Color(hue: ((hue + 35).truncatingRemainder(dividingBy: 360)) / 360, saturation: 0.82, brightness: 0.82)],
+                                  ? AnyShapeStyle(LinearGradient(colors: [Color(white: 0.42), Color(white: 0.22)],
                                                                  startPoint: .topLeading, endPoint: .bottomTrailing))
                                   : AnyShapeStyle(Color.black.opacity(0.07)))
                         Text(String(title.prefix(1)).uppercased())
