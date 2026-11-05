@@ -19,7 +19,7 @@ enum SK {
     static let amber = Color(red: 0.98, green: 0.72, blue: 0.20)
     static let ink = Color(white: 0.07)
     static let sub = Color(white: 0.42)
-    static let bg = Color(red: 0.975, green: 0.975, blue: 0.993)
+    static let bg = Color.white
     static let confetti: [Color] = [purple, sky, pink, Color(red: 1.0, green: 0.82, blue: 0.40), green]
 
     static func statusColor(_ key: String) -> Color {
@@ -88,6 +88,7 @@ struct SKInfo {
     var suggestions: [String] = []
     var thread: [(q: String, a: String)] = []
     var first = ""
+    var processing = "Processing"
 
     init(_ d: [String: Any]) {
         title = (d["title"] as? String) ?? title
@@ -97,6 +98,7 @@ struct SKInfo {
         placeholder = (d["placeholder"] as? String) ?? placeholder
         suggestions = (d["suggestions"] as? [String]) ?? []
         first = (d["first"] as? String) ?? ""
+        processing = (d["processing"] as? String) ?? processing
         thread = ((d["thread"] as? [[String: Any]]) ?? []).map {
             (q: ($0["q"] as? String) ?? "", a: ($0["a"] as? String) ?? "")
         }
@@ -448,15 +450,7 @@ struct SKRootView: View {
 }
 
 struct SKBackdrop: View {
-    var body: some View {
-        ZStack {
-            SK.bg
-            Circle().fill(SK.purple.opacity(0.20)).frame(width: 320).blur(radius: 80).offset(x: -150, y: -260)
-            Circle().fill(SK.sky.opacity(0.22)).frame(width: 300).blur(radius: 80).offset(x: 170, y: 40)
-            Circle().fill(SK.pink.opacity(0.14)).frame(width: 280).blur(radius: 90).offset(x: -120, y: 330)
-        }
-        .ignoresSafeArea()
-    }
+    var body: some View { Color.white.ignoresSafeArea() }
 }
 
 // MARK: - En-tête
@@ -483,24 +477,21 @@ struct SKHeader: View {
     @ObservedObject var model: SKChatModel
 
     var body: some View {
-        ZStack {
-            Menu {
-                Button { model.reset() } label: { Label(model.info.title, systemImage: "square.and.pencil") }
-            } label: {
+        SKGlassContainer(spacing: 12) {
+            HStack(spacing: 12) {
+                SKCircleButton(icon: "xmark") { SK.tap(); model.dismiss?() }
                 HStack(spacing: 6) {
-                    Text(model.info.title).font(.inter(23, .bold))
-                    Image(systemName: "chevron.down").font(.system(size: 13, weight: .bold))
+                    Text(model.info.title).font(.inter(18, .medium)).lineLimit(1)
+                    Image(systemName: "chevron.down").font(.system(size: 12, weight: .semibold))
                 }
-                .foregroundStyle(SK.ink)
-            }
-            HStack {
-                SKCircleButton(icon: "chevron.left") { SK.tap(); model.dismiss?() }
-                Spacer()
-                SKCircleButton(icon: "eye") { SK.tap() }
+                .foregroundStyle(Color(white: 0.3))
+                .frame(maxWidth: .infinity)
+                SKCircleButton(icon: "square.and.pencil") { SK.tap(); model.reset() }
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
     }
 }
 
@@ -542,20 +533,20 @@ struct SKTurnView: View {
             HStack {
                 Spacer(minLength: 56)
                 Text(turn.text)
-                    .font(.inter(19, .medium))
+                    .font(.inter(18, .regular))
                     .foregroundStyle(SK.ink)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 14)
-                    .skGlass(RoundedRectangle(cornerRadius: 26, style: .continuous), tint: SK.purple.opacity(0.10))
+                    .background(Color(white: 0.925), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             }
             .transition(.move(edge: .trailing).combined(with: .opacity))
         } else {
             VStack(alignment: .leading, spacing: 14) {
                 if turn.typing {
-                    SKTyping()
+                    SKProcessing(label: model.info.processing)
                 } else if !turn.text.isEmpty {
                     Text(turn.text)
-                        .font(.inter(19, .semibold))
+                        .font(.inter(18, .regular))
                         .foregroundStyle(SK.ink)
                         .lineSpacing(5)
                         .fixedSize(horizontal: false, vertical: true)
@@ -563,28 +554,52 @@ struct SKTurnView: View {
                 ForEach(turn.cards) { c in
                     SKActionCard(m: c) { model.bridge.button(c.replyID, c.index) }
                 }
+                if !turn.typing && !turn.text.isEmpty && !turn.isUser && turn.cards.allSatisfy({ $0.phase != .working && $0.phase != .waiting }) {
+                    HStack(spacing: 22) {
+                        ForEach(["doc.on.doc", "hand.thumbsup", "hand.thumbsdown"], id: \.self) { n in
+                            Button { SK.tap(.soft) } label: { Image(systemName: n).font(.system(size: 18, weight: .regular)) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    .foregroundStyle(Color(white: 0.3))
+                    .padding(.top, 2)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
 
-struct SKTyping: View {
+/// Icône de points qui s'allument + « Traitement en cours » (état d'attente de la réponse).
+struct SKProcessing: View {
+    let label: String
+    private let dots: [(x: CGFloat, y: CGFloat)] = [(3, 21), (14, 21), (14, 12), (14, 3)]
+
     var body: some View {
         TimelineView(.animation) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
-            HStack(spacing: 6) {
-                ForEach(0..<3, id: \.self) { i in
-                    let k = (sin(t * 5 - Double(i) * 0.8) + 1) / 2
-                    Circle()
-                        .fill(SK.purple.opacity(0.35 + 0.5 * k))
-                        .frame(width: 9, height: 9)
-                        .scaleEffect(0.75 + 0.35 * k)
+            let p = CGFloat((t * 0.55).truncatingRemainder(dividingBy: 1))
+            HStack(spacing: 14) {
+                ZStack(alignment: .topLeading) {
+                    ForEach(0..<dots.count, id: \.self) { i in
+                        let k = (sin(t * 5.5 - Double(i) * 0.7) + 1) / 2
+                        Circle()
+                            .fill(Color(white: 0.28))
+                            .frame(width: 4.5, height: 4.5)
+                            .scaleEffect(0.8 + 0.4 * k)
+                            .opacity(0.25 + 0.75 * k)
+                            .offset(x: dots[i].x, y: dots[i].y)
+                    }
                 }
+                .frame(width: 24, height: 26)
+                Text(label)
+                    .font(.inter(22, .regular))
+                    .foregroundStyle(
+                        LinearGradient(colors: [Color(white: 0.30), Color(white: 0.72), Color(white: 0.30)],
+                                       startPoint: UnitPoint(x: p * 2 - 1, y: 0.5),
+                                       endPoint: UnitPoint(x: p * 2, y: 0.5))
+                    )
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 15)
-            .skGlass(Capsule())
         }
     }
 }
@@ -618,43 +633,42 @@ struct SKInputBar: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
-            HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 TextField(model.info.placeholder, text: $model.input)
                     .font(.inter(19, .regular))
                     .focused($focused)
                     .submitLabel(.send)
                     .onSubmit { model.send(model.input) }
-                    .padding(.leading, 12)
-                Button { SK.tap() } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(SK.sub)
-                        .frame(width: 38, height: 38)
-                }
-                .buttonStyle(.plain)
-                Button {
-                    if hasText { model.send(model.input) } else { SK.tap() }
-                } label: {
-                    ZStack {
-                        Circle().fill(SK.ink)
-                        if hasText {
-                            Image(systemName: "arrow.up").font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
-                                .transition(.scale.combined(with: .opacity))
-                        } else {
-                            Image(systemName: "waveform").font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
-                                .transition(.scale.combined(with: .opacity))
-                        }
+                    .padding(.horizontal, 6)
+                HStack(spacing: 10) {
+                    SKMascot().frame(width: 30, height: 30)
+                    Spacer()
+                    Button { SK.tap() } label: {
+                        Image(systemName: "plus").font(.system(size: 22, weight: .regular))
+                            .foregroundStyle(Color(white: 0.3)).frame(width: 38, height: 38)
                     }
-                    .frame(width: 42, height: 42)
-                    .animation(.spring(response: 0.35, dampingFraction: 0.75), value: hasText)
+                    .buttonStyle(.plain)
+                    Button {
+                        if hasText { model.send(model.input) } else { SK.tap() }
+                    } label: {
+                        ZStack {
+                            if hasText {
+                                Circle().fill(SK.ink)
+                                Image(systemName: "arrow.up").font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
+                            } else {
+                                Image(systemName: "mic").font(.system(size: 22, weight: .regular)).foregroundStyle(Color(white: 0.3))
+                            }
+                        }
+                        .frame(width: 38, height: 38)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: hasText)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(model.busy && !hasText)
                 }
-                .buttonStyle(.plain)
-                .disabled(model.busy && !hasText)
             }
-            .padding(.leading, 12)
-            .padding(.trailing, 7)
-            .padding(.vertical, 7)
-            .skGlass(Capsule(), interactive: true)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .skGlass(RoundedRectangle(cornerRadius: 30, style: .continuous), interactive: true)
             .padding(.horizontal, 16)
         }
         .padding(.top, 6)
@@ -708,9 +722,9 @@ struct SKActionCard: View {
 
     private var tint: Color {
         switch m.phase {
-        case .done: return SK.green.opacity(0.12)
-        case .failed: return SK.red.opacity(0.12)
-        default: return SK.purple.opacity(0.10)
+        case .done: return SK.green.opacity(0.07)
+        case .failed: return SK.red.opacity(0.08)
+        default: return Color.white.opacity(0.35)
         }
     }
 
@@ -1210,8 +1224,13 @@ final class SidekickViewController: UIHostingController<SKRootView> {
         let m = SKChatModel(info: SKInfo(info), bridge: bridge)
         model = m
         super.init(rootView: SKRootView(model: m))
-        modalPresentationStyle = .fullScreen
-        view.backgroundColor = .clear
+        modalPresentationStyle = .pageSheet
+        if let sheet = sheetPresentationController {
+            sheet.detents = [.large()]
+            sheet.prefersGrabberVisible = true
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = false
+        }
+        view.backgroundColor = .white
         m.dismiss = { [weak self] in self?.dismiss(animated: true) }
     }
 
