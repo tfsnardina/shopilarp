@@ -39,6 +39,8 @@ enum SK {
 // MARK: - Liquid Glass (avec repli iOS < 26)
 
 extension View {
+    /// Verre fin et transparent : variante `.clear` + liseré et ombre légers (pas de gris sur fond blanc).
+    /// Avec une teinte (bouton principal), on garde le verre normal.
     @ViewBuilder
     func skGlass<S: Shape>(_ shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
         #if compiler(>=6.2)
@@ -46,15 +48,17 @@ extension View {
             if let tint = tint {
                 self.glassEffect(.regular.tint(tint).interactive(interactive), in: shape)
             } else {
-                self.glassEffect(.regular.interactive(interactive), in: shape)
+                self.glassEffect(.clear.interactive(interactive), in: shape)
+                    .overlay(shape.stroke(Color.black.opacity(0.07), lineWidth: 0.7))
+                    .shadow(color: Color.black.opacity(0.06), radius: 10, y: 3)
             }
         } else {
             self.background(.ultraThinMaterial, in: shape)
-                .overlay(shape.stroke(Color.white.opacity(0.55), lineWidth: 0.6))
+                .overlay(shape.stroke(Color.black.opacity(0.08), lineWidth: 0.6))
         }
         #else
         self.background(.ultraThinMaterial, in: shape)
-            .overlay(shape.stroke(Color.white.opacity(0.55), lineWidth: 0.6))
+            .overlay(shape.stroke(Color.black.opacity(0.08), lineWidth: 0.6))
         #endif
     }
 }
@@ -570,36 +574,34 @@ struct SKTurnView: View {
     }
 }
 
-/// Icône de points qui s'allument + « Traitement en cours » (état d'attente de la réponse).
+/// Spinner « braille » (6 points qui s'allument en boucle) + « Traitement en cours », petit et discret.
 struct SKProcessing: View {
     let label: String
-    private let dots: [(x: CGFloat, y: CGFloat)] = [(3, 21), (14, 21), (14, 12), (14, 3)]
+    /// Points allumés à chaque image (colonne * 3 + ligne), 10 images de ~83 ms comme dans l'animation de référence.
+    private static let frames: [[Int]] = [
+        [3, 4, 2, 5], [4, 2, 5], [1, 2, 5], [0, 1, 2, 5], [0, 1, 2],
+        [0, 3, 1, 2], [0, 3, 1], [0, 3, 4], [0, 3, 4, 5], [3, 4, 5],
+    ]
+    private let pitch: CGFloat = 5.0
+    private let dia: CGFloat = 2.4
 
     var body: some View {
-        TimelineView(.animation) { tl in
-            let t = tl.date.timeIntervalSinceReferenceDate
-            let p = CGFloat((t * 0.55).truncatingRemainder(dividingBy: 1))
-            HStack(spacing: 14) {
-                ZStack(alignment: .topLeading) {
-                    ForEach(0..<dots.count, id: \.self) { i in
-                        let k = (sin(t * 5.5 - Double(i) * 0.7) + 1) / 2
-                        Circle()
-                            .fill(Color(white: 0.28))
-                            .frame(width: 4.5, height: 4.5)
-                            .scaleEffect(0.8 + 0.4 * k)
-                            .opacity(0.25 + 0.75 * k)
-                            .offset(x: dots[i].x, y: dots[i].y)
+        HStack(spacing: 9) {
+            TimelineView(.animation) { tl in
+                let idx = Int(tl.date.timeIntervalSinceReferenceDate / 0.0833) % SKProcessing.frames.count
+                let lit = SKProcessing.frames[idx]
+                Canvas { ctx, _ in
+                    for d in 0..<6 where lit.contains(d) {
+                        let col = CGFloat(d / 3), row = CGFloat(d % 3)
+                        let r = CGRect(x: col * pitch, y: row * pitch, width: dia, height: dia)
+                        ctx.fill(Path(ellipseIn: r), with: .color(Color(white: 0.24)))
                     }
                 }
-                .frame(width: 24, height: 26)
-                Text(label)
-                    .font(.inter(22, .regular))
-                    .foregroundStyle(
-                        LinearGradient(colors: [Color(white: 0.30), Color(white: 0.72), Color(white: 0.30)],
-                                       startPoint: UnitPoint(x: p * 2 - 1, y: 0.5),
-                                       endPoint: UnitPoint(x: p * 2, y: 0.5))
-                    )
+                .frame(width: pitch + dia, height: pitch * 2 + dia)
             }
+            Text(label)
+                .font(.inter(15, .regular))
+                .foregroundStyle(Color(white: 0.29))
         }
     }
 }
