@@ -3715,7 +3715,7 @@
       '<div class="sk-ov-row"><div class="sk-glass sk-card"><input id="skov-q" placeholder="Work with Sidekick" autocomplete="off" enterkeyhint="send">' +
       '<div class="sk-card-bar"><span class="sk-face">' + mascot() + '</span><span class="sk-fill"></span>' +
       '<button class="sk-ib" data-skplus aria-label="Attach">' + ic("plus") + '</button><button class="sk-ib" id="skov-go" aria-label="Voice">' + ic("mic") + "</button></div>" +
-      '<div class="sk-think"><span class="sk-dots"><i></i><i></i><i></i><i></i></span><span class="sk-thinking">Processing</span><span class="sk-fill"></span>' +
+      '<div class="sk-think"><span class="sk-dots"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="sk-thinking">Processing</span><span class="sk-fill"></span>' +
       '<button class="sk-ib" data-skplus aria-label="Attach">' + ic("plus") + '</button><button class="sk-ib sk-stop" data-skstop aria-label="Stop"><i></i></button></div></div>' +
       '<button class="sk-glass sk-circ sk-x" data-skclose aria-label="Close">' + ic("x") + "</button></div></div>";
     app.appendChild(el);
