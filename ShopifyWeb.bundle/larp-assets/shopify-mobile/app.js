@@ -3227,6 +3227,11 @@
       dl_t: "Suppression du produit", dl_d: "Produit supprimé", dl_s: ["Recherche du produit", "Retrait de la boutique", "Nettoyage"],
       st_t: "Changement de statut", st_d: "Statut mis à jour", st_s: ["Sélection des produits", "Mise à jour du statut"],
       fo_t: "Traitement de la commande", fo_d: "Commande traitée", fo_s: ["Vérification de la commande", "Génération du suivi", "Envoi au client"],
+      bp_t: "Modification des prix", bp_d: "Prix mis à jour", bp_s: ["Sélection des produits", "Calcul des nouveaux prix", "Application des prix"], bp_n: function (n) { return n + " produits"; },
+      fa_t: "Traitement des commandes", fa_d: "Commandes traitées", fa_s: ["Vérification des commandes", "Génération des suivis", "Envoi aux clients"], fa_n: function (n) { return n + " commandes"; }, e_noord: "Aucune commande à traiter.",
+      dp_t: "Duplication du produit", dp_d: "Produit dupliqué", dp_c: "(copie)",
+      tg_t: "Mise à jour des tags", tg_d: "Tags mis à jour", tg_s: ["Sélection des produits", "Mise à jour des tags"], f_tags: "Tags",
+      no_t: "Ajout de la note", no_d: "Note ajoutée", no_s: ["Recherche de la commande", "Enregistrement de la note"], f_note: "Note", b_orders: "Voir les commandes",
       go_t: function (n) { return "Ouverture : " + n; }, go_d: "C’est ouvert", go_s: ["Navigation"],
       f_title: "Nom", f_price: "Prix", f_compare: "Prix barré", f_inv: "Stock", f_status: "Statut", f_type: "Type", f_vendor: "Fournisseur", f_vars: "Variantes", f_desc: "Description",
       sn: { Active: "Actif", Draft: "Brouillon", Archived: "Archivé", Unlisted: "Non listé" },
@@ -3243,6 +3248,11 @@
       dl_t: "Deleting the product", dl_d: "Product deleted", dl_s: ["Finding the product", "Removing from your store", "Cleaning up"],
       st_t: "Changing status", st_d: "Status updated", st_s: ["Selecting products", "Updating the status"],
       fo_t: "Fulfilling the order", fo_d: "Order fulfilled", fo_s: ["Checking the order", "Generating tracking", "Notifying the customer"],
+      bp_t: "Updating prices", bp_d: "Prices updated", bp_s: ["Selecting products", "Computing new prices", "Applying prices"], bp_n: function (n) { return n + " products"; },
+      fa_t: "Fulfilling orders", fa_d: "Orders fulfilled", fa_s: ["Checking the orders", "Generating tracking", "Notifying customers"], fa_n: function (n) { return n + " orders"; }, e_noord: "No order to fulfill.",
+      dp_t: "Duplicating the product", dp_d: "Product duplicated", dp_c: "(copy)",
+      tg_t: "Updating tags", tg_d: "Tags updated", tg_s: ["Selecting products", "Updating the tags"], f_tags: "Tags",
+      no_t: "Adding the note", no_d: "Note added", no_s: ["Finding the order", "Saving the note"], f_note: "Note", b_orders: "View orders",
       go_t: function (n) { return "Opening: " + n; }, go_d: "Opened", go_s: ["Navigating"],
       f_title: "Name", f_price: "Price", f_compare: "Compare-at", f_inv: "Stock", f_status: "Status", f_type: "Type", f_vendor: "Vendor", f_vars: "Variants", f_desc: "Description",
       sn: { Active: "Active", Draft: "Draft", Archived: "Archived", Unlisted: "Unlisted" },
@@ -3314,6 +3324,26 @@
   }
 
   /* ── Les actions : chaque plan décrit la carte (titre, étapes, aperçu) et l'exécution réelle (commit) ── */
+
+  /* ── Outils des actions avancées ── */
+  function skPick(refs) {
+    var list = [];
+    if (typeof refs === "string" || typeof refs === "number") refs = [refs];
+    if (!Array.isArray(refs)) refs = [];
+    var all = refs.some(function (r) { return /^(all|tous|toutes|\*)$/i.test(String(r).trim()); });
+    if (all) list = prods.slice(); else refs.forEach(function (r) { var p = skFind(r); if (p && list.indexOf(p) < 0) list.push(p); });
+    return { list: list, refs: refs };
+  }
+  function skRowsPv(title, ch) {
+    return '<div class="skp"><div class="skp-tx"><b class="skp-t">' + esc(title) + '</b></div></div><div class="skd">' +
+      ch.map(function (c) { return '<div class="skd-r"><span>' + esc(c.l) + "</span><s>" + esc(c.from) + "</s>" + (c.from ? "<i>\u2192</i>" : "") + "<b>" + esc(c.to) + "</b></div>"; }).join("") + "</div>";
+  }
+  function skRowsStep(i, card) {
+    if (i === 1) $$(".skd-r", card).forEach(function (r, k) { setTimeout(function () { r.classList.add("in"); }, Math.min(k, 6) * 200); });
+    if (i === 2) { var sp = $(".skp", card); if (sp) sp.classList.add("lift"); }
+  }
+  function skBtnList() { return { l: skT("b_list"), fn: function () { skOpen(function () { navigate("products"); }); } }; }
+
   var SK_ACT = {
     create_product: function (a) {
       var plan = { title: skT("cp_t"), done: skT("cp_d"), steps: skT("cp_s") }, title = String(a.title || "").trim().slice(0, 120);
@@ -3452,6 +3482,104 @@
       return plan;
     },
 
+
+    adjust_stock: function (a) {
+      var p = skFind(a.product);
+      if (!p) return SK_ACT.update_product(a);
+      var d = skNum(a.delta), v = skNum(a.set != null ? a.set : a.inventory), t = v != null ? v : d != null ? p.inv + d : null;
+      if (t == null) return { title: skT("up_t"), done: skT("up_d"), steps: skT("up_s"), err: skT("e_bad") };
+      return SK_ACT.update_product({ product: a.product, inventory: Math.max(0, Math.round(t)) });
+    },
+
+    bulk_price: function (a) {
+      var plan = { title: skT("bp_t"), done: skT("bp_d"), steps: skT("bp_s") }, pk = skPick(a.products != null ? a.products : a.product), list = pk.list;
+      if (!list.length) { plan.err = skT("e_prod", pk.refs.join(", ") || "?"); return plan; }
+      var f = Math.pow(10, S.dec != null ? S.dec : 2), pc = skNum(a.percent), am = skNum(a.amount), st = skNum(a.set), rows = [];
+      if (pc == null && am == null && st == null) { plan.err = skT("e_bad"); return plan; }
+      list.forEach(function (p) {
+        var np = st != null ? st : pc != null ? (p.price / f) * (1 + pc / 100) : (p.price / f) + am;
+        np = Math.max(0, Math.round(np * f) / f);
+        if (Math.round(np * f) !== p.price) rows.push({ p: p, np: np });
+      });
+      if (!rows.length) { plan.err = skT("e_none"); return plan; }
+      rows = rows.slice(0, 40);
+      var ch = rows.slice(0, 5).map(function (r) { return { l: skShort(r.p.title, 14), from: money(r.p.price), to: skMoney(r.np) }; });
+      if (rows.length > 5) ch.push({ l: "+" + (rows.length - 5), from: "", to: "" });
+      plan.nv = { k: "update", title: skT("bp_n", rows.length), changes: ch };
+      plan.pv = skRowsPv(skT("bp_n", rows.length), ch); plan.onStep = skRowsStep;
+      plan.commit = function () {
+        rows.forEach(function (r) { var info = nativeProductInfo(r.p); info.price = r.np; window.__larpNativeProductUpdate(info); });
+        rendered.products = 0; if (current === "products") renderProducts();
+        return { ok: true, btn: skBtnList() };
+      };
+      return plan;
+    },
+
+    fulfill_orders: function (a) {
+      var plan = { title: skT("fa_t"), done: skT("fa_d"), steps: skT("fa_s") }, refs = a.numbers != null ? a.numbers : a.number, list = [];
+      if (typeof refs === "string" || typeof refs === "number") refs = [refs];
+      if (!Array.isArray(refs)) refs = [];
+      var all = refs.some(function (r) { return /^(all|tous|toutes|\*)$/i.test(String(r).trim()); });
+      if (all) list = unfulfilled().slice(); else refs.forEach(function (r) { var n = skNum(r), o = n != null ? findOrder(Math.round(n)) : null; if (o && o.ful !== "Fulfilled" && list.indexOf(o) < 0) list.push(o); });
+      if (!list.length) { plan.err = skT("e_noord"); return plan; }
+      list = list.slice(0, 15);
+      var ch = list.slice(0, 5).map(function (o) { return { l: "#" + o.n, from: "", to: skShort((o.c && o.c.name ? o.c.name + " \u00b7 " : "") + money(o.total), 22) }; });
+      if (list.length > 5) ch.push({ l: "+" + (list.length - 5), from: "", to: "" });
+      plan.nv = { k: "update", title: skT("fa_n", list.length), changes: ch };
+      plan.pv = skRowsPv(skT("fa_n", list.length), ch); plan.onStep = skRowsStep;
+      plan.commit = function () {
+        list.forEach(function (o) { var pl = SK_ACT.fulfill_order({ number: o.n }); if (!pl.err && pl.commit) pl.commit(); });
+        return { ok: true, btn: { l: skT("b_orders"), fn: function () { skOpen(function () { navigate("orders"); }); } } };
+      };
+      return plan;
+    },
+
+    duplicate_product: function (a) {
+      var p = skFind(a.product);
+      if (!p) return { title: skT("dp_t"), done: skT("dp_d"), steps: skT("up_s"), err: skT("e_prod", a.product) };
+      var f = Math.pow(10, S.dec != null ? S.dec : 2), t = String(a.title || "").trim() || (p.title + " " + skT("dp_c"));
+      var plan = SK_ACT.create_product({ title: t, price: p.price / f, compare_at: p.compare ? p.compare / f : 0, inventory: p.inv, status: "Draft", type: p.type === "General" ? "" : p.type, vendor: p.vendor,
+        variants: p.vnames[0] === "Default" ? "" : p.vnames.join(", "), description: p.desc || "", tags: p.tags || [] });
+      plan.title = skT("dp_t"); plan.done = skT("dp_d");
+      return plan;
+    },
+
+    tag_products: function (a) {
+      var plan = { title: skT("tg_t"), done: skT("tg_d"), steps: skT("tg_s") }, pk = skPick(a.products != null ? a.products : a.product), list = pk.list;
+      if (!list.length) { plan.err = skT("e_prod", pk.refs.join(", ") || "?"); return plan; }
+      var add = (Array.isArray(a.add) ? a.add : a.add ? [a.add] : []).map(String), rem = (Array.isArray(a.remove) ? a.remove : a.remove ? [a.remove] : []).map(String), rows = [];
+      if (!add.length && !rem.length) { plan.err = skT("e_bad"); return plan; }
+      list.forEach(function (p) {
+        var cur = (p.tags || []).slice(), nt = cur.filter(function (t) { return rem.indexOf(t) < 0; });
+        add.forEach(function (t) { if (nt.indexOf(t) < 0) nt.push(t); });
+        if (nt.join("|") !== cur.join("|")) rows.push({ p: p, nt: nt.slice(0, 20), cur: cur });
+      });
+      if (!rows.length) { plan.err = skT("e_none"); return plan; }
+      var ch = rows.slice(0, 5).map(function (r) { return { l: skShort(r.p.title, 14), from: skShort(r.cur.join(", ") || "\u2013", 12), to: skShort(r.nt.join(", ") || "\u2013", 16) }; });
+      if (rows.length > 5) ch.push({ l: "+" + (rows.length - 5), from: "", to: "" });
+      plan.nv = { k: "update", title: skT("bp_n", rows.length), changes: ch };
+      plan.pv = skRowsPv(skT("bp_n", rows.length), ch); plan.onStep = skRowsStep;
+      plan.commit = function () {
+        rows.forEach(function (r) { var info = nativeProductInfo(r.p); info.tags = r.nt; window.__larpNativeProductUpdate(info); });
+        return { ok: true, btn: skBtnList() };
+      };
+      return plan;
+    },
+
+    note_order: function (a) {
+      var plan = { title: skT("no_t"), done: skT("no_d"), steps: skT("no_s") }, n = skNum(a.number), o = n != null ? findOrder(Math.round(n)) : null, note = String(a.note || "").trim().slice(0, 300);
+      if (!o) { plan.err = skT("e_ord", a.number); return plan; }
+      if (!note) { plan.err = skT("e_bad"); return plan; }
+      var ch = [{ l: skT("f_note"), from: skShort(o.note || "\u2013", 14), to: skShort(note, 24) }];
+      plan.nv = { k: "update", title: "#" + o.n + (o.c && o.c.name ? " " + o.c.name : ""), changes: ch };
+      plan.pv = skRowsPv("#" + o.n + (o.c && o.c.name ? " " + o.c.name : ""), ch); plan.onStep = skRowsStep;
+      plan.commit = function () {
+        o.note = note; saveState(); refreshAll();
+        return { ok: true, btn: { l: skT("b_ord"), fn: function () { skOpen(function () { openOrder(o.n); }); } } };
+      };
+      return plan;
+    },
+
     go: function (a) {
       var s = String(a.screen || "").toLowerCase(), label = skT("scr")[s], plan = { title: skT("go_t", label || s), done: skT("go_d"), steps: skT("go_s"), delay: 650 };
       if (!label) { plan.err = skT("e_bad"); return plan; }
@@ -3552,6 +3680,12 @@
     "- delete_product → {product}",
     "- set_status → {products: [titles or indexes] or [\"all\"], status: \"Active\"|\"Draft\"|\"Archived\"|\"Unlisted\"}",
     "- fulfill_order → {number}",
+    "- fulfill_orders → {numbers: [order numbers] or [\"all\"]} (fulfill several orders at once, max 15)",
+    "- adjust_stock → {product, delta? (+/- integer) or set? (integer)} (restock, remove stock)",
+    "- bulk_price → {products: [titles or indexes] or [\"all\"], percent? (e.g. -10 for -10%) or amount? (+/- in store currency) or set? (new price)}",
+    "- duplicate_product → {product, title?}",
+    "- tag_products → {products: [titles or indexes] or [\"all\"], add?: [strings], remove?: [strings]}",
+    "- note_order → {number, note}",
     "- open_product → {product}",
     "- open_order → {number}",
     "- go → {screen: \"home\"|\"orders\"|\"products\"|\"menu\"|\"customers\"|\"analytics\"|\"payouts\"|\"alerts\"|\"search\"}",
@@ -3562,18 +3696,28 @@
     "- Refer to existing products only with the exact titles or indexes from the product list in the store data. Never invent order numbers.",
     "- Put navigation actions (go, open_product, open_order) last, and at most one.",
     "- If a request is a destructive bulk operation and not explicit, ask for confirmation and return no actions.",
-    "- If asked for something you cannot do (refunds, emails, ads…), say so honestly and suggest what you can do.",
+    "- For questions and analysis, use the store data above: quote real numbers, compare periods (7d/30d/90d vs previous), name the products/orders/customers concerned, and finish with one concrete suggestion or next step you can do for them.",
+    "- You can chain several different actions in one answer (e.g. restock low-stock products AND fulfill orders AND open the orders screen). Order them logically.",
+    "- Interpret vague requests smartly: \"mes ruptures\" = products with stock 0 or <=5, \"mes commandes en attente\" = orders to fulfill, \"les invendus\" = products with sold 0. Use the data to pick the exact products.",
+    "- If asked for something you cannot do (refunds, emails, ads, discounts codes…), say so honestly and suggest what you can do.",
     "",
     "EXAMPLE",
     "User: crée un t-shirt noir à 25€ en S M L",
     "{\"reply\":\"Je crée ton t-shirt noir tout de suite ✨\",\"actions\":[{\"type\":\"create_product\",\"args\":{\"title\":\"T-shirt noir\",\"price\":25,\"inventory\":20,\"variants\":\"S, M, L\",\"status\":\"Active\",\"type\":\"T-shirts\",\"description\":\"Un t-shirt noir intemporel en coton doux, coupe regular.\",\"tags\":[\"t-shirt\",\"noir\"]}}]}"
   ].join("\n");
   function skContext() {
-    var R = rangeData("30d"), Rt = rangeData("today"), u = unfulfilled(), top = prods.slice().sort(function (x, y) { return y.sold - x.sold; }).slice(0, 3);
-    var pl = prods.slice(0, 60).map(function (p) { return p.i + ". " + p.title + " | " + money(p.price) + " | stock " + p.inv + " | " + p.status + (p.vnames[0] !== "Default" ? " | variants: " + p.vnames.join("/") : ""); });
-    return "Store: " + S.name + "\nCurrency: " + S.cur + " (" + String(S.sym).trim() + ")\nSales today: " + money(Rt.tot.s) + " from " + Rt.tot.o + " orders\nSales last 30 days: " + money(R.tot.s) + " from " + R.tot.o + " orders\nCustomers: " + count(S.custTotal) +
-      "\nOrders to fulfill (" + u.length + "): " + (u.slice(0, 12).map(function (o) { return "#" + o.n + (o.c ? " " + o.c.name : "") + " " + money(o.total); }).join("; ") || "none") +
-      "\nBest sellers: " + (top.map(function (p) { return p.title + " (" + p.sold + ")"; }).join(", ") || "none") +
+    var R = rangeData("30d"), Rt = rangeData("today"), R7 = rangeData("7d"), R90 = rangeData("90d"), u = unfulfilled(), top = prods.slice().sort(function (x, y) { return y.sold - x.sold; }).slice(0, 5);
+    var pl = prods.slice(0, 80).map(function (p) { return p.i + ". " + p.title + " | " + money(p.price) + " | stock " + p.inv + " | " + p.status + " | sold " + p.sold + (p.vnames[0] !== "Default" ? " | variants: " + p.vnames.join("/") : "") + (p.tags && p.tags.length ? " | tags: " + p.tags.join("/") : ""); });
+    var low = prods.filter(function (p) { return p.status === "Active" && p.inv <= 5; }).slice(0, 12).map(function (p) { return p.title + " (" + p.inv + ")"; });
+    var by = { Active: 0, Draft: 0, Archived: 0, Unlisted: 0 }; prods.forEach(function (p) { by[p.status] = (by[p.status] || 0) + 1; });
+    var recent = orders.slice(0, 12).map(function (o) { return "#" + o.n + " " + new Date(o.ts).toISOString().slice(0, 10) + " " + (o.c ? o.c.name : "-") + " " + money(o.total) + " " + o.pay + "/" + o.ful; });
+    var bestC = custs.slice().sort(function (a, b) { return b.spent - a.spent; }).slice(0, 5).map(function (c) { return c.name + " (" + money(c.spent) + ", " + c.n + " orders)"; });
+    var aov = R.tot.o ? money(Math.round(R.tot.s / R.tot.o)) : "-";
+    return "Today's date: " + new Date().toISOString().slice(0, 10) + "\nStore: " + S.name + "\nCurrency: " + S.cur + " (" + String(S.sym).trim() + ")\nSales today: " + money(Rt.tot.s) + " from " + Rt.tot.o + " orders\nSales last 7 days: " + money(R7.tot.s) + " from " + R7.tot.o + " orders (previous 7 days: " + money(R7.ptot.s) + ")\nSales last 30 days: " + money(R.tot.s) + " from " + R.tot.o + " orders (previous 30 days: " + money(R.ptot.s) + ")\nSales last 90 days: " + money(R90.tot.s) + " from " + R90.tot.o + " orders\nAverage order value (30d): " + aov + "\nCustomers: " + count(S.custTotal) +
+      "\nOrders to fulfill (" + u.length + "): " + (u.slice(0, 15).map(function (o) { return "#" + o.n + (o.c ? " " + o.c.name : "") + " " + money(o.total); }).join("; ") || "none") +
+      "\nPayments to capture: " + toCapture().length + "\nRecent orders: " + (recent.join("; ") || "none") +
+      "\nBest sellers (30d): " + (top.map(function (p) { return p.title + " (" + p.sold + ")"; }).join(", ") || "none") + "\nTop customers: " + (bestC.join("; ") || "none") +
+      "\nLow stock (<=5): " + (low.join(", ") || "none") + "\nProducts by status: Active " + by.Active + ", Draft " + by.Draft + ", Archived " + by.Archived + ", Unlisted " + by.Unlisted +
       "\nProducts (" + prods.length + "):\n" + (pl.join("\n") || "(no products yet)");
   }
   function skCall(messages) {
@@ -3583,7 +3727,7 @@
       var ctl = window.AbortController ? new AbortController() : null, to = setTimeout(function () { if (ctl) ctl.abort(); }, 30000);
       return fetch(SKC.endpoint || "https://api.groq.com/openai/v1/chat/completions", {
         method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key }, signal: ctl ? ctl.signal : undefined,
-        body: JSON.stringify({ model: models[i], messages: messages, temperature: 0.4, max_tokens: 1600, response_format: { type: "json_object" } })
+        body: JSON.stringify({ model: models[i], messages: messages, temperature: 0.4, max_tokens: 2400, response_format: { type: "json_object" } })
       }).then(function (r) {
         clearTimeout(to);
         return r.json().catch(function () { return {}; }).then(function (j) {
@@ -3622,7 +3766,7 @@
     var T = L10n;
     return {
       mode: "sidekick", title: T("New conversation"), greeting: greeting().replace("!", ""), headline: T("How can I help?"), whatsNew: T("What\u2019s new?"), placeholder: T("Work with Sidekick"), processing: T("Processing"),
-      suggestions: ["How are sales today?", "What are my best sellers?", "Which orders need attention?", "Write a product description"].map(function (x) { return T(x); }),
+      suggestions: ["How are sales today?", "Which products are low on stock?", "Fulfill all my orders", "Summarize my week", "What are my best sellers?"].map(function (x) { return T(x); }),
       thread: skThread.map(function (m) { return { q: m.q, a: m.a }; }), first: first || ""
     };
   }
